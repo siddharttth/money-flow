@@ -86,7 +86,14 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
       <div className="flex min-h-dvh">
         {/* Desktop sidebar */}
         <aside
-          className="hidden lg:flex flex-col w-60 shrink-0 border-r px-3 py-5 sticky top-0 h-dvh"
+          /*
+           * Fixed rather than sticky. `overflow-x: hidden` on <html> (needed so
+           * a stray wide element can never scroll the page sideways) silently
+           * disables position:sticky for every descendant, so the sidebar used
+           * to scroll away with the page. Fixed is immune to that, and the
+           * content column is offset by the same width below.
+           */
+          className="hidden lg:flex flex-col w-60 fixed left-0 top-0 bottom-0 z-40 border-r px-3 py-5 overflow-y-auto"
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
           <Link href="/dashboard" className="flex items-center gap-2 px-2 mb-6">
@@ -127,7 +134,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           </div>
         </aside>
 
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex-1 min-w-0 flex flex-col lg:ml-60">
           {/* Mobile header */}
           <header
             className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b"

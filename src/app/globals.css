@@ -58,60 +58,60 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #121218;
-    --surface: #1a1a21;
-    --surface-2: #23232c;
-    --border: #2c2c37;
-    --border-strong: #45455a;
-    --text: #f3f2f7;
-    --text-muted: #a9a9bd;
+  --bg: #000000;
+  --surface: #0a0a0d;
+  --surface-2: #141419;
+  --border: #1c1c23;
+  --border-strong: #33333f;
+  --text: #f4f4f7;
+  --text-muted: #9a9aa9;
 
-    --brass: #97a4ff;
-    --brass-bright: #b6c0ff;
-    --on-brass: #0b0b14;
-    --brass-soft: rgba(151, 164, 255, 0.12);
+  --brass: #8b9cff;
+  --brass-bright: #adb8ff;
+  --on-brass: #05050a;
+  --brass-soft: rgba(139, 156, 255, 0.13);
 
-    --rule-red: #ffb4ab;
-    --rule-red-soft: rgba(255, 180, 171, 0.12);
-    --credit: #6fd6a3;
-    --credit-soft: rgba(111, 214, 163, 0.12);
+  --rule-red: #ff9d92;
+  --rule-red-soft: rgba(255, 157, 146, 0.13);
+  --credit: #5fd3a0;
+  --credit-soft: rgba(95, 211, 160, 0.13);
 
-    --danger: #ffb4ab;
-    --success: #6fd6a3;
-    --accent: #97a4ff;
-    --accent-soft: rgba(151, 164, 255, 0.12);
+  --danger: #ff9d92;
+  --success: #5fd3a0;
+  --accent: #8b9cff;
+  --accent-soft: rgba(139, 156, 255, 0.13);
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
-    --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.8);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.9);
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #121218;
-  --surface: #1a1a21;
-  --surface-2: #23232c;
-  --border: #2c2c37;
-  --border-strong: #45455a;
-  --text: #f3f2f7;
-  --text-muted: #a9a9bd;
+  --bg: #000000;
+  --surface: #0a0a0d;
+  --surface-2: #141419;
+  --border: #1c1c23;
+  --border-strong: #33333f;
+  --text: #f4f4f7;
+  --text-muted: #9a9aa9;
 
-  --brass: #97a4ff;
-  --brass-bright: #b6c0ff;
-  --on-brass: #0b0b14;
-  --brass-soft: rgba(151, 164, 255, 0.12);
+  --brass: #8b9cff;
+  --brass-bright: #adb8ff;
+  --on-brass: #05050a;
+  --brass-soft: rgba(139, 156, 255, 0.13);
 
-  --rule-red: #ffb4ab;
-  --rule-red-soft: rgba(255, 180, 171, 0.12);
-  --credit: #6fd6a3;
-  --credit-soft: rgba(111, 214, 163, 0.12);
+  --rule-red: #ff9d92;
+  --rule-red-soft: rgba(255, 157, 146, 0.13);
+  --credit: #5fd3a0;
+  --credit-soft: rgba(95, 211, 160, 0.13);
 
-  --danger: #ffb4ab;
-  --success: #6fd6a3;
-  --accent: #97a4ff;
-  --accent-soft: rgba(151, 164, 255, 0.12);
+  --danger: #ff9d92;
+  --success: #5fd3a0;
+  --accent: #8b9cff;
+  --accent-soft: rgba(139, 156, 255, 0.13);
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
-  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.8);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.9);
 }
 
 @layer base {
@@ -250,6 +250,20 @@ h1, h2, h3 {
   }
 
   .muted { color: var(--text-muted); }
+
+  /*
+   * Grouping without boxing. A strip of related figures shares one surface and
+   * is separated by hairlines, instead of each figure getting its own card —
+   * four identical boxes in a row read as four unrelated things.
+   */
+  .hair-grid { gap: 1px; background: var(--border); }
+  .hair-grid > * { background: var(--surface); }
+
+  /* A quiet section rule, for headings that do not need a card around them. */
+  .hair {
+    height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
 
   .scroll-x {
     overflow-x: auto;

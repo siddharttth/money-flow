@@ -16,6 +16,51 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
   );
 }
 
+/**
+ * A section heading that sits on the page rather than inside a card — an
+ * uppercase label with a rule trailing off. Used to group content without
+ * wrapping every group in another box.
+ */
+export function SectionHead({
+  label,
+  action,
+}: {
+  label: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-4 mb-3.5">
+      <span className="label mb-0 shrink-0">{label}</span>
+      <span className="hair flex-1" aria-hidden />
+      {action}
+    </div>
+  );
+}
+
+/**
+ * Related figures on ONE surface, split by hairlines. Four separate cards in a
+ * row read as four unrelated things; this reads as one summary.
+ */
+export function StatStrip({ items }: { items: { label: string; minor?: number; value?: string; sub?: string }[] }) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 hair-grid">
+        {items.map((it) => (
+          <div key={it.label} className="px-4 py-3.5 sm:px-5 sm:py-4 min-w-0">
+            <p className="label mb-1 truncate">{it.label}</p>
+            {it.minor !== undefined ? (
+              <Money minor={it.minor} className="text-lg sm:text-xl font-semibold" />
+            ) : (
+              <p className="text-lg sm:text-xl font-semibold truncate">{it.value ?? '—'}</p>
+            )}
+            {it.sub && <p className="muted text-xs mt-1 truncate">{it.sub}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Consistent placeholder for "nothing here yet" across every list in the app. */
 export function EmptyState({
   icon = '🗒️',

@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { currentMonth, dayLabel, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { CategoryStat, Expense, ExpenseList, PersonStat, Summary } from '@/lib/types';
-import { Card, EmptyState, ErrorState, ListSkeleton, Money, SectionTitle, Skeleton, StatTile } from '@/components/ui';
+import { Card, EmptyState, ErrorState, ListSkeleton, Money, SectionHead, SectionTitle, Skeleton, StatStrip } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { CategoryDonut, DailyTrend, MonthlyBars, ShareBar } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
@@ -44,42 +44,44 @@ export default function DashboardPage() {
         <MonthPicker month={month} onChange={setMonth} />
       </div>
 
-      {/* Hero total */}
-      {/* The month total carries the brass rule — it is the one number that matters. */}
-      <Card className="relative overflow-hidden rule-brass">
+      {/* The month total is the page's subject — it gets air, not a card. */}
+      <div className="pt-1 pb-1">
         <p className="label">Total spending</p>
         {s ? (
           <>
-            <Money minor={s.totalMinor} className="block text-4xl sm:text-5xl font-semibold tracking-tight" />
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm muted">
-              <span>{s.transactionCount} transactions</span>
+            <div className="flex items-end gap-4 flex-wrap">
+              <Money minor={s.totalMinor} className="block text-[2.75rem] sm:text-6xl font-bold tracking-tight leading-none" />
               {change != null && (
-                <span style={{ color: change > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                  {change > 0 ? '▲' : '▼'} {Math.abs(change).toFixed(1)}% vs {monthLabel(s.previousMonth.month)}
+                <span
+                  className="text-sm font-semibold pb-1.5"
+                  style={{ color: change > 0 ? 'var(--rule-red)' : 'var(--credit)' }}
+                >
+                  {change > 0 ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%
                 </span>
               )}
             </div>
+            <p className="muted text-sm mt-2.5">
+              {s.transactionCount} transactions
+              {change != null && ` · ${monthLabel(s.previousMonth.month)} was ${formatINR(s.previousMonth.totalMinor)}`}
+            </p>
           </>
         ) : (
-          <Skeleton className="h-12 w-52 mt-1" />
+          <Skeleton className="h-12 w-56 mt-1" />
         )}
-      </Card>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="Today" minor={s?.todayMinor} value={s ? undefined : '—'} />
-        <StatTile label="This week" minor={s?.weekMinor} value={s ? undefined : '—'} />
-        <StatTile
-          label="Daily average"
-          minor={s?.avgDailyMinor}
-          value={s ? undefined : '—'}
-          sub={s ? `over ${s.activeDays} days` : undefined}
-        />
-        <StatTile
-          label="Top category"
-          value={s?.topCategory ? s.topCategory.name : '—'}
-          sub={s?.topCategory ? formatINR(s.topCategory.totalMinor) : undefined}
-        />
       </div>
+
+      <StatStrip
+        items={[
+          { label: 'Today', minor: s?.todayMinor },
+          { label: 'This week', minor: s?.weekMinor },
+          { label: 'Daily average', minor: s?.avgDailyMinor, sub: s ? `over ${s.activeDays} days` : undefined },
+          {
+            label: 'Top category',
+            value: s?.topCategory ? s.topCategory.name : '—',
+            sub: s?.topCategory ? formatINR(s.topCategory.totalMinor) : undefined,
+          },
+        ]}
+      />
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card>
@@ -169,24 +171,32 @@ export default function DashboardPage() {
 
       {/* Lending sits beside spending but is never added to it. */}
       {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
-        <Link href="/peers" className="block">
-          <Card className={peers.data.owedByMeMinor > peers.data.owedToMeMinor ? 'rule-red' : 'rule-credit'}>
-            <SectionTitle action={<span className="text-sm" style={{ color: 'var(--accent)' }}>Peers →</span>}>
-              Lent &amp; borrowed
-            </SectionTitle>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+        <div>
+          <SectionHead label="Lent & borrowed" />
+        <Link href="/peers" className="block group">
+          <div className="card overflow-hidden">
+            <div className="grid grid-cols-2 hair-grid">
+              <div className="px-4 py-3.5 sm:px-5 sm:py-4">
                 <p className="label mb-1">They owe me</p>
                 <Money minor={peers.data.owedToMeMinor} className="text-xl font-semibold" style={{ color: 'var(--credit)' }} />
               </div>
-              <div>
+              <div className="px-4 py-3.5 sm:px-5 sm:py-4">
                 <p className="label mb-1">I owe</p>
                 <Money minor={peers.data.owedByMeMinor} className="text-xl font-semibold" style={{ color: 'var(--rule-red)' }} />
               </div>
             </div>
-            <p className="muted text-xs mt-3">Tracked separately — not part of the {monthLabel(month)} total above.</p>
-          </Card>
+            <div
+              className="px-4 sm:px-5 py-2.5 flex items-center justify-between gap-3 border-t"
+              style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+            >
+              <span className="muted text-xs">Tracked separately — not part of the {monthLabel(month)} total.</span>
+              <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--accent)' }}>
+                Peers →
+              </span>
+            </div>
+          </div>
         </Link>
+        </div>
       )}
 
       <div className="grid lg:grid-cols-2 gap-5">
