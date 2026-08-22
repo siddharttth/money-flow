@@ -35,17 +35,30 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-7">
-          <div className="text-4xl mb-2">💸</div>
-          <h1 className="text-2xl font-semibold">Money Flow</h1>
-          <p className="muted text-sm mt-1.5">
-            {isRegister ? 'Create your account' : 'Sign in to your expenses'}
+    <div className="min-h-dvh app-grid flex items-center justify-center px-4 py-10 relative overflow-hidden">
+      {/* The same soft blue glow the landing page uses. */}
+      <div
+        className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[min(560px,90vw)] h-[360px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: 'var(--brass-soft)' }}
+        aria-hidden
+      />
+
+      <div className="w-full max-w-sm relative z-10">
+        <div className="text-center mb-8">
+          <Link href="/" className="wordmark text-2xl inline-block mb-3" style={{ color: 'var(--brass)' }}>
+            Money Flow
+          </Link>
+          <h1 className="text-xl font-bold mb-1.5">
+            {isRegister ? 'Start your ledger' : 'Welcome back'}
+          </h1>
+          <p className="muted text-sm">
+            {isRegister
+              ? 'Track what you spent on, and who it was with.'
+              : 'Pick up where your spreadsheet left off.'}
           </p>
         </div>
 
-        <form onSubmit={submit} className="card p-5 space-y-4">
+        <form onSubmit={submit} className="card p-6 space-y-4">
           {isRegister && (
             <div>
               <label className="label" htmlFor="name">
@@ -98,7 +111,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           {isRegister && (
             <div>
               <label className="label" htmlFor="code">
-                Signup code <span className="normal-case font-normal">— if your deployment requires one</span>
+                Signup code
               </label>
               <input
                 id="code"
@@ -106,6 +119,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
                 value={signupCode}
                 onChange={(e) => setSignupCode(e.target.value)}
                 autoComplete="off"
+                placeholder="Only if this deployment requires one"
               />
             </div>
           )}

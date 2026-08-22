@@ -15,7 +15,7 @@ export type IconKey =
   | 'home' | 'health' | 'movie' | 'book' | 'fuel' | 'gift' | 'salon' | 'phone'
   | 'coffee' | 'pet' | 'travel' | 'cash';
 
-const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
 const PATHS: Record<IconKey, React.ReactNode> = {
   bill: <><path {...P} d="M6 3.5h12v17l-2.5-1.6-2.5 1.6-2.5-1.6L8 20.5 6 21z" /><path {...P} d="M9 8h6M9 12h6" /></>,

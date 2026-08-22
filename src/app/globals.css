@@ -1,121 +1,126 @@
 @import 'tailwindcss';
 
 /*
- * MONEY FLOW — visual system
+ * MONEY FLOW — one design system, shared with the landing page.
  *
- * The reference is a bahi-khata: ink on warm paper, a red rule down the
- * margin, brass for what matters. Not a SaaS dashboard.
+ * "Dynamic Momentum": a stark light base so a single electric blue can carry
+ * every action and identity cue. Depth comes from tonal layers and soft
+ * blue-tinted ambient glows, never heavy drop shadows. Pills for anything
+ * pressable, soft rectangles for anything that holds content.
  *
- *   ink        the ground (deep navy-black in dark, warm paper in light)
- *   brass      the one accent — money, totals, primary actions
- *   rule-red   the ledger margin line; also debit / "I owe" / overspend
- *   credit     money coming back to you
- *
- * Colour is used sparingly and always means something. A card is plain unless
- * it carries weight, in which case it gets a rule down its left edge.
+ * Token names are semantic, so pages never reference a raw colour:
+ *   --brass      the primary blue (name kept from the previous system so the
+ *                whole app did not have to churn on a rename)
+ *   --rule-red   debit / money you owe / destructive
+ *   --credit     money coming back to you
  */
 
 @theme {
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-serif: var(--font-serif), ui-serif, Georgia, serif;
 }
 
-/* Light — warm ledger paper */
+/* Light — the canonical theme, matching the landing page. */
 :root {
-  --bg: #f5f1e8;
-  --surface: #fffdf8;
-  --surface-2: #efe9dc;
-  --border: #ded5c4;
-  --border-strong: #c9bda6;
-  --text: #14181f;
-  --text-muted: #6d675a;
+  --bg: #fff8f7;
+  --surface: #ffffff;
+  --surface-2: #f3ecec;
+  --border: #f0ebea;
+  --border-strong: #c5c5d8;
+  --text: #1e1b1b;
+  --text-muted: #444655;
 
-  --brass: #8a6a14;
-  --brass-bright: #a8831f;
-  --on-brass: #fffdf8;
-  --brass-soft: #f0e6cd;
+  --brass: #4056f4;
+  --brass-bright: #1f38dc;
+  --on-brass: #ffffff;
+  --brass-soft: rgba(64, 86, 244, 0.08);
 
-  --rule-red: #a83226;
-  --rule-red-soft: #f4e0dc;
-  --credit: #1f6b4d;
-  --credit-soft: #dcece4;
+  --rule-red: #ba1a1a;
+  --rule-red-soft: #ffdad6;
+  --credit: #12714d;
+  --credit-soft: #d9efe4;
 
-  --danger: #a83226;
-  --success: #1f6b4d;
-  --accent: #8a6a14;
-  --accent-soft: #f0e6cd;
+  --danger: #ba1a1a;
+  --success: #12714d;
+  --accent: #4056f4;
+  --accent-soft: rgba(64, 86, 244, 0.08);
 
-  --shadow: 0 1px 2px rgba(20, 24, 31, 0.05), 0 10px 28px -18px rgba(20, 24, 31, 0.25);
+  /* An ambient blue glow rather than a grey drop shadow. */
+  --shadow: 0 1px 2px rgba(30, 27, 27, 0.04), 0 18px 40px -22px rgba(64, 86, 244, 0.28);
+  --shadow-lg: 0 24px 56px -20px rgba(64, 86, 244, 0.28);
 }
 
-/* Dark — ink navy */
+/*
+ * Dark is a counterpart, not a different brand: same electric blue identity,
+ * lifted for contrast on a dark neutral. Kept so anyone whose phone is in dark
+ * mode is not thrown into a white screen.
+ */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0c1119;
-    --surface: #131a25;
-    --surface-2: #1a2231;
-    --border: #26303f;
-    --border-strong: #3a4759;
-    --text: #eaeef4;
-    --text-muted: #8e9bad;
+    --bg: #121218;
+    --surface: #1a1a21;
+    --surface-2: #23232c;
+    --border: #2c2c37;
+    --border-strong: #45455a;
+    --text: #f3f2f7;
+    --text-muted: #a9a9bd;
 
-    --brass: #d9b562;
-    --brass-bright: #e8c87d;
-    --on-brass: #14181f;
-    --brass-soft: #241f14;
+    --brass: #97a4ff;
+    --brass-bright: #b6c0ff;
+    --on-brass: #0b0b14;
+    --brass-soft: rgba(151, 164, 255, 0.12);
 
-    --rule-red: #d9604c;
-    --rule-red-soft: #2a1714;
-    --credit: #5cba8e;
-    --credit-soft: #12241c;
+    --rule-red: #ffb4ab;
+    --rule-red-soft: rgba(255, 180, 171, 0.12);
+    --credit: #6fd6a3;
+    --credit-soft: rgba(111, 214, 163, 0.12);
 
-    --danger: #d9604c;
-    --success: #5cba8e;
-    --accent: #d9b562;
-    --accent-soft: #241f14;
+    --danger: #ffb4ab;
+    --success: #6fd6a3;
+    --accent: #97a4ff;
+    --accent-soft: rgba(151, 164, 255, 0.12);
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+    --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.8);
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #0c1119;
-  --surface: #131a25;
-  --surface-2: #1a2231;
-  --border: #26303f;
-  --border-strong: #3a4759;
-  --text: #eaeef4;
-  --text-muted: #8e9bad;
+  --bg: #121218;
+  --surface: #1a1a21;
+  --surface-2: #23232c;
+  --border: #2c2c37;
+  --border-strong: #45455a;
+  --text: #f3f2f7;
+  --text-muted: #a9a9bd;
 
-  --brass: #d9b562;
-  --brass-bright: #e8c87d;
-  --on-brass: #14181f;
-  --brass-soft: #241f14;
+  --brass: #97a4ff;
+  --brass-bright: #b6c0ff;
+  --on-brass: #0b0b14;
+  --brass-soft: rgba(151, 164, 255, 0.12);
 
-  --rule-red: #d9604c;
-  --rule-red-soft: #2a1714;
-  --credit: #5cba8e;
-  --credit-soft: #12241c;
+  --rule-red: #ffb4ab;
+  --rule-red-soft: rgba(255, 180, 171, 0.12);
+  --credit: #6fd6a3;
+  --credit-soft: rgba(111, 214, 163, 0.12);
 
-  --danger: #d9604c;
-  --success: #5cba8e;
-  --accent: #d9b562;
-  --accent-soft: #241f14;
+  --danger: #ffb4ab;
+  --success: #6fd6a3;
+  --accent: #97a4ff;
+  --accent-soft: rgba(151, 164, 255, 0.12);
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -18px rgba(0, 0, 0, 0.8);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.8);
 }
 
-/*
- * These live in @layer base deliberately. Unlayered CSS outranks @layer
- * components in Tailwind v4, so a universal border-color rule written outside
- * a layer silently overrode .rule-brass / .rule-red and painted them grey.
- */
 @layer base {
   * { box-sizing: border-box; }
 
   /* Tailwind v4 defaults border-color to currentColor, which turns every
-     divide-y into a hard black or white line. Default them to the token. */
+     divide-y into a hard black or white line. Default them to the token.
+     This must live in a layer: unlayered CSS outranks @layer components and
+     would override the accent rules below. */
   *, ::before, ::after { border-color: var(--border); }
 }
 
@@ -134,106 +139,110 @@ body { min-height: 100dvh; }
 .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
 
 .wordmark {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 @layer components {
+  /* Soft rectangle: white, hairline border, ambient glow. */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 1rem;
     box-shadow: var(--shadow);
   }
 
-  /*
-   * The ledger margin. A card only earns a rule when it carries weight:
-   * brass for the figure that matters most, red for money you owe,
-   * green for money coming back. Everything else stays plain.
-   */
-  .rule-brass { border-left: 3px solid var(--brass); }
-  .rule-red { border-left: 3px solid var(--rule-red); }
-  .rule-credit { border-left: 3px solid var(--credit); }
+  /* An accent bar marks a card that carries weight. Plain cards get none. */
+  .rule-brass { box-shadow: inset 3px 0 0 var(--brass), var(--shadow); }
+  .rule-red { box-shadow: inset 3px 0 0 var(--rule-red), var(--shadow); }
+  .rule-credit { box-shadow: inset 3px 0 0 var(--credit), var(--shadow); }
 
+  /*
+   * Soft grey field with a bottom-only rule that turns blue on focus.
+   * 16px exactly: anything smaller and iOS Safari zooms the page on focus.
+   */
   .input {
     width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-bottom: 2px solid var(--border-strong);
     color: var(--text);
-    border-radius: 8px;
-    padding: 0.7rem 0.85rem;
-    /* Exactly 16px. Anything smaller makes iOS Safari zoom the page when the
-       field is focused, which throws the whole layout off. */
+    border-radius: 0.5rem 0.5rem 0 0;
+    padding: 0.75rem 0.85rem;
     font-size: 16px;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.18s, background 0.18s;
   }
-  .input:focus {
-    border-color: var(--brass);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brass) 22%, transparent);
-  }
-  .input::placeholder { color: var(--text-muted); }
+  .input:focus { border-bottom-color: var(--brass); background: var(--brass-soft); }
+  .input::placeholder { color: var(--text-muted); opacity: 0.65; }
 
   .label {
     display: block;
-    font-size: 0.68rem;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 0.4rem;
   }
 
+  /* Pills are mandatory for anything pressable. */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 8px;
-    padding: 0.7rem 1.1rem;
-    font-size: 0.92rem;
+    border-radius: 9999px;
+    padding: 0.7rem 1.35rem;
+    font-size: 0.9rem;
     font-weight: 600;
+    letter-spacing: 0.01em;
     border: 1px solid transparent;
     cursor: pointer;
-    transition: filter 0.15s, background 0.15s, transform 0.05s;
+    transition: background 0.18s, box-shadow 0.2s, transform 0.06s, border-color 0.18s;
     min-height: 44px;
     font-family: inherit;
   }
   .btn:active { transform: scale(0.985); }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .btn-primary { background: var(--brass); color: var(--on-brass); }
-  .btn-primary:hover:not(:disabled) { background: var(--brass-bright); }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--brass-bright);
+    box-shadow: 0 14px 30px -12px rgba(64, 86, 244, 0.5);
+  }
 
-  .btn-ghost { background: var(--surface-2); color: var(--text); border-color: var(--border); }
-  .btn-ghost:hover:not(:disabled) { border-color: var(--border-strong); }
+  .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
 
   .btn-danger { background: transparent; color: var(--rule-red); border-color: var(--border-strong); }
-  .btn-danger:hover:not(:disabled) { background: var(--rule-red-soft); }
+  .btn-danger:hover:not(:disabled) { background: var(--rule-red-soft); border-color: var(--rule-red); }
 
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.45rem 0.75rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
+    padding: 0.45rem 0.9rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background: var(--surface-2);
     color: var(--text);
     font-size: 0.85rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.12s;
+    transition: all 0.14s;
     min-height: 38px;
     font-family: inherit;
   }
   .chip:hover { border-color: var(--brass); }
-  /* Category chips pass their colour down to the icon only, keeping the
-     label at full contrast while the glyph carries the colour cue. */
-  .chip[data-selected='false'] svg { color: var(--chip-icon, currentColor); }
   .chip[data-selected='true'] {
     background: var(--brass);
     border-color: var(--brass);
@@ -254,7 +263,21 @@ body { min-height: 100dvh; }
     background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.4s infinite;
-    border-radius: 4px;
+    border-radius: 6px;
+  }
+
+  /* The faint graph paper that ties the app back to the landing page. */
+  .app-grid {
+    background-image:
+      linear-gradient(to right, rgba(30, 27, 27, 0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(30, 27, 27, 0.028) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  :root[data-theme='dark'] .app-grid,
+  html:not([data-theme='light']) .app-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
   }
 }
 
@@ -271,9 +294,9 @@ body { min-height: 100dvh; }
 .animate-in { animation: slideUp 0.18s ease-out; }
 
 /*
- * Every rupee figure. Fixed-width digits so ₹600 and ₹11,000 line up in a
- * column and can be compared without reading them — the whole point of a
- * passbook. `tabular` is the legacy name, kept so no markup had to churn.
+ * Every rupee figure. Fixed-width digits so 600 and 11,000 line up in a column
+ * and can be compared without reading them. `tabular` is the legacy class
+ * name, kept so no markup had to churn.
  */
 .tabular,
 .num {
@@ -284,12 +307,11 @@ body { min-height: 100dvh; }
 }
 
 /* A genuine zero is not information — it should recede. */
-.num[data-zero='true'] { color: var(--text-muted); opacity: 0.65; }
+.num[data-zero='true'] { color: var(--text-muted); opacity: 0.6; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
-
 
 /*
  * ============================================================

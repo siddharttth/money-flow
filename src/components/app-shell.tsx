@@ -90,8 +90,8 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
           <Link href="/dashboard" className="flex items-center gap-2 px-2 mb-6">
-            <span aria-hidden style={{ width: 3, height: 20, background: 'var(--rule-red)', borderRadius: 2 }} />
-            <span className="wordmark text-lg">Money Flow</span>
+            <span aria-hidden style={{ width: 4, height: 20, background: 'var(--brass)', borderRadius: 99 }} />
+            <span className="wordmark text-lg" style={{ color: 'var(--brass)' }}>Money Flow</span>
           </Link>
 
           <button className="btn btn-primary mb-5" onClick={() => openAdd()}>
@@ -103,7 +103,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                className="flex items-center gap-3 px-3.5 py-2.5 rounded-full text-sm font-semibold transition-colors"
                 style={
                   isActive(item.href)
                     ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
@@ -139,11 +139,15 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             }}
           >
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <span className="wordmark text-lg">Money Flow</span>
+              <span className="wordmark text-lg" style={{ color: 'var(--brass)' }}>
+                Money Flow
+              </span>
             </Link>
           </header>
 
-          <main className="flex-1 px-4 sm:px-6 py-5 pb-28 lg:pb-8 max-w-5xl w-full mx-auto">{children}</main>
+          <main className="flex-1 w-full app-grid">
+            <div className="px-4 sm:px-6 py-5 pb-28 lg:pb-8 max-w-5xl w-full mx-auto">{children}</div>
+          </main>
         </div>
 
         {/* Mobile bottom nav with the + as the centre action */}
@@ -166,8 +170,12 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               <button
                 onClick={() => openAdd()}
                 aria-label="Add expense"
-                className="w-14 h-14 -mt-6 rounded-full text-white text-2xl font-light shadow-lg flex items-center justify-center"
-                style={{ background: 'var(--accent)' }}
+                className="w-14 h-14 -mt-6 rounded-full text-2xl font-light flex items-center justify-center"
+                style={{
+                  background: 'var(--brass)',
+                  color: 'var(--on-brass)',
+                  boxShadow: '0 12px 28px -8px rgba(64, 86, 244, 0.55)',
+                }}
               >
                 +
               </button>

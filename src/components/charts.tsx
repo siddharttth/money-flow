@@ -132,7 +132,7 @@ export function MonthlyBars({
           />
           <Bar dataKey="totalMinor" radius={[6, 6, 0, 0]}>
             {data.map((d) => (
-              <Cell key={d.month} fill={d.month === activeMonth ? 'var(--brass)' : 'var(--border-strong)'} />
+              <Cell key={d.month} fill={d.month === activeMonth ? 'var(--brass)' : 'var(--surface-2)'} />
             ))}
           </Bar>
         </BarChart>

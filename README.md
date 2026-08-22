@@ -117,23 +117,25 @@ seeded data, rather than stock photography.
 
 ## Design
 
-The reference is a **bahi-khata**, not a SaaS dashboard: ink on warm paper, a red rule down the
-margin, brass for what matters.
+One system across the marketing page and the app — "Dynamic Momentum": a stark light base so a
+single **electric blue** (`#4056F4`) can carry every action and identity cue.
 
-- **Ink navy / warm ledger paper** grounds both themes. Brass (`--brass`) is the single accent
-  and always means money; `--rule-red` is the ledger margin line and doubles as debit;
-  `--credit` is money coming back.
-- **A card earns a rule only when it carries weight** — brass on the month total, red on what you
-  owe, green on what you're owed. Everything routine stays plain, so hierarchy comes from
-  meaning rather than decoration.
-- **Every rupee figure is IBM Plex Mono** with tabular figures. Fixed-width digits are the reason
-  a passbook column is scannable: ₹600 and ₹11,000 line up and can be compared without reading.
-- **A genuine zero is dimmed.** "₹0 today" is the absence of information and shouldn't compete
-  with a real number.
-- **Icons, not emoji.** Emoji dragged their own colour and cartoon style into a restrained
-  palette. The set in `components/icons.tsx` inherits `currentColor`, so a category renders in
-  its own colour. People get initials — a name identifies better than a generic face.
-- **Charts hide below two data points** rather than drawing a single bar across the full width.
+- **Type**: Montserrat for headings and the wordmark, Plus Jakarta Sans for UI. IBM Plex Mono is
+  kept for rupee figures only — fixed-width digits are why a ledger column is scannable, and no
+  proportional face gives that.
+- **Shape**: pills for anything pressable, soft rectangles for anything holding content. Inputs
+  are a soft grey field with a bottom-only rule that turns blue on focus.
+- **Depth** comes from tonal layers and soft blue-tinted ambient glows, never heavy drop shadows.
+- **Hierarchy**: a card earns an accent bar only when it carries weight — blue on the month
+  total, red on what you owe, green on what you are owed. Routine stats stay plain.
+- **Zeros are dimmed.** "₹0 today" is the absence of information.
+- **Icons, not emoji** — a 2px stroke set inheriting `currentColor`, so a category renders in its
+  own colour. People get initials.
+- **Dark mode is a counterpart, not a second brand**: the same blue identity lifted for contrast
+  on a dark neutral, so a phone in dark mode is never thrown a white screen.
+
+Token names are semantic (`--brass` is the primary blue, `--rule-red` is debit, `--credit` is
+money coming back), so pages never reference a raw colour and a repalette touches one file.
 
 ## Peers — money lent and borrowed
 
