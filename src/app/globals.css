@@ -1,0 +1,206 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Light and dark are both first-class; the app follows the OS
+ * unless the user pins a theme (stored in localStorage, applied via data-theme).
+ */
+@theme {
+  --font-sans: ui-sans-serif, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+}
+
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f2f4f8;
+  --border: #e4e7ee;
+  --text: #10131a;
+  --text-muted: #667085;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --shadow: 0 1px 2px rgba(16, 19, 26, 0.04), 0 8px 24px -12px rgba(16, 19, 26, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b0d12;
+    --surface: #14171f;
+    --surface-2: #1b1f29;
+    --border: #262b36;
+    --text: #f1f3f7;
+    --text-muted: #99a1b3;
+    --accent: #818cf8;
+    --accent-soft: #1e2130;
+    --danger: #f87171;
+    --success: #4ade80;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b0d12;
+  --surface: #14171f;
+  --surface-2: #1b1f29;
+  --border: #262b36;
+  --text: #f1f3f7;
+  --text-muted: #99a1b3;
+  --accent: #818cf8;
+  --accent-soft: #1e2130;
+  --danger: #f87171;
+  --success: #4ade80;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+* { box-sizing: border-box; }
+
+/*
+ * Tailwind v4 defaults border-color to currentColor, which turns every
+ * `divide-y` / `border` into a hard black (or white, in dark mode) line.
+ * Default them all to the theme token instead.
+ */
+*, ::before, ::after { border-color: var(--border); }
+
+html, body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* Never let the page itself scroll sideways on a phone. */
+  overflow-x: hidden;
+}
+
+body { min-height: 100dvh; }
+
+/* Respect the iOS home indicator / notch. */
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+
+@layer components {
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .input::placeholder { color: var(--text-muted); }
+
+  .label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 12px;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s, transform 0.05s;
+    /* Comfortable tap target on mobile. */
+    min-height: 44px;
+  }
+  .btn:active { transform: scale(0.985); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .btn-ghost { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: var(--border); }
+
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--border); }
+  .btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s;
+    min-height: 38px;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip[data-selected='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .muted { color: var(--text-muted); }
+
+  /* Wide content scrolls inside its own box, never the page. */
+  .scroll-x {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-x::-webkit-scrollbar { height: 6px; }
+  .scroll-x::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 8px;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-in { animation: slideUp 0.18s ease-out; }
+
+/* Numbers line up in tables and totals. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
