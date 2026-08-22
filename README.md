@@ -103,6 +103,18 @@ uses `EXISTS` rather than a `JOIN` precisely so a multi-person expense is counte
 
 ---
 
+## Routes
+
+`/` is a public marketing landing page. The app lives under `/dashboard`, `/expenses`,
+`/peers`, `/people`, `/analytics`, `/categories` and `/settings`, all behind the session check
+in `(app)/layout.tsx`.
+
+The landing deliberately uses a **different visual language** from the app — white base,
+electric blue, Montserrat — and every rule is scoped under `.lp` so none of it leaks into the
+ledger UI. `.lp` also pins its own colours, so a visitor whose OS is in dark mode still sees
+the intended design. Its product imagery is real screenshots of the running app, captured from
+seeded data, rather than stock photography.
+
 ## Design
 
 The reference is a **bahi-khata**, not a SaaS dashboard: ink on warm paper, a red rule down the

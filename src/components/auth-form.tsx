@@ -26,7 +26,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         email,
         password,
       });
-      router.push('/');
+      router.push('/dashboard');
       router.refresh();
     } catch (err) {
       setError(err instanceof RequestError ? err.message : 'Something went wrong');

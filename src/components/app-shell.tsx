@@ -9,7 +9,7 @@ import { ExpenseForm } from './expense-form';
 import type { Expense } from '@/lib/types';
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: '◎' },
+  { href: '/dashboard', label: 'Dashboard', icon: '◎' },
   { href: '/expenses', label: 'Expenses', icon: '≡' },
   { href: '/peers', label: 'Peers', icon: '⇄' },
   { href: '/people', label: 'People', icon: '☺' },
@@ -19,7 +19,7 @@ const NAV = [
 ];
 
 // Only four fit either side of the + button, so the rest live behind "More".
-const MOBILE_PRIMARY = ['/', '/expenses', '/peers'];
+const MOBILE_PRIMARY = ['/dashboard', '/expenses', '/peers'];
 const MORE_ITEMS = ['/people', '/analytics', '/categories', '/settings'];
 
 type ToastAction = { label: string; onClick: () => void };
@@ -73,7 +73,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
     return () => window.removeEventListener('keydown', onKey);
   }, [openAdd]);
 
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   async function logout() {
     await api.post('/api/auth/logout');
@@ -89,7 +89,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           className="hidden lg:flex flex-col w-60 shrink-0 border-r px-3 py-5 sticky top-0 h-dvh"
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
-          <Link href="/" className="flex items-center gap-2 px-2 mb-6">
+          <Link href="/dashboard" className="flex items-center gap-2 px-2 mb-6">
             <span aria-hidden style={{ width: 3, height: 20, background: 'var(--rule-red)', borderRadius: 2 }} />
             <span className="wordmark text-lg">Money Flow</span>
           </Link>
@@ -138,7 +138,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               paddingTop: 'max(env(safe-area-inset-top), 0.75rem)',
             }}
           >
-            <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
               <span className="wordmark text-lg">Money Flow</span>
             </Link>
           </header>

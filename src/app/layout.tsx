@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Sans, IBM_Plex_Mono, IBM_Plex_Serif } from 'next/font/google';
+import { IBM_Plex_Sans, IBM_Plex_Mono, IBM_Plex_Serif, Montserrat, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
 /**
@@ -29,9 +29,25 @@ const serif = IBM_Plex_Serif({
   display: 'swap',
 });
 
+/** Marketing-only faces. The app itself never uses these. */
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['600', '700', '900'],
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-ui',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'Money Flow',
-  description: 'A fast personal expense tracker — what you spent on, and who it was with.',
+  title: 'Money Flow — precision in every entry',
+  description:
+    'A personal expense ledger that separates what you spent on from who it was with. Replace the spreadsheet, keep the speed.',
 };
 
 export const viewport: Viewport = {
@@ -50,7 +66,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${serif.variable} ${montserrat.variable} ${jakarta.variable}`}>
       <head>
         {/* Applies the saved theme before first paint so there is no flash. */}
         <script

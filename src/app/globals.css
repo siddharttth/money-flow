@@ -289,3 +289,113 @@ body { min-height: 100dvh; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+
+/*
+ * ============================================================
+ * MARKETING LANDING ONLY
+ * ------------------------------------------------------------
+ * A deliberately different language from the app: white base,
+ * electric blue, geometric headlines. Everything is scoped under
+ * .lp so none of it can leak into the ledger UI, and .lp pins its
+ * own colours so the app's dark theme never bleeds through.
+ * ============================================================
+ */
+.lp {
+  --lp-blue: #4056f4;
+  --lp-blue-deep: #1f38dc;
+  --lp-blue-soft: rgba(64, 86, 244, 0.08);
+  --lp-ink: #1e1b1b;
+  --lp-ink-soft: #444655;
+  --lp-outline: #c5c5d8;
+  --lp-surface: #ffffff;
+  --lp-surface-low: #f9f2f1;
+  --lp-ghost: rgba(4, 3, 3, 0.035);
+
+  background: var(--lp-surface);
+  color: var(--lp-ink);
+  font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+.lp-display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.lp-label {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Depth here is a soft blue glow rather than a drop shadow. */
+.lp-ambient { box-shadow: 0 20px 40px -10px rgba(64, 86, 244, 0.15); }
+.lp-ambient-lg { box-shadow: 0 40px 80px -24px rgba(64, 86, 244, 0.22); }
+
+.lp-grid {
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* The oversized background word that anchors a section. */
+.lp-watermark {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--lp-ghost);
+  line-height: 0.85;
+  user-select: none;
+}
+
+/* Pill buttons are mandatory in this system. */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.95rem 2rem;
+  min-height: 48px;
+  transition: transform 0.25s, box-shadow 0.25s, background 0.2s;
+  cursor: pointer;
+}
+.lp-btn-primary { background: var(--lp-blue); color: #fff; }
+.lp-btn-primary:hover { transform: scale(1.04); box-shadow: 0 20px 40px -10px rgba(64, 86, 244, 0.4); }
+.lp-btn-secondary { background: #fff; color: var(--lp-blue); border: 1px solid var(--lp-blue); }
+.lp-btn-secondary:hover { background: var(--lp-blue-soft); }
+
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  background: var(--lp-blue-soft);
+  color: var(--lp-blue-deep);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+}
+
+.lp-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 1rem;
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+.lp-card-glow:hover { box-shadow: 0 24px 48px -16px rgba(64, 86, 244, 0.18); transform: translateY(-2px); }
+
+@media (min-width: 768px) {
+  /* Asymmetry: the winning card lifts out of the grid. */
+  .lp-overlap { transform: translateY(-40px); }
+}
