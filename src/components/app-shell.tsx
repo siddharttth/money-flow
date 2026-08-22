@@ -9,13 +9,18 @@ import { ExpenseForm } from './expense-form';
 import type { Expense } from '@/lib/types';
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: '◎', mobile: true },
-  { href: '/expenses', label: 'Expenses', icon: '≡', mobile: true },
-  { href: '/people', label: 'People', icon: '☺', mobile: true },
-  { href: '/analytics', label: 'Analytics', icon: '◑', mobile: false },
-  { href: '/categories', label: 'Categories', icon: '◈', mobile: false },
-  { href: '/settings', label: 'Settings', icon: '⚙', mobile: true },
+  { href: '/', label: 'Dashboard', icon: '◎' },
+  { href: '/expenses', label: 'Expenses', icon: '≡' },
+  { href: '/peers', label: 'Peers', icon: '⇄' },
+  { href: '/people', label: 'People', icon: '☺' },
+  { href: '/analytics', label: 'Analytics', icon: '◑' },
+  { href: '/categories', label: 'Categories', icon: '◈' },
+  { href: '/settings', label: 'Settings', icon: '⚙' },
 ];
+
+// Only four fit either side of the + button, so the rest live behind "More".
+const MOBILE_PRIMARY = ['/', '/expenses', '/peers'];
+const MORE_ITEMS = ['/people', '/analytics', '/categories', '/settings'];
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -32,6 +37,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
   const pathname = usePathname();
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | undefined>();
   const [toastMsg, setToastMsg] = useState<{
     text: string;
@@ -135,9 +141,6 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             <Link href="/" className="flex items-center gap-2 font-semibold">
               <span>💸</span> Money Flow
             </Link>
-            <button onClick={logout} className="muted text-sm">
-              Sign out
-            </button>
           </header>
 
           <main className="flex-1 px-4 sm:px-6 py-5 pb-28 lg:pb-8 max-w-5xl w-full mx-auto">{children}</main>
@@ -153,7 +156,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           }}
         >
           <div className="grid grid-cols-5 items-center">
-            {NAV.filter((n) => n.mobile)
+            {NAV.filter((n) => MOBILE_PRIMARY.includes(n.href))
               .slice(0, 2)
               .map((item) => (
                 <MobileTab key={item.href} {...item} active={isActive(item.href)} />
@@ -170,14 +173,45 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               </button>
             </div>
 
-            {NAV.filter((n) => n.mobile)
+            {NAV.filter((n) => MOBILE_PRIMARY.includes(n.href))
               .slice(2)
               .map((item) => (
                 <MobileTab key={item.href} {...item} active={isActive(item.href)} />
               ))}
+
+            <button
+              onClick={() => setMoreOpen(true)}
+              className="flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium"
+              style={{ color: MORE_ITEMS.some((h) => isActive(h)) ? 'var(--accent)' : 'var(--text-muted)' }}
+            >
+              <span aria-hidden className="text-lg leading-none">
+                ⋯
+              </span>
+              More
+            </button>
           </div>
         </nav>
       </div>
+
+      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
+        <div className="grid grid-cols-2 gap-2">
+          {NAV.filter((n) => MORE_ITEMS.includes(n.href)).map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMoreOpen(false)}
+              className="btn btn-ghost justify-start"
+              style={isActive(item.href) ? { background: 'var(--accent-soft)', color: 'var(--accent)' } : undefined}
+            >
+              <span aria-hidden>{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <button className="btn btn-danger w-full mt-3" onClick={logout}>
+          Sign out
+        </button>
+      </Modal>
 
       <Modal
         open={addOpen}

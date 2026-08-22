@@ -138,11 +138,52 @@ export const expensePeople = pgTable('expense_people', {
   personIdx: index('expense_people_person_idx').on(t.personId),
 }));
 
+/**
+ * PEER LEDGER — money lent and borrowed. Deliberately NOT an expense.
+ *
+ * Lending someone ₹1,000 is not spending: you expect it back, so it must never
+ * touch expense totals or category analytics. Borrowing is not income either.
+ * Hence a separate table that no spending query ever reads.
+ *
+ * Two directions cover every case in the old PEERS sheet:
+ *   'out' — money left you toward this person (gave / lent / paid on their behalf)
+ *   'in'  — money came to you from them (took / borrowed / got repaid)
+ *
+ * balance = SUM(out) - SUM(in)
+ *   > 0  they owe you   (the sheet's GIVEN column)
+ *   < 0  you owe them   (the sheet's TAKEN column)
+ *
+ * A repayment is just an entry in the opposite direction, so the running
+ * balance settles itself without any special "settlement" concept.
+ */
+export const ledgerEntries = pgTable('ledger_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  personId: uuid('person_id').notNull().references(() => people.id, { onDelete: 'cascade' }),
+  direction: text('direction').notNull(), // 'out' | 'in'
+  amountMinor: integer('amount_minor').notNull(), // paise, always positive
+  entryDate: date('entry_date').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+}, (t) => ({
+  userPersonIdx: index('ledger_user_person_idx').on(t.userId, t.personId),
+  userDateIdx: index('ledger_user_date_idx').on(t.userId, t.entryDate),
+  liveIdx: index('ledger_live_idx').on(t.userId, t.deletedAt),
+}));
+
+export const ledgerEntriesRelations = relations(ledgerEntries, ({ one }) => ({
+  user: one(users, { fields: [ledgerEntries.userId], references: [users.id] }),
+  person: one(people, { fields: [ledgerEntries.personId], references: [people.id] }),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   categories: many(categories),
   people: many(people),
   expenses: many(expenses),
   groups: many(groups),
+  ledgerEntries: many(ledgerEntries),
 }));
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
@@ -182,3 +223,4 @@ export type Category = typeof categories.$inferSelect;
 export type Person = typeof people.$inferSelect;
 export type Group = typeof groups.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;

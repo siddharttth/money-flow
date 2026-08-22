@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const daily = useSWR<{ items: { date: string; totalMinor: number }[] }>(`/api/analytics/daily?month=${month}`);
   const trends = useSWR<{ items: { month: string; totalMinor: number }[] }>(`/api/analytics/trends?months=6`);
   const recent = useSWR<ExpenseList>(`/api/expenses?start=${start}&end=${end}&limit=6`);
+  const peers = useSWR<{ owedToMeMinor: number; owedByMeMinor: number }>('/api/ledger');
 
   const s = summary.data;
   const change = s?.changePct;
@@ -164,6 +165,32 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+
+      {/* Lending sits beside spending but is never added to it. */}
+      {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
+        <Link href="/peers" className="block">
+          <Card>
+            <SectionTitle action={<span className="text-sm" style={{ color: 'var(--accent)' }}>Peers →</span>}>
+              Lent &amp; borrowed
+            </SectionTitle>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="label mb-1">They owe me</p>
+                <p className="text-xl font-semibold tabular" style={{ color: 'var(--success)' }}>
+                  {formatINR(peers.data.owedToMeMinor)}
+                </p>
+              </div>
+              <div>
+                <p className="label mb-1">I owe</p>
+                <p className="text-xl font-semibold tabular" style={{ color: 'var(--danger)' }}>
+                  {formatINR(peers.data.owedByMeMinor)}
+                </p>
+              </div>
+            </div>
+            <p className="muted text-xs mt-3">Tracked separately — not part of the {monthLabel(month)} total above.</p>
+          </Card>
+        </Link>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card>

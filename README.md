@@ -103,6 +103,27 @@ uses `EXISTS` rather than a `JOIN` precisely so a multi-person expense is counte
 
 ---
 
+## Peers — money lent and borrowed
+
+The old sheet's PEERS tab, modelled properly. **Lending is not spending**: you expect the money
+back, so it must never touch expense totals or category analytics. Borrowing is not income.
+Hence `ledger_entries`, a table no spending query reads.
+
+Every case reduces to two directions:
+
+```
+'out'  money left you toward them   (gave / lent / paid on their behalf)
+'in'   money came to you from them  (took / borrowed / got repaid)
+
+balance = SUM(out) - SUM(in)
+  > 0   they owe you    (the sheet's GIVEN column)
+  < 0   you owe them    (the sheet's TAKEN column)
+```
+
+A repayment is just an entry in the opposite direction, so the running balance settles itself
+with no special "settlement" concept. The per-peer page shows every sub-transaction with the
+balance after it, and **Settle up** pre-fills an entry for the exact outstanding amount.
+
 ## API
 
 All routes require the session cookie and return JSON errors as `{ error, details }`.
@@ -121,6 +142,10 @@ POST   /api/categories/reorder
 GET    |POST   /api/people               GET |PATCH |DELETE  /api/people/:id
 GET    /api/people/:id/detail            person page in one request
 GET    |POST   /api/groups               PATCH |DELETE  /api/groups/:id
+
+GET    |POST   /api/ledger              peer balances + GIVEN/TAKEN totals
+PATCH  |DELETE /api/ledger/:id          POST /api/ledger/:id/restore
+GET    /api/ledger/person/:personId     one peer's history + running balance
 
 GET    /api/analytics/summary    ?month
 GET    /api/analytics/categories ?month|start&end &personIds

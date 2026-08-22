@@ -77,6 +77,16 @@ export const createGroupSchema = z.object({
 
 export const updateGroupSchema = createGroupSchema.partial();
 
+export const createLedgerSchema = z.object({
+  personId: z.string().uuid('Pick a person'),
+  direction: z.enum(['out', 'in'], { errorMap: () => ({ message: 'Choose gave or got' }) }),
+  amount,
+  entryDate: isoDate,
+  note: z.string().trim().max(500).optional().nullable(),
+});
+
+export const updateLedgerSchema = createLedgerSchema.partial();
+
 export const importCommitSchema = z.object({
   rows: z.array(
     z.object({
