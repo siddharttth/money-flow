@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -74,7 +74,20 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-/** Bottom sheet on mobile, centred dialog on desktop. */
+/**
+ * Bottom sheet on mobile, centred dialog on desktop.
+ *
+ * MOBILE KEYBOARD
+ * ---------------
+ * iOS does not shrink the layout viewport when the software keyboard opens —
+ * `innerHeight` and `100dvh` stay at full height. A sheet anchored to the
+ * bottom of that viewport therefore sits *behind* the keyboard, taking the
+ * Save button and the lower fields with it.
+ *
+ * `visualViewport` is the only thing that does report the visible area, so the
+ * overlay is sized and positioned from it. The sheet then always ends exactly
+ * where the keyboard begins.
+ */
 export function Modal({
   open,
   onClose,
@@ -88,43 +101,139 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Must sit with the other hooks: anything below the `if (!open) return null`
+  // early return would be called conditionally and break hook ordering.
+  const swallowNextClick = useRef(false);
+  // null until measured, so SSR and no-visualViewport browsers fall back to inset-0.
+  const [area, setArea] = useState<{ top: number; height: number } | null>(null);
+
   useEffect(() => {
     if (!open) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
+
+    /*
+     * iOS ignores `overflow: hidden` on body, so the page scrolls behind the
+     * sheet. Pinning the body and restoring the offset afterwards is the only
+     * lock that holds there.
+     */
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
+    const vv = window.visualViewport;
+    const sync = () => {
+      if (!vv) return;
+      setArea({ top: vv.offsetTop, height: vv.height });
+    };
+    sync();
+    vv?.addEventListener('resize', sync);
+    vv?.addEventListener('scroll', sync);
+
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      vv?.removeEventListener('resize', sync);
+      vv?.removeEventListener('scroll', sync);
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+      setArea(null);
     };
   }, [open, onClose]);
 
+  /** Keep the focused field visible once the keyboard has finished animating. */
+  useEffect(() => {
+    if (!open) return;
+    const el = dialogRef.current;
+    if (!el) return;
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+    };
+    el.addEventListener('focusin', onFocusIn);
+    return () => el.removeEventListener('focusin', onFocusIn);
+  }, [open]);
+
   if (!open) return null;
+
+  /*
+   * A backdrop tap while typing dismisses the keyboard rather than the sheet —
+   * closing there would throw away a half-entered expense, and the area just
+   * above the keyboard is exactly where stray taps land.
+   *
+   * The check has to happen on pointerdown: the browser blurs the focused
+   * input on pointerdown, so by the time click fires there is nothing left to
+   * detect. pointerdown records it, click acts on the record.
+   */
+  const onBackdropPointerDown = (e: React.PointerEvent) => {
+    if (e.target !== e.currentTarget) return;
+    const active = document.activeElement as HTMLElement | null;
+    swallowNextClick.current = !!(
+      active &&
+      dialogRef.current?.contains(active) &&
+      /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)
+    );
+    // The browser's own blur closes the keyboard; we only suppress the close.
+  };
+
+  const onBackdropClick = (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (swallowNextClick.current) {
+      swallowNextClick.current = false;
+      return;
+    }
+    onClose();
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/45 backdrop-blur-[2px]"
-      onClick={onClose}
+      className="fixed left-0 right-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-[2px]"
+      style={area ? { top: area.top, height: area.height } : { top: 0, bottom: 0 }}
+      onPointerDown={onBackdropPointerDown}
+      onClick={onBackdropClick}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`card animate-in w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} max-h-[92dvh] overflow-y-auto rounded-b-none sm:rounded-b-2xl safe-bottom`}
+        className={`card animate-in w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'} flex flex-col rounded-b-none sm:rounded-b-xl`}
+        /* Always leave a strip of backdrop above the sheet: it keeps the
+           bottom-sheet affordance and gives a tap target for dismissing. */
+        style={{ maxHeight: 'calc(100% - 28px)' }}
       >
         <div
-          className="sticky top-0 flex items-center justify-between px-4 sm:px-5 py-3.5 border-b"
+          className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b shrink-0"
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
           <h3 className="font-semibold">{title}</h3>
-          <button onClick={onClose} aria-label="Close" className="muted text-xl leading-none px-2 py-1">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="muted text-2xl leading-none px-3 -mr-2 -my-2 py-2"
+          >
             ×
           </button>
         </div>
-        <div className="p-4 sm:p-5">{children}</div>
+        {/* Only this region scrolls, so the sticky footer inside it stays put. */}
+        <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain flex-1 safe-bottom">{children}</div>
       </div>
     </div>
   );

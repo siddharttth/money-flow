@@ -39,6 +39,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Lets the header/nav sit under the notch on iOS.
   viewportFit: 'cover',
+  // Android Chrome resizes the layout around the keyboard with this; iOS is
+  // handled via visualViewport in the Modal.
+  interactiveWidget: 'resizes-content',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#faf7f1' },
     { media: '(prefers-color-scheme: dark)', color: '#0e141d' },
