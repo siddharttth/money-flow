@@ -12,21 +12,21 @@ import './globals.css';
 const display = Montserrat({
   subsets: ['latin'],
   weight: ['600', '700', '900'],
-  variable: '--font-display',
+  variable: '--ff-display',
   display: 'swap',
 });
 
 const ui = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-ui',
+  variable: '--ff-ui',
   display: 'swap',
 });
 
 const mono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-mono',
+  variable: '--ff-mono',
   display: 'swap',
 });
 

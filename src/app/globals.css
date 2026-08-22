@@ -16,9 +16,12 @@
  */
 
 @theme {
-  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+  /* next/font publishes --ff-*; these compose the real fallback stacks on top.
+     Naming both sides --font-display would be a self-reference, which CSS
+     treats as a cycle and drops, silently losing the fallbacks. */
+  --font-sans: var(--ff-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--ff-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--ff-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 /* Light — the canonical theme, matching the landing page. */
@@ -350,19 +353,19 @@ h1, h2, h3 {
 
   background: var(--lp-surface);
   color: var(--lp-ink);
-  font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   color-scheme: light;
 }
 
 .lp-display {
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.12;
 }
 
 .lp-label {
-  font-family: var(--font-ui), sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.2em;
@@ -382,7 +385,7 @@ h1, h2, h3 {
 
 /* The oversized background word that anchors a section. */
 .lp-watermark {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-display);
   font-weight: 900;
   letter-spacing: -0.04em;
   color: var(--lp-ghost);
@@ -397,7 +400,7 @@ h1, h2, h3 {
   justify-content: center;
   gap: 0.5rem;
   border-radius: 9999px;
-  font-family: var(--font-ui), sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.05em;
