@@ -183,10 +183,22 @@ async function assertCategory(userId: string, categoryId: string) {
   if (!cat.isActive) throw new ApiError(422, `Category "${cat.name}" is disabled`);
 }
 
-/** Silently drops person ids that aren't this user's, rather than trusting input. */
-async function validPersonIds(userId: string, ids: string[]): Promise<string[]> {
+/**
+ * Resolves the participant list, rejecting ids that aren't this user's.
+ *
+ * An expense with nobody attached is always your own spending, so an empty
+ * list resolves to the "Me" person rather than landing in an unassigned
+ * bucket. Enforcing it here means the rule holds for the UI, the raw API and
+ * the CSV importer alike, instead of living in one form component.
+ */
+async function resolvePersonIds(userId: string, ids: string[]): Promise<string[]> {
   const unique = [...new Set(ids)];
-  if (!unique.length) return [];
+
+  if (!unique.length) {
+    const self = await getSelfPersonId(userId);
+    return self ? [self] : [];
+  }
+
   const rows = await db
     .select({ id: people.id })
     .from(people)
@@ -195,9 +207,19 @@ async function validPersonIds(userId: string, ids: string[]): Promise<string[]> 
   return rows.map((r) => r.id);
 }
 
+/** The account's "Me" person. Null only if it was somehow removed. */
+export async function getSelfPersonId(userId: string): Promise<string | null> {
+  const [self] = await db
+    .select({ id: people.id })
+    .from(people)
+    .where(and(eq(people.userId, userId), eq(people.isSelf, true)))
+    .limit(1);
+  return self?.id ?? null;
+}
+
 export async function createExpense(userId: string, input: CreateExpenseInput): Promise<ExpenseDTO> {
   await assertCategory(userId, input.categoryId);
-  const personIds = await validPersonIds(userId, input.personIds ?? []);
+  const personIds = await resolvePersonIds(userId, input.personIds ?? []);
 
   const id = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -236,7 +258,8 @@ export async function updateExpense(userId: string, id: string, input: UpdateExp
   if (!existing) throw new ApiError(404, 'Expense not found');
 
   if (input.categoryId) await assertCategory(userId, input.categoryId);
-  const personIds = input.personIds ? await validPersonIds(userId, input.personIds) : null;
+  // Clearing the list on an edit falls back to "Me" for the same reason.
+  const personIds = input.personIds ? await resolvePersonIds(userId, input.personIds) : null;
 
   await db.transaction(async (tx) => {
     const patch: Partial<typeof expenses.$inferInsert> = { updatedAt: new Date() };

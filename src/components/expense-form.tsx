@@ -139,12 +139,6 @@ export function ExpenseForm({
     });
   }
 
-  function clearPeople() {
-    setPersonTouched(true);
-    setMulti(false);
-    setPersonIds([]);
-  }
-
   return (
     <form
       onSubmit={(e) => {
@@ -225,11 +219,6 @@ export function ExpenseForm({
               {p.name}
             </button>
           ))}
-
-          {/* Clears in one tap instead of unchecking each person. */}
-          <button type="button" className="chip" data-selected={personIds.length === 0} onClick={clearPeople}>
-            Nobody
-          </button>
 
           {/* Splitting across people is rare, so it is opt-in rather than the
               default behaviour every single-person entry has to work around. */}

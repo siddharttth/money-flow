@@ -80,6 +80,63 @@ async function seedScenario() {
   });
 }
 
+describe('expenses with no person default to "Me"', () => {
+  it('assigns "Me" when the person list is omitted entirely', async () => {
+    const e = await createExpense(userId, {
+      amount: 1200,
+      categoryId: cat['Shopping'],
+      expenseDate: '2026-08-15',
+      note: null,
+      personIds: [],
+    });
+
+    expect(e.people.map((p) => p.name)).toEqual(['Me']);
+
+    const { people: ppl, unassignedMinor, grandTotalMinor } = await getPersonBreakdown({ userId, ...AUG });
+    expect(ppl.find((p) => p.name === 'Me')!.totalMinor).toBe(120000);
+    expect(unassignedMinor).toBe(0);
+    // The defaulting must not change what was actually spent.
+    expect(grandTotalMinor).toBe(120000);
+  });
+
+  it('leaves an explicit person alone', async () => {
+    const e = await createExpense(userId, {
+      amount: 800,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-23',
+      note: null,
+      personIds: [person['Sankalp']],
+    });
+    // "Me" is a fallback, never an addition.
+    expect(e.people.map((p) => p.name)).toEqual(['Sankalp']);
+  });
+
+  it('does not add "Me" to a multi-person expense', async () => {
+    const e = await createExpense(userId, {
+      amount: 2000,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-10',
+      note: null,
+      personIds: [person['Sankalp'], person['Aarya']],
+    });
+
+    expect(e.people.map((p) => p.name).sort()).toEqual(['Aarya', 'Sankalp']);
+    expect((await getTotal({ userId, ...AUG })).totalMinor).toBe(200000);
+  });
+
+  it('keeps a duplicated expense on its original person', async () => {
+    const e = await createExpense(userId, {
+      amount: 500,
+      categoryId: cat['Misc'],
+      expenseDate: '2026-08-05',
+      note: null,
+      personIds: [person['Mummy']],
+    });
+    const copy = await duplicateExpense(userId, e.id);
+    expect(copy.people.map((p) => p.name)).toEqual(['Mummy']);
+  });
+});
+
 describe('the sample scenario', () => {
   beforeEach(seedScenario);
 
@@ -217,12 +274,14 @@ describe('editing keeps every aggregation in sync', () => {
     expect((await getTotal({ userId, ...JUL })).totalMinor).toBe(80000);
   });
 
-  it('clears the person when the list is emptied', async () => {
+  it('falls back to "Me" when the person list is emptied', async () => {
     await updateExpense(userId, id, { personIds: [] });
 
     const { people: ppl, unassignedMinor } = await getPersonBreakdown({ userId, ...AUG });
-    expect(ppl).toHaveLength(0);
-    expect(unassignedMinor).toBe(80000);
+    expect(ppl.map((p) => p.name)).toEqual(['Me']);
+    expect(ppl[0].totalMinor).toBe(80000);
+    // Nothing is left dangling in the unassigned bucket.
+    expect(unassignedMinor).toBe(0);
   });
 });
 
@@ -360,12 +419,12 @@ describe('filtering', () => {
     expect(totalMinor).toBe(80000);
   });
 
-  it('filters expenses with nobody attached', async () => {
+  it('has nothing unassigned, since expenses default to "Me"', async () => {
     await createExpense(userId, { amount: 1200, categoryId: cat['Shopping'], expenseDate: '2026-08-15', note: null, personIds: [] });
 
     const { totalMinor, count } = await getTotal({ userId, ...AUG, personIds: ['none'] });
-    expect(totalMinor).toBe(120000);
-    expect(count).toBe(1);
+    expect(totalMinor).toBe(0);
+    expect(count).toBe(0);
   });
 
   it('combines a category and a person filter', async () => {

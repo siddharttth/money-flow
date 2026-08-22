@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { ApiError, ok, parseBody, withAuth } from '@/lib/api';
 import { importCommitSchema } from '@/lib/validation';
 import { pickColor, slugify } from '@/lib/defaults';
+import { getSelfPersonId } from '@/lib/expenses';
 import { toMinor } from '@/lib/money';
 import { randomUUID } from 'crypto';
 
@@ -25,6 +26,8 @@ export const POST = withAuth(async (req, session) => {
 
     let createdCategories = 0;
     let createdPeople = 0;
+    // Rows with no person column are your own spending, same rule as the form.
+    const selfId = existingPeople.find((p) => p.isSelf)?.id ?? (await getSelfPersonId(session.userId));
 
     async function ensureCategory(name: string) {
       const key = name.toLowerCase();
@@ -87,6 +90,8 @@ export const POST = withAuth(async (req, session) => {
       if (row.personName) {
         const person = await ensurePerson(row.personName);
         pendingLinks.push({ index: i, personId: person.id });
+      } else if (selfId) {
+        pendingLinks.push({ index: i, personId: selfId });
       }
     }
 

@@ -133,7 +133,10 @@ POST   /api/import/commit        write the previewed rows
 GET    /api/export               CSV, one row per transaction
 ```
 
-`personIds=none` filters to expenses with nobody attached.
+`personIds=none` filters to expenses with nobody attached. New expenses never land there —
+an empty person list resolves to the **Me** person, enforced in the service layer so the UI,
+the raw API and the importer all behave the same. The filter still finds older rows created
+before that rule.
 
 ---
 
@@ -156,7 +159,7 @@ The rules, in order:
 
 1. A person amount equal to a category amount **pairs** with it.
 2. A person amount equal to a sum of 2–3 category amounts pairs with all of them.
-3. Leftover category amounts become expenses with no person.
+3. Leftover category amounts become expenses attributed to **Me** (your own spending).
 4. Leftover person amounts are filed under a fallback category, with a warning.
 
 The preview shows the reconstructed total beside your sheet's own `TOTAL` column and
