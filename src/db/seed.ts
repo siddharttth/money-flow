@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { db, client } from './index';
+import { db, closeDb } from './index';
 import { users, categories, people, expenses, expensePeople } from './schema';
 import { bootstrapUser } from './bootstrap';
 import { hashPassword } from '@/lib/auth';
@@ -128,7 +128,7 @@ async function main() {
   const total = [...AUGUST, ...JULY].reduce((s, r) => s + r[1], 0);
   console.log(`✅ Seeded ${inserted} expenses (₹${total.toLocaleString('en-IN')}) for ${EMAIL}`);
   console.log(`   Sign in with: ${EMAIL} / ${PASSWORD}`);
-  await client.end();
+  await closeDb();
 }
 
 main().catch(async (e) => {
