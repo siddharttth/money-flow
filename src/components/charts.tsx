@@ -17,13 +17,13 @@ import {
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
 
-const axisStyle = { fontSize: 11, fill: 'var(--text-muted)' };
+const axisStyle = { fontSize: 11, fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)' };
 
 function TooltipBox({ label, value }: { label: string; value: number }) {
   return (
     <div className="card px-3 py-2 text-xs">
       <p className="muted">{label}</p>
-      <p className="font-semibold tabular">{formatINR(value, { decimals: true })}</p>
+      <p className="num font-semibold">{formatINR(value, { decimals: true })}</p>
     </div>
   );
 }
@@ -66,7 +66,7 @@ export function CategoryDonut({
       {/* Centre label — the number that actually matters. */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="label mb-0">Total</span>
-        <span className="text-xl font-semibold tabular">{formatINR(total)}</span>
+        <span className="num text-xl font-semibold">{formatINR(total)}</span>
       </div>
     </div>
   );
@@ -80,8 +80,8 @@ export function DailyTrend({ data }: { data: { date: string; totalMinor: number 
         <AreaChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
           <defs>
             <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--brass)" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="var(--brass)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -94,7 +94,7 @@ export function DailyTrend({ data }: { data: { date: string; totalMinor: number 
               ) : null
             }
           />
-          <Area type="monotone" dataKey="totalMinor" stroke="var(--accent)" strokeWidth={2} fill="url(#spendFill)" />
+          <Area type="monotone" dataKey="totalMinor" stroke="var(--brass)" strokeWidth={2} fill="url(#spendFill)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -112,7 +112,7 @@ export function MonthlyBars({
   return (
     <div style={{ height: 200 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }} barCategoryGap="28%" maxBarSize={56}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="month"
@@ -132,7 +132,7 @@ export function MonthlyBars({
           />
           <Bar dataKey="totalMinor" radius={[6, 6, 0, 0]}>
             {data.map((d) => (
-              <Cell key={d.month} fill={d.month === activeMonth ? 'var(--accent)' : 'var(--border)'} />
+              <Cell key={d.month} fill={d.month === activeMonth ? 'var(--brass)' : 'var(--border-strong)'} />
             ))}
           </Bar>
         </BarChart>

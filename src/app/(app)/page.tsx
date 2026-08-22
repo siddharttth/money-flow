@@ -6,11 +6,12 @@ import useSWR from 'swr';
 import { currentMonth, dayLabel, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { CategoryStat, Expense, ExpenseList, PersonStat, Summary } from '@/lib/types';
-import { Card, EmptyState, ErrorState, ListSkeleton, SectionTitle, Skeleton, StatTile } from '@/components/ui';
+import { Card, EmptyState, ErrorState, ListSkeleton, Money, SectionTitle, Skeleton, StatTile } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { CategoryDonut, DailyTrend, MonthlyBars, ShareBar } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
 import { monthRange } from '@/lib/dates';
+import { CategoryIcon, Icon, PersonMark, resolveIcon } from '@/components/icons';
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(currentMonth());
@@ -44,11 +45,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Hero total */}
-      <Card className="relative overflow-hidden">
+      {/* The month total carries the brass rule — it is the one number that matters. */}
+      <Card className="relative overflow-hidden rule-brass">
         <p className="label">Total spending</p>
         {s ? (
           <>
-            <p className="text-4xl sm:text-5xl font-semibold tabular tracking-tight">{formatINR(s.totalMinor)}</p>
+            <Money minor={s.totalMinor} className="block text-4xl sm:text-5xl font-semibold tracking-tight" />
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm muted">
               <span>{s.transactionCount} transactions</span>
               {change != null && (
@@ -64,12 +66,17 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="Today" value={s ? formatINR(s.todayMinor) : '—'} />
-        <StatTile label="This week" value={s ? formatINR(s.weekMinor) : '—'} />
-        <StatTile label="Daily average" value={s ? formatINR(s.avgDailyMinor) : '—'} sub={s ? `over ${s.activeDays} days` : undefined} />
+        <StatTile label="Today" minor={s?.todayMinor} value={s ? undefined : '—'} />
+        <StatTile label="This week" minor={s?.weekMinor} value={s ? undefined : '—'} />
+        <StatTile
+          label="Daily average"
+          minor={s?.avgDailyMinor}
+          value={s ? undefined : '—'}
+          sub={s ? `over ${s.activeDays} days` : undefined}
+        />
         <StatTile
           label="Top category"
-          value={s?.topCategory ? `${s.topCategory.icon} ${s.topCategory.name}` : '—'}
+          value={s?.topCategory ? s.topCategory.name : '—'}
           sub={s?.topCategory ? formatINR(s.topCategory.totalMinor) : undefined}
         />
       </div>
@@ -89,7 +96,7 @@ export default function DashboardPage() {
                   <Link key={c.categoryId} href={`/analytics?category=${c.categoryId}&month=${month}`} className="block">
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex items-center gap-2 min-w-0">
-                        <span aria-hidden>{c.icon}</span>
+                        <Icon name={resolveIcon(c.icon)} size={16} />
                         <span className="truncate">{c.name}</span>
                       </span>
                       <span className="tabular font-medium shrink-0">{formatINR(c.totalMinor)}</span>
@@ -127,13 +134,7 @@ export default function DashboardPage() {
                   href={`/people/${p.personId}?month=${month}`}
                   className="flex items-center gap-3 py-2 rounded-lg"
                 >
-                  <span
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0"
-                    style={{ background: `${p.color}22` }}
-                    aria-hidden
-                  >
-                    {p.avatar}
-                  </span>
+                  <PersonMark name={p.name} color={p.color} size={36} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">
                       {p.name} {p.isSelf && <span className="muted font-normal text-xs">· you</span>}
@@ -169,22 +170,18 @@ export default function DashboardPage() {
       {/* Lending sits beside spending but is never added to it. */}
       {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
         <Link href="/peers" className="block">
-          <Card>
+          <Card className={peers.data.owedByMeMinor > peers.data.owedToMeMinor ? 'rule-red' : 'rule-credit'}>
             <SectionTitle action={<span className="text-sm" style={{ color: 'var(--accent)' }}>Peers →</span>}>
               Lent &amp; borrowed
             </SectionTitle>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="label mb-1">They owe me</p>
-                <p className="text-xl font-semibold tabular" style={{ color: 'var(--success)' }}>
-                  {formatINR(peers.data.owedToMeMinor)}
-                </p>
+                <Money minor={peers.data.owedToMeMinor} className="text-xl font-semibold" style={{ color: 'var(--credit)' }} />
               </div>
               <div>
                 <p className="label mb-1">I owe</p>
-                <p className="text-xl font-semibold tabular" style={{ color: 'var(--danger)' }}>
-                  {formatINR(peers.data.owedByMeMinor)}
-                </p>
+                <Money minor={peers.data.owedByMeMinor} className="text-xl font-semibold" style={{ color: 'var(--rule-red)' }} />
               </div>
             </div>
             <p className="muted text-xs mt-3">Tracked separately — not part of the {monthLabel(month)} total above.</p>
@@ -195,19 +192,23 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-5">
         <Card>
           <SectionTitle>Daily spending</SectionTitle>
-          {daily.data?.items.length ? (
-            <DailyTrend data={daily.data.items} />
+          {(daily.data?.items.length ?? 0) >= 2 ? (
+            <DailyTrend data={daily.data!.items} />
           ) : (
-            <p className="muted text-sm py-8 text-center">Not enough data for a trend yet.</p>
+            <EmptyState icon="📈" title="Not enough data yet" hint="Two days of spending draws the first trend." />
           )}
         </Card>
 
         <Card>
           <SectionTitle>Last 6 months</SectionTitle>
-          {trends.data?.items.length ? (
-            <MonthlyBars data={trends.data.items} activeMonth={month} />
+          {(trends.data?.items.length ?? 0) >= 2 ? (
+            <MonthlyBars data={trends.data!.items} activeMonth={month} />
           ) : (
-            <p className="muted text-sm py-8 text-center">No history yet.</p>
+            <EmptyState
+              icon="📅"
+              title="Not enough history yet"
+              hint="A trend needs at least two months. Come back next month and this fills in."
+            />
           )}
         </Card>
       </div>
@@ -236,13 +237,7 @@ function RecentRow({ expense: e }: { expense: Expense }) {
   const { openAdd } = useShell();
   return (
     <button onClick={() => openAdd(e)} className="w-full flex items-center gap-3 py-3 text-left">
-      <span
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: `${e.category.color}22` }}
-        aria-hidden
-      >
-        {e.category.icon}
-      </span>
+      <CategoryIcon icon={e.category.icon} color={e.category.color} size={36} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">
           {e.category.name}

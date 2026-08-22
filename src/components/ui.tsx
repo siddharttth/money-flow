@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useEffect } from 'react';
+import { formatINR } from '@/lib/money';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`card p-4 sm:p-5 ${className}`}>{children}</div>;
@@ -172,21 +173,52 @@ export function ChipRow({ children, scroll = false }: { children: ReactNode; scr
   );
 }
 
+/**
+ * A rupee figure. Always monospace, and a genuine zero is dimmed — "₹0 today"
+ * is the absence of information and shouldn't compete with a real number.
+ */
+export function Money({
+  minor,
+  compact = false,
+  decimals = false,
+  className = '',
+  style,
+}: {
+  minor: number;
+  compact?: boolean;
+  decimals?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span className={`num ${className}`} data-zero={minor === 0} style={style}>
+      {formatINR(minor, { compact, decimals })}
+    </span>
+  );
+}
+
 export function StatTile({
   label,
   value,
+  minor,
   sub,
   tone,
 }: {
   label: string;
-  value: string;
+  /** Pass `minor` for money (mono + zero dimming); `value` for anything else. */
+  value?: string;
+  minor?: number;
   sub?: string;
   tone?: 'up' | 'down';
 }) {
   return (
     <div className="card p-3.5 sm:p-4">
       <p className="label mb-1">{label}</p>
-      <p className="text-xl sm:text-2xl font-semibold tabular">{value}</p>
+      {minor !== undefined ? (
+        <Money minor={minor} className="text-xl sm:text-2xl font-semibold" />
+      ) : (
+        <p className="text-xl sm:text-2xl font-semibold">{value}</p>
+      )}
       {sub && (
         <p
           className="text-xs mt-1"

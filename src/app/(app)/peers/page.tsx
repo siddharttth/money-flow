@@ -5,8 +5,9 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { formatINR } from '@/lib/money';
 import { dayLabel } from '@/lib/dates';
-import { Card, EmptyState, ErrorState, ListSkeleton, Modal } from '@/components/ui';
+import { Card, EmptyState, ErrorState, ListSkeleton, Modal, Money } from '@/components/ui';
 import { LedgerForm } from '@/components/ledger-form';
+import { PersonMark } from '@/components/icons';
 
 type Balance = {
   personId: string;
@@ -47,20 +48,24 @@ export default function PeersPage() {
 
       {/* Headline: the sheet's GIVEN and TAKEN totals. */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="!p-4">
+        <Card className="!p-4 rule-credit">
           <p className="label mb-1">They owe me</p>
-          <p className="text-xl sm:text-2xl font-semibold tabular" style={{ color: 'var(--success)' }}>
-            {data ? formatINR(data.owedToMeMinor) : '—'}
-          </p>
+          {data ? (
+            <Money minor={data.owedToMeMinor} className="text-xl sm:text-2xl font-semibold" style={{ color: 'var(--credit)' }} />
+          ) : (
+            <p className="text-xl sm:text-2xl font-semibold">—</p>
+          )}
           <p className="muted text-xs mt-1">
             {data ? `${data.theyOwe.length} ${data.theyOwe.length === 1 ? 'person' : 'people'}` : ''}
           </p>
         </Card>
-        <Card className="!p-4">
+        <Card className="!p-4 rule-red">
           <p className="label mb-1">I owe</p>
-          <p className="text-xl sm:text-2xl font-semibold tabular" style={{ color: 'var(--danger)' }}>
-            {data ? formatINR(data.owedByMeMinor) : '—'}
-          </p>
+          {data ? (
+            <Money minor={data.owedByMeMinor} className="text-xl sm:text-2xl font-semibold" style={{ color: 'var(--rule-red)' }} />
+          ) : (
+            <p className="text-xl sm:text-2xl font-semibold">—</p>
+          )}
           <p className="muted text-xs mt-1">
             {data ? `${data.iOwe.length} ${data.iOwe.length === 1 ? 'person' : 'people'}` : ''}
           </p>
@@ -157,13 +162,7 @@ function PeerGroup({
       <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
         {items.map((b) => (
           <Link key={b.personId} href={`/peers/${b.personId}`} className="flex items-center gap-3 px-4 sm:px-5 py-3">
-            <span
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0"
-              style={{ background: `${b.color}22` }}
-              aria-hidden
-            >
-              {b.avatar}
-            </span>
+            <PersonMark name={b.name} color={b.color} size={40} />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{b.name}</p>
               <p className="muted text-xs truncate">

@@ -11,8 +11,9 @@ import { MonthPicker } from '@/components/month-picker';
 import { ShareBar } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
 import { PALETTE } from '@/lib/defaults';
+import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
 
-const ICONS = ['💸', '🧾', '🚬', '🍔', '🥦', '🛍️', '🚕', '✨', '📈', '🏠', '💊', '🎬', '📚', '⛽', '🎁', '💇'];
+// Drawn from the icon set so a category can never hold an emoji again.
 
 export default function CategoriesPage() {
   const { toast } = useShell();
@@ -70,13 +71,7 @@ export default function CategoriesPage() {
                 return (
                   <div key={c.id} className="py-3">
                     <div className="flex items-center gap-3">
-                      <span
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-                        style={{ background: `${c.color}22` }}
-                        aria-hidden
-                      >
-                        {c.icon}
-                      </span>
+                      <CategoryIcon icon={c.icon} color={c.color} size={40} />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm truncate">
                           {c.name}
@@ -133,7 +128,7 @@ export default function CategoriesPage() {
           <div className="flex flex-wrap gap-2">
             {disabled.map((c) => (
               <button key={c.id} className="chip" onClick={() => setEditing(c)}>
-                {c.icon} {c.name}
+                <Icon name={resolveIcon(c.icon)} size={14} /> {c.name}
               </button>
             ))}
           </div>
@@ -173,7 +168,7 @@ function CategoryModal({
   onDone: (msg: string) => void;
 }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('💸');
+  const [icon, setIcon] = useState<string>('cash');
   const [color, setColor] = useState(PALETTE[0]);
   const [kind, setKind] = useState('expense');
   const [busy, setBusy] = useState(false);
@@ -184,7 +179,7 @@ function CategoryModal({
   if (key !== identity && open) {
     setKey(identity);
     setName(category?.name ?? '');
-    setIcon(category?.icon ?? '💸');
+    setIcon(resolveIcon(category?.icon));
     setColor(category?.color ?? PALETTE[0]);
     setKind(category?.kind ?? 'expense');
     setError(null);
@@ -220,9 +215,16 @@ function CategoryModal({
         <div>
           <label className="label">Icon</label>
           <div className="flex flex-wrap gap-2">
-            {ICONS.map((i) => (
-              <button key={i} className="chip text-lg px-3" data-selected={icon === i} onClick={() => setIcon(i)}>
-                {i}
+            {ICON_KEYS.map((k) => (
+              <button
+                key={k}
+                className="chip px-2.5"
+                data-selected={icon === k}
+                onClick={() => setIcon(k)}
+                aria-label={k}
+                style={icon === k ? undefined : { color }}
+              >
+                <Icon name={k} size={18} />
               </button>
             ))}
           </div>

@@ -22,7 +22,7 @@ Everything here runs on free tiers.
 | ORM | Drizzle | SQL-first migrations, tiny runtime |
 | Auth | JWT in an httpOnly cookie (`jose` + `bcryptjs`) | No paid auth service |
 | Validation | Zod | One schema per endpoint, reused for error messages |
-| UI | Tailwind v4, Recharts, SWR | Mobile-first, dark mode, no component library |
+| UI | Tailwind v4, Recharts, SWR, IBM Plex | Mobile-first, dark mode, no component library |
 | Tests | Vitest + PGlite | Real Postgres in-process; no external DB needed |
 
 ---
@@ -102,6 +102,26 @@ person breakdown also returns `grandTotalMinor` (real money) separately from
 uses `EXISTS` rather than a `JOIN` precisely so a multi-person expense is counted once.
 
 ---
+
+## Design
+
+The reference is a **bahi-khata**, not a SaaS dashboard: ink on warm paper, a red rule down the
+margin, brass for what matters.
+
+- **Ink navy / warm ledger paper** grounds both themes. Brass (`--brass`) is the single accent
+  and always means money; `--rule-red` is the ledger margin line and doubles as debit;
+  `--credit` is money coming back.
+- **A card earns a rule only when it carries weight** — brass on the month total, red on what you
+  owe, green on what you're owed. Everything routine stays plain, so hierarchy comes from
+  meaning rather than decoration.
+- **Every rupee figure is IBM Plex Mono** with tabular figures. Fixed-width digits are the reason
+  a passbook column is scannable: ₹600 and ₹11,000 line up and can be compared without reading.
+- **A genuine zero is dimmed.** "₹0 today" is the absence of information and shouldn't compete
+  with a real number.
+- **Icons, not emoji.** Emoji dragged their own colour and cartoon style into a restrained
+  palette. The set in `components/icons.tsx` inherits `currentColor`, so a category renders in
+  its own colour. People get initials — a name identifies better than a generic face.
+- **Charts hide below two data points** rather than drawing a single bar across the full width.
 
 ## Peers — money lent and borrowed
 

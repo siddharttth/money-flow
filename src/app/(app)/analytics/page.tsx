@@ -11,6 +11,7 @@ import { Card, EmptyState, ListSkeleton, Modal, SectionTitle, StatTile } from '@
 import { MonthPicker } from '@/components/month-picker';
 import { CategoryDonut, DailyTrend, MonthlyBars, ShareBar } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
+import { Icon, resolveIcon } from '@/components/icons';
 
 export default function AnalyticsPage() {
   return (
@@ -54,8 +55,8 @@ function AnalyticsInner() {
 
       {/* Monthly summary — the spreadsheet's month tab, computed. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="Total" value={s ? formatINR(s.totalMinor) : '—'} sub={s ? `${s.transactionCount} ${s.transactionCount === 1 ? 'transaction' : 'transactions'}` : undefined} />
-        <StatTile label="Daily average" value={s ? formatINR(s.avgDailyMinor) : '—'} />
+        <StatTile label="Total" minor={s?.totalMinor} value={s ? undefined : '—'} sub={s ? `${s.transactionCount} ${s.transactionCount === 1 ? 'transaction' : 'transactions'}` : undefined} />
+        <StatTile label="Daily average" minor={s?.avgDailyMinor} value={s ? undefined : '—'} />
         <StatTile
           label="Vs last month"
           value={s?.changePct != null ? `${s.changePct > 0 ? '+' : ''}${s.changePct.toFixed(1)}%` : '—'}
@@ -64,7 +65,8 @@ function AnalyticsInner() {
         />
         <StatTile
           label="Biggest day"
-          value={s?.topDay ? formatINR(s.topDay.totalMinor) : '—'}
+          minor={s?.topDay?.totalMinor}
+          value={s?.topDay ? undefined : '—'}
           sub={s?.topDay ? dayLabel(s.topDay.date) : undefined}
         />
       </div>
@@ -82,7 +84,7 @@ function AnalyticsInner() {
               data-selected={personIds.includes(p.id)}
               onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
             >
-              {p.avatar} {p.name}
+              {p.name}
             </button>
           ))}
           <button
@@ -108,7 +110,7 @@ function AnalyticsInner() {
                   <button key={c.categoryId} className="block w-full text-left" onClick={() => setDrill(c)}>
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex items-center gap-2 min-w-0">
-                        <span aria-hidden>{c.icon}</span>
+                        <Icon name={resolveIcon(c.icon)} size={16} />
                         <span className="truncate">{c.name}</span>
                         <span className="muted text-xs shrink-0">{(c.share * 100).toFixed(0)}%</span>
                       </span>
@@ -140,7 +142,6 @@ function AnalyticsInner() {
                   <div key={p.personId}>
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex items-center gap-2 min-w-0">
-                        <span aria-hidden>{p.avatar}</span>
                         <span className="truncate">{p.name}</span>
                         <span className="muted text-xs shrink-0">×{p.count}</span>
                       </span>
@@ -166,15 +167,19 @@ function AnalyticsInner() {
 
       <Card>
         <SectionTitle>Daily spending</SectionTitle>
-        {daily.data?.items.length ? <DailyTrend data={daily.data.items} /> : <p className="muted text-sm py-8 text-center">No data.</p>}
+        {(daily.data?.items.length ?? 0) >= 2 ? (
+          <DailyTrend data={daily.data!.items} />
+        ) : (
+          <EmptyState icon="📈" title="Not enough data yet" hint="Two days of spending draws the first trend." />
+        )}
       </Card>
 
       <Card>
         <SectionTitle>12 month trend</SectionTitle>
-        {trends.data?.items.length ? (
-          <MonthlyBars data={trends.data.items} activeMonth={month} />
+        {(trends.data?.items.length ?? 0) >= 2 ? (
+          <MonthlyBars data={trends.data!.items} activeMonth={month} />
         ) : (
-          <p className="muted text-sm py-8 text-center">No history yet.</p>
+          <EmptyState icon="📅" title="Not enough history yet" hint="A trend needs at least two months." />
         )}
       </Card>
 
@@ -202,7 +207,7 @@ function CategoryDrilldown({
   );
 
   return (
-    <Modal open={!!category} onClose={onClose} title={category ? `${category.icon} ${category.name}` : ''} wide>
+    <Modal open={!!category} onClose={onClose} title={category ? category.name : ''} wide>
       {category && (
         <>
           <div className="mb-4">

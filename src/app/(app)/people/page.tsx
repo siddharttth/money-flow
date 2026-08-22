@@ -10,9 +10,11 @@ import type { Group, Person, PersonStat } from '@/lib/types';
 import { Card, EmptyState, ListSkeleton, Modal, SectionTitle } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { useShell } from '@/components/app-shell';
+import { PersonMark } from '@/components/icons';
+import { PALETTE } from '@/lib/defaults';
 
 const RELATIONSHIPS = ['self', 'family', 'friend', 'other'] as const;
-const AVATARS = ['🙂', '🙋', '👩', '👨', '🧑', '👧', '🧒', '👵', '👴', '🤝', '🎓', '🏢'];
+
 
 export default function PeoplePage() {
   const { toast } = useShell();
@@ -70,13 +72,7 @@ export default function PeoplePage() {
                   return (
                     <div key={p.id} className="flex items-center gap-3 py-3">
                       <Link href={`/people/${p.id}?month=${month}`} className="flex items-center gap-3 flex-1 min-w-0">
-                        <span
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0"
-                          style={{ background: `${p.color}22` }}
-                          aria-hidden
-                        >
-                          {p.avatar}
-                        </span>
+                        <PersonMark name={p.name} color={p.color} size={40} />
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">
                             {p.name}
@@ -126,7 +122,7 @@ export default function PeoplePage() {
           <div className="flex flex-wrap gap-2">
             {hidden.map((p) => (
               <button key={p.id} className="chip" onClick={() => setEditing(p)}>
-                {p.avatar} {p.name}
+                {p.name}
               </button>
             ))}
           </div>
@@ -217,7 +213,7 @@ function PersonModal({
 }) {
   const [name, setName] = useState('');
   const [relationshipType, setRelationshipType] = useState<string>('friend');
-  const [avatar, setAvatar] = useState('🙂');
+  const [color, setColor] = useState(PALETTE[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState('');
@@ -228,7 +224,7 @@ function PersonModal({
     setKey(identity);
     setName(person?.name ?? '');
     setRelationshipType(person?.relationshipType ?? 'friend');
-    setAvatar(person?.avatar ?? '🙂');
+    setColor(person?.color ?? PALETTE[0]);
     setError(null);
   }
 
@@ -237,10 +233,10 @@ function PersonModal({
     setError(null);
     try {
       if (person) {
-        await api.patch(`/api/people/${person.id}`, { name, relationshipType, avatar });
+        await api.patch(`/api/people/${person.id}`, { name, relationshipType, color });
         onDone('Person updated');
       } else {
-        await api.post('/api/people', { name, relationshipType, avatar });
+        await api.post('/api/people', { name, relationshipType, color });
         onDone('Person added');
       }
     } catch (err) {
@@ -295,13 +291,20 @@ function PersonModal({
         </div>
 
         <div>
-          <label className="label">Avatar</label>
-          <div className="flex flex-wrap gap-2">
-            {AVATARS.map((a) => (
-              <button key={a} className="chip text-lg px-3" data-selected={avatar === a} onClick={() => setAvatar(a)}>
-                {a}
-              </button>
-            ))}
+          <label className="label">Colour</label>
+          <div className="flex items-center gap-3">
+            <PersonMark name={name || '?'} color={color} size={44} />
+            <div className="flex flex-wrap gap-2">
+              {PALETTE.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  aria-label={`Colour ${c}`}
+                  className="w-7 h-7 rounded-full border-2"
+                  style={{ background: c, borderColor: color === c ? 'var(--text)' : 'transparent' }}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -374,7 +377,7 @@ function GroupModal({
                 data-selected={personIds.includes(p.id)}
                 onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
               >
-                {p.avatar} {p.name}
+                {p.name}
               </button>
             ))}
           </div>

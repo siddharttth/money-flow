@@ -151,7 +151,6 @@ export function LedgerForm({
                   onClick={() => setPersonId(p.id)}
                   style={personId === p.id ? { background: p.color, borderColor: p.color } : undefined}
                 >
-                  <span aria-hidden>{p.avatar}</span>
                   {p.name}
                 </button>
               ))}

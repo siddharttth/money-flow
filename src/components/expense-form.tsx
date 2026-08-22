@@ -6,6 +6,7 @@ import { api, RequestError } from '@/lib/client';
 import { todayISO } from '@/lib/dates';
 import type { Category, Expense, Person } from '@/lib/types';
 import { ChipRow } from './ui';
+import { Icon, resolveIcon } from '@/components/icons';
 
 /** Categories and people the user picked most recently, surfaced first so the
  *  common case is a single tap. Stored locally — no server round trip. */
@@ -188,9 +189,14 @@ export function ExpenseForm({
                 className="chip"
                 data-selected={categoryId === c.id}
                 onClick={() => setCategoryId(c.id)}
-                style={categoryId === c.id ? { background: c.color, borderColor: c.color } : undefined}
+                style={
+                  categoryId === c.id
+                    ? { background: c.color, borderColor: c.color, color: '#fff' }
+                    : { ['--chip-icon' as string]: c.color }
+                }
               >
-                <span aria-hidden>{c.icon}</span>
+                {/* Tinted when unselected so the row is scannable by colour. */}
+                <Icon name={resolveIcon(c.icon)} size={15} className={categoryId === c.id ? '' : undefined} />
                 {c.name}
               </button>
             ))}
@@ -215,7 +221,7 @@ export function ExpenseForm({
               onClick={() => selectPerson(p.id)}
               style={personIds.includes(p.id) ? { background: p.color, borderColor: p.color } : undefined}
             >
-              <span aria-hidden>{multi && personIds.includes(p.id) ? '✓' : p.avatar}</span>
+              {multi && personIds.includes(p.id) && <span aria-hidden>✓</span>}
               {p.name}
             </button>
           ))}

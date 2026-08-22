@@ -16,11 +16,11 @@ const EMAIL = process.env.SEED_EMAIL ?? 'demo@moneyflow.app';
 const PASSWORD = process.env.SEED_PASSWORD ?? 'demo1234';
 
 const EXTRA_PEOPLE = [
-  { name: 'Mummy', relationshipType: 'family', avatar: '👵', color: '#ec4899' },
-  { name: 'Aditi', relationshipType: 'family', avatar: '👩', color: '#a855f7' },
-  { name: 'Aarya', relationshipType: 'family', avatar: '👧', color: '#22c55e' },
-  { name: 'Sankalp', relationshipType: 'friend', avatar: '🧑', color: '#3b82f6' },
-  { name: 'Randoms', relationshipType: 'other', avatar: '🤝', color: '#64748b' },
+  { name: 'Mummy', relationshipType: 'family', color: '#a85a76' },
+  { name: 'Aditi', relationshipType: 'family', color: '#7d6098' },
+  { name: 'Aarya', relationshipType: 'family', color: '#5f8a5a' },
+  { name: 'Sankalp', relationshipType: 'friend', color: '#4a7a96' },
+  { name: 'Randoms', relationshipType: 'other', color: '#6b7280' },
 ];
 
 type Row = [day: number, amount: number, category: string, person: string | null, note: string | null];

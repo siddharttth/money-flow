@@ -11,6 +11,7 @@ import { Card, EmptyState, ErrorState, ListSkeleton, SectionTitle } from '@/comp
 import { MonthPicker } from '@/components/month-picker';
 import { ShareBar } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
+import { CategoryIcon, Icon, PersonMark, resolveIcon } from '@/components/icons';
 
 type Detail = {
   person: Person;
@@ -49,13 +50,7 @@ export default function PersonDetailPage({ params }: { params: Promise<{ id: str
         <>
           <Card>
             <div className="flex items-center gap-4">
-              <span
-                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shrink-0"
-                style={{ background: `${data.person.color}22` }}
-                aria-hidden
-              >
-                {data.person.avatar}
-              </span>
+              <PersonMark name={data.person.name} color={data.person.color} size={56} />
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold truncate">{data.person.name}</h1>
                 <p className="muted text-sm capitalize">{data.person.relationshipType}</p>
@@ -95,7 +90,7 @@ export default function PersonDetailPage({ params }: { params: Promise<{ id: str
                     <div key={c.categoryId}>
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="flex items-center gap-2 min-w-0">
-                          <span aria-hidden>{c.icon}</span>
+                          <Icon name={resolveIcon(c.icon)} size={16} />
                           <span className="truncate">{c.name}</span>
                           <span className="muted text-xs shrink-0">×{c.count}</span>
                         </span>
@@ -125,13 +120,7 @@ export default function PersonDetailPage({ params }: { params: Promise<{ id: str
                 {data.expenses.map((e) => (
                   <button key={e.id} onClick={() => openAdd(e)} className="w-full flex items-center gap-3 py-3 text-left">
                     <span className="muted text-xs w-14 shrink-0 tabular">{dayLabel(e.expenseDate)}</span>
-                    <span
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: `${e.category.color}22` }}
-                      aria-hidden
-                    >
-                      {e.category.icon}
-                    </span>
+                    <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{e.category.name}</p>
                       {e.note && <p className="muted text-xs truncate">{e.note}</p>}

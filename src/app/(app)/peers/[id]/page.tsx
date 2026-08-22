@@ -9,6 +9,7 @@ import { dayLabel } from '@/lib/dates';
 import { Card, EmptyState, ErrorState, ListSkeleton, Modal, SectionTitle } from '@/components/ui';
 import { LedgerForm, type LedgerEntry } from '@/components/ledger-form';
 import { useShell } from '@/components/app-shell';
+import { PersonMark } from '@/components/icons';
 
 type Detail = {
   person: { id: string; name: string; avatar: string; color: string; relationshipType: string };
@@ -69,13 +70,7 @@ export default function PeerDetailPage({ params }: { params: Promise<{ id: strin
         <>
           <Card>
             <div className="flex items-center gap-4">
-              <span
-                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl shrink-0"
-                style={{ background: `${data.person.color}22` }}
-                aria-hidden
-              >
-                {data.person.avatar}
-              </span>
+              <PersonMark name={data.person.name} color={data.person.color} size={56} />
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold truncate">{data.person.name}</h1>
                 <p className="muted text-sm capitalize">{data.person.relationshipType}</p>

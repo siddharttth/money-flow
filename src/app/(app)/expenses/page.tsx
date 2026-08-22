@@ -9,6 +9,7 @@ import type { Category, Expense, ExpenseList, Person } from '@/lib/types';
 import { Card, EmptyState, ErrorState, ListSkeleton, Modal } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { useShell } from '@/components/app-shell';
+import { CategoryIcon, Icon, resolveIcon } from '@/components/icons';
 
 type Sort = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc';
 
@@ -246,7 +247,7 @@ export default function ExpensesPage() {
                     setCategoryIds((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]))
                   }
                 >
-                  {c.icon} {c.name}
+                  <Icon name={resolveIcon(c.icon)} size={14} /> {c.name}
                 </button>
               ))}
             </div>
@@ -262,7 +263,7 @@ export default function ExpensesPage() {
                   data-selected={personIds.includes(p.id)}
                   onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
                 >
-                  {p.avatar} {p.name}
+                  {p.name}
                 </button>
               ))}
               <button
@@ -307,13 +308,7 @@ function ExpenseRow({
     <div>
       <div className="flex items-center gap-3 px-4 sm:px-5 py-3">
         <button onClick={onEdit} className="flex items-center gap-3 min-w-0 flex-1 text-left">
-          <span
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: `${e.category.color}22` }}
-            aria-hidden
-          >
-            {e.category.icon}
-          </span>
+          <CategoryIcon icon={e.category.icon} color={e.category.color} size={36} />
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{e.category.name}</p>
             <p className="muted text-xs truncate">

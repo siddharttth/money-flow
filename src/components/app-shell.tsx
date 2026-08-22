@@ -90,8 +90,8 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
           <Link href="/" className="flex items-center gap-2 px-2 mb-6">
-            <span className="text-xl">💸</span>
-            <span className="font-semibold">Money Flow</span>
+            <span aria-hidden style={{ width: 3, height: 20, background: 'var(--rule-red)', borderRadius: 2 }} />
+            <span className="wordmark text-lg">Money Flow</span>
           </Link>
 
           <button className="btn btn-primary mb-5" onClick={() => openAdd()}>
@@ -139,7 +139,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             }}
           >
             <Link href="/" className="flex items-center gap-2 font-semibold">
-              <span>💸</span> Money Flow
+              <span className="wordmark text-lg">Money Flow</span>
             </Link>
           </header>
 
