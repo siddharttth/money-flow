@@ -3,262 +3,312 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { currentMonth, dayLabel, monthLabel } from '@/lib/dates';
+import { currentMonth, dayLabel, monthLabel, monthRange, todayISO, daysBetween } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
-import type { CategoryStat, Expense, ExpenseList, PersonStat, Summary } from '@/lib/types';
-import { Card, EmptyState, ErrorState, ListSkeleton, Money, SectionHead, SectionTitle, Skeleton, StatStrip } from '@/components/ui';
+import type { CategoryStat, PersonStat, Summary } from '@/lib/types';
+import type { Transaction } from '@/lib/transactions';
+import { Card, EmptyState, ErrorState, ListSkeleton, Money, SectionHead, Skeleton } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
-import { CategoryDonut, DailyTrend, MonthlyBars, ShareBar } from '@/components/charts';
+import { CategoryDonut, DailyTrend } from '@/components/charts';
 import { useShell } from '@/components/app-shell';
-import { monthRange } from '@/lib/dates';
-import { CategoryIcon, Icon, PersonMark, resolveIcon } from '@/components/icons';
+import { useInspector } from '@/components/inspector';
+import { CategoryIcon, PersonMark } from '@/components/icons';
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(currentMonth());
+  const [view, setView] = useState<'trend' | 'categories'>('trend');
   const { openAdd } = useShell();
+  const { openPerson, openCategory } = useInspector();
   const { start, end } = monthRange(month);
 
   const summary = useSWR<Summary>(`/api/analytics/summary?month=${month}`);
   const cats = useSWR<{ items: CategoryStat[]; grandTotalMinor: number }>(`/api/analytics/categories?month=${month}`);
-  const ppl = useSWR<{ people: PersonStat[]; unassignedMinor: number; grandTotalMinor: number }>(
-    `/api/analytics/people?month=${month}`,
-  );
+  const ppl = useSWR<{ people: PersonStat[]; grandTotalMinor: number }>(`/api/analytics/people?month=${month}`);
   const daily = useSWR<{ items: { date: string; totalMinor: number }[] }>(`/api/analytics/daily?month=${month}`);
-  const trends = useSWR<{ items: { month: string; totalMinor: number }[] }>(`/api/analytics/trends?months=6`);
-  const recent = useSWR<ExpenseList>(`/api/expenses?start=${start}&end=${end}&limit=6`);
-  const peers = useSWR<{ owedToMeMinor: number; owedByMeMinor: number }>('/api/ledger');
+  const peers = useSWR<{ owedToMeMinor: number; owedByMeMinor: number; netMinor: number }>('/api/ledger');
+  const recent = useSWR<{ items: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&limit=8`);
 
   const s = summary.data;
-  const change = s?.changePct;
+  const today = todayISO();
+  const isCurrent = month === today.slice(0, 7);
+  const daysElapsed = isCurrent ? daysBetween(start, today) : daysBetween(start, end);
+  const daysInMonth = daysBetween(start, end);
+  // Straight-line burn rate — the simplest projection that is honest.
+  const projected = s && daysElapsed ? Math.round((s.totalMinor / daysElapsed) * daysInMonth) : 0;
+  const net = peers.data?.netMinor ?? 0;
 
   if (summary.error) return <ErrorState message={summary.error.message} onRetry={() => summary.mutate()} />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Dashboard</h1>
-          {/* The picker beside this already names the month on small screens. */}
           <p className="muted text-sm hidden sm:block">{monthLabel(month)}</p>
         </div>
         <MonthPicker month={month} onChange={setMonth} />
       </div>
 
-      {/* The month total is the page's subject — it gets air, not a card. */}
-      <div className="pt-1 pb-1">
-        <p className="label">Total spending</p>
-        {s ? (
-          <>
-            <div className="flex items-end gap-4 flex-wrap">
-              <Money minor={s.totalMinor} className="block text-[2.75rem] sm:text-6xl font-bold tracking-tight leading-none" />
-              {change != null && (
-                <span
-                  className="text-sm font-semibold pb-1.5"
-                  style={{ color: change > 0 ? 'var(--rule-red)' : 'var(--credit)' }}
-                >
-                  {change > 0 ? '▲' : '▼'} {Math.abs(change).toFixed(1)}%
-                </span>
-              )}
-            </div>
-            <p className="muted text-sm mt-2.5">
-              {s.transactionCount} transactions
-              {change != null && ` · ${monthLabel(s.previousMonth.month)} was ${formatINR(s.previousMonth.totalMinor)}`}
-            </p>
-          </>
-        ) : (
-          <Skeleton className="h-12 w-56 mt-1" />
-        )}
+      {/* Four figures that answer: how much, how fast, who, and where it lands. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="!p-4">
+          <p className="micro mb-1.5">Spent this month</p>
+          {s ? (
+            <>
+              <Money minor={s.totalMinor} className="block text-2xl font-semibold" />
+              <p className="text-xs mt-1.5" style={{ color: (s.changePct ?? 0) > 0 ? 'var(--rule-red)' : 'var(--credit)' }}>
+                {s.changePct != null
+                  ? `${s.changePct > 0 ? '↑' : '↓'} ${Math.abs(s.changePct).toFixed(1)}% vs ${monthLabel(s.previousMonth.month).split(' ')[0]}`
+                  : `${s.transactionCount} transactions`}
+              </p>
+            </>
+          ) : (
+            <Skeleton className="h-8 w-24" />
+          )}
+        </Card>
+
+        <Card className="!p-4">
+          <p className="micro mb-1.5">Daily pace</p>
+          {s ? (
+            <>
+              <Money minor={s.avgDailyMinor} className="block text-2xl font-semibold" />
+              <p className="muted text-xs mt-1.5">avg over {daysElapsed} days</p>
+            </>
+          ) : (
+            <Skeleton className="h-8 w-24" />
+          )}
+        </Card>
+
+        <Link href="/people" className="block">
+          <Card className="!p-4 h-full transition-colors" style={{ transitionDuration: '150ms' }}>
+            <p className="micro mb-1.5">Net peer balance</p>
+            {peers.data ? (
+              <>
+                <Money
+                  minor={Math.abs(net)}
+                  className="block text-2xl font-semibold"
+                  style={{ color: net === 0 ? 'var(--text)' : net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+                />
+                <p className="muted text-xs mt-1.5">
+                  {net === 0
+                    ? 'all settled'
+                    : `${formatINR(peers.data.owedToMeMinor)} lent · ${formatINR(peers.data.owedByMeMinor)} borrowed`}
+                </p>
+              </>
+            ) : (
+              <Skeleton className="h-8 w-24" />
+            )}
+          </Card>
+        </Link>
+
+        <Card className="!p-4">
+          <p className="micro mb-1.5">Projected month end</p>
+          {s ? (
+            <>
+              <Money minor={projected} className="block text-2xl font-semibold" />
+              <p className="muted text-xs mt-1.5">
+                {isCurrent ? `at the current burn rate` : `actual for ${monthLabel(month).split(' ')[0]}`}
+              </p>
+            </>
+          ) : (
+            <Skeleton className="h-8 w-24" />
+          )}
+        </Card>
       </div>
 
-      <StatStrip
-        items={[
-          { label: 'Today', minor: s?.todayMinor },
-          { label: 'This week', minor: s?.weekMinor },
-          { label: 'Daily average', minor: s?.avgDailyMinor, sub: s ? `over ${s.activeDays} days` : undefined },
-          {
-            label: 'Top category',
-            value: s?.topCategory ? s.topCategory.name : '—',
-            sub: s?.topCategory ? formatINR(s.topCategory.totalMinor) : undefined,
-          },
-        ]}
-      />
+      {/* 60/40: the chart carries the month, the rails carry the shortcuts. */}
+      <div className="grid lg:grid-cols-5 gap-5 items-start">
+        <Card className="lg:col-span-3">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-base font-semibold">Spending trajectory</h2>
+            <div className="flex gap-1 p-1 rounded-full" style={{ background: 'var(--surface-2)' }}>
+              {(['trend', 'categories'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className="px-3 py-1 rounded-full text-xs font-semibold capitalize transition-colors"
+                  style={{
+                    transitionDuration: '150ms',
+                    background: view === v ? 'var(--surface)' : 'transparent',
+                    color: view === v ? 'var(--text)' : 'var(--text-muted)',
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
-        <Card>
-          <SectionTitle action={<Link href="/analytics" className="text-sm" style={{ color: 'var(--accent)' }}>All →</Link>}>
-            Where it went
-          </SectionTitle>
-          {cats.isLoading ? (
-            <ListSkeleton rows={4} />
+          {view === 'trend' ? (
+            (daily.data?.items.length ?? 0) >= 2 ? (
+              <DailyTrend data={daily.data!.items} height={330} />
+            ) : (
+              <EmptyState icon="📈" title="Not enough data yet" hint="Two days of spending draws the first trend." />
+            )
           ) : cats.data?.items.length ? (
             <>
-              <CategoryDonut data={cats.data.items.map((c) => ({ name: c.name, totalMinor: c.totalMinor, color: c.color }))} />
-              <div className="space-y-2.5 mt-4">
-                {cats.data.items.slice(0, 6).map((c) => (
-                  <Link key={c.categoryId} href={`/analytics?category=${c.categoryId}&month=${month}`} className="block">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="flex items-center gap-2 min-w-0">
-                        <Icon name={resolveIcon(c.icon)} size={16} />
-                        <span className="truncate">{c.name}</span>
-                      </span>
-                      <span className="tabular font-medium shrink-0">{formatINR(c.totalMinor)}</span>
-                    </div>
-                    <ShareBar share={c.share} color={c.color} />
-                  </Link>
+              <CategoryDonut
+                data={cats.data.items.map((c) => ({ name: c.name, totalMinor: c.totalMinor, color: c.color }))}
+                height={200}
+              />
+              <div className="space-y-1 mt-4">
+                {cats.data.items.slice(0, 5).map((c) => (
+                  <button
+                    key={c.categoryId}
+                    onClick={() => openCategory(c.categoryId)}
+                    className="row w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left"
+                  >
+                    <CategoryIcon icon={c.icon} color={c.color} size={28} />
+                    <span className="text-sm flex-1 truncate">{c.name}</span>
+                    <span className="micro">{(c.share * 100).toFixed(0)}%</span>
+                    <Money minor={c.totalMinor} className="text-sm font-semibold w-20 text-right" />
+                  </button>
                 ))}
               </div>
             </>
           ) : (
             <EmptyState
               icon="📊"
-              title="No spending yet"
-              hint={`Nothing recorded for ${monthLabel(month)}.`}
+              title="Nothing logged yet"
+              hint={`No spending recorded for ${monthLabel(month)}.`}
               action={
                 <button className="btn btn-primary" onClick={() => openAdd()}>
-                  Add your first expense
+                  Add your first transaction
                 </button>
               }
             />
           )}
         </Card>
 
-        <Card>
-          <SectionTitle action={<Link href="/people" className="text-sm" style={{ color: 'var(--accent)' }}>All →</Link>}>
-            Who it was with
-          </SectionTitle>
-          {ppl.isLoading ? (
-            <ListSkeleton rows={4} />
-          ) : ppl.data?.people.length ? (
-            <div className="space-y-1">
-              {ppl.data.people.slice(0, 7).map((p) => (
-                <Link
-                  key={p.personId}
-                  href={`/people/${p.personId}?month=${month}`}
-                  className="flex items-center gap-3 py-2 rounded-lg"
-                >
-                  <PersonMark name={p.name} color={p.color} size={36} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {p.name} {p.isSelf && <span className="muted font-normal text-xs">· you</span>}
-                    </p>
-                    <p className="muted text-xs">
-                      {p.count} {p.count === 1 ? 'transaction' : 'transactions'}
-                    </p>
-                  </div>
-                  <span className="tabular font-medium text-sm">{formatINR(p.totalMinor)}</span>
-                </Link>
-              ))}
-              {ppl.data.unassignedMinor > 0 && (
-                <div className="flex items-center gap-3 py-2 border-t mt-1 pt-3" style={{ borderColor: 'var(--border)' }}>
-                  <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'var(--surface-2)' }}>
-                    —
-                  </span>
-                  <p className="text-sm muted flex-1">Not linked to anyone</p>
-                  <span className="tabular text-sm muted">{formatINR(ppl.data.unassignedMinor)}</span>
-                </div>
-              )}
-              {/* The one thing users get wrong about this app, stated plainly. */}
-              <p className="muted text-xs pt-3 leading-relaxed">
-                These are association totals — the same {formatINR(ppl.data.grandTotalMinor)} of spending viewed by
-                person. They aren&apos;t added to the month total.
-              </p>
-            </div>
-          ) : (
-            <EmptyState icon="👥" title="Nobody tagged yet" hint="Tag people on an expense to see this breakdown." />
-          )}
-        </Card>
+        <div className="lg:col-span-2 space-y-5">
+          <Card>
+            <SectionHead label="Top categories" action={<Link href="/analytics" className="micro" style={{ color: 'var(--accent)' }}>All</Link>} />
+            {cats.isLoading ? (
+              <ListSkeleton rows={4} />
+            ) : cats.data?.items.length ? (
+              <div className="space-y-0.5">
+                {cats.data.items.slice(0, 4).map((c) => (
+                  <button
+                    key={c.categoryId}
+                    onClick={() => openCategory(c.categoryId)}
+                    className="row w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left"
+                  >
+                    <CategoryIcon icon={c.icon} color={c.color} size={26} />
+                    <span className="text-sm flex-1 truncate">{c.name}</span>
+                    <Money minor={c.totalMinor} className="text-sm font-semibold" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted text-sm py-2">No categories used yet.</p>
+            )}
+          </Card>
+
+          <Card>
+            <SectionHead label="Top people" action={<Link href="/people" className="micro" style={{ color: 'var(--accent)' }}>All</Link>} />
+            {ppl.isLoading ? (
+              <ListSkeleton rows={4} />
+            ) : ppl.data?.people.length ? (
+              <div className="space-y-0.5">
+                {ppl.data.people.slice(0, 4).map((p) => (
+                  <button
+                    key={p.personId}
+                    onClick={() => openPerson(p.personId)}
+                    className="row w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left"
+                  >
+                    <PersonMark name={p.name} color={p.color} size={26} />
+                    <span className="text-sm flex-1 truncate">{p.name}</span>
+                    <Money minor={p.totalMinor} className="text-sm font-semibold" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState icon="👥" title="Nobody tagged yet" hint="Tag a person on a transaction." />
+            )}
+          </Card>
+        </div>
       </div>
 
-      {/* Lending sits beside spending but is never added to it. */}
-      {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
-        <div>
-          <SectionHead label="Lent & borrowed" />
-        <Link href="/peers" className="block group">
-          <div className="card overflow-hidden">
-            <div className="grid grid-cols-2 hair-grid">
-              <div className="px-4 py-3.5 sm:px-5 sm:py-4">
-                <p className="label mb-1">They owe me</p>
-                <Money minor={peers.data.owedToMeMinor} className="text-xl font-semibold" style={{ color: 'var(--credit)' }} />
-              </div>
-              <div className="px-4 py-3.5 sm:px-5 sm:py-4">
-                <p className="label mb-1">I owe</p>
-                <Money minor={peers.data.owedByMeMinor} className="text-xl font-semibold" style={{ color: 'var(--rule-red)' }} />
-              </div>
+      <div>
+        <SectionHead
+          label="Recent activity"
+          action={
+            <Link href="/expenses" className="micro" style={{ color: 'var(--accent)' }}>
+              View all
+            </Link>
+          }
+        />
+        <Card className="!p-0 overflow-hidden">
+          {recent.isLoading ? (
+            <div className="p-4">
+              <ListSkeleton rows={5} />
             </div>
-            <div
-              className="px-4 sm:px-5 py-2.5 flex items-center justify-between gap-3 border-t"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
-            >
-              <span className="muted text-xs">Tracked separately — not part of the {monthLabel(month)} total.</span>
-              <span className="text-xs font-semibold shrink-0" style={{ color: 'var(--accent)' }}>
-                Peers →
-              </span>
+          ) : recent.data?.items.length ? (
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {recent.data.items.map((t) => (
+                <ActivityRow key={`${t.kind}-${t.id}`} tx={t} />
+              ))}
             </div>
-          </div>
-        </Link>
-        </div>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-5">
-        <Card>
-          <SectionTitle>Daily spending</SectionTitle>
-          {(daily.data?.items.length ?? 0) >= 2 ? (
-            <DailyTrend data={daily.data!.items} />
-          ) : (
-            <EmptyState icon="📈" title="Not enough data yet" hint="Two days of spending draws the first trend." />
-          )}
-        </Card>
-
-        <Card>
-          <SectionTitle>Last 6 months</SectionTitle>
-          {(trends.data?.items.length ?? 0) >= 2 ? (
-            <MonthlyBars data={trends.data!.items} activeMonth={month} />
           ) : (
             <EmptyState
-              icon="📅"
-              title="Not enough history yet"
-              hint="A trend needs at least two months. Come back next month and this fills in."
+              icon="🧾"
+              title="No activity this month"
+              hint="Log a transaction and it appears here instantly."
+              action={
+                <button className="btn btn-primary" onClick={() => openAdd()}>
+                  Add transaction
+                </button>
+              }
             />
           )}
         </Card>
       </div>
-
-      <Card>
-        <SectionTitle action={<Link href="/expenses" className="text-sm" style={{ color: 'var(--accent)' }}>View all →</Link>}>
-          Recent
-        </SectionTitle>
-        {recent.isLoading ? (
-          <ListSkeleton rows={4} />
-        ) : recent.data?.items.length ? (
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {recent.data.items.map((e) => (
-              <RecentRow key={e.id} expense={e} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState icon="🧾" title="No expenses this month" />
-        )}
-      </Card>
     </div>
   );
 }
 
-function RecentRow({ expense: e }: { expense: Expense }) {
-  const { openAdd } = useShell();
+function ActivityRow({ tx }: { tx: Transaction }) {
+  const { openPerson, openCategory } = useInspector();
+  const isLedger = tx.kind !== 'expense';
+
   return (
-    <button onClick={() => openAdd(e)} className="w-full flex items-center gap-3 py-3 text-left">
-      <CategoryIcon icon={e.category.icon} color={e.category.color} size={36} />
+    <div className="row flex items-center gap-3 px-4 py-3">
+      {tx.category ? (
+        <CategoryIcon icon={tx.category.icon} color={tx.category.color} size={34} />
+      ) : (
+        <span
+          className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+          style={{
+            background: tx.kind === 'borrowed' ? 'var(--credit-soft)' : 'var(--rule-red-soft)',
+            color: tx.kind === 'borrowed' ? 'var(--credit)' : 'var(--rule-red)',
+          }}
+        >
+          {tx.kind === 'borrowed' ? '↓' : '↑'}
+        </span>
+      )}
+
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">
-          {e.category.name}
-          {e.people.length > 0 && <span className="muted font-normal"> · {e.people.map((p) => p.name).join(', ')}</span>}
+          {tx.note || tx.category?.name || (tx.kind === 'lent' ? 'Money given' : 'Money received')}
         </p>
-        <p className="muted text-xs truncate">
-          {dayLabel(e.expenseDate)}
-          {e.note ? ` · ${e.note}` : ''}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="muted text-xs">{dayLabel(tx.date)}</span>
+          {tx.category && (
+            <button className="tag" onClick={() => openCategory(tx.category!.id)}>
+              {tx.category.name}
+            </button>
+          )}
+          {tx.people.map((p) => (
+            <button key={p.id} className="tag" onClick={() => openPerson(p.id)}>
+              <PersonMark name={p.name} color={p.color} size={14} />
+              {p.name}
+            </button>
+          ))}
+          {isLedger && <span className="micro">{tx.kind}</span>}
+        </div>
       </div>
-      <span className="tabular font-medium text-sm shrink-0">{formatINR(e.amountMinor)}</span>
-    </button>
+
+      <Money minor={tx.amountMinor} className="text-sm font-semibold shrink-0" />
+    </div>
   );
 }

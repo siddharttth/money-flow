@@ -30,6 +30,9 @@ export const PATCH = withAuth<Ctx>(async (req, session, { params }) => {
   for (const key of ['icon', 'color', 'kind', 'isActive', 'sortOrder'] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
   }
+  if (input.monthlyBudget !== undefined) {
+    patch.monthlyBudgetMinor = input.monthlyBudget != null ? Math.round(input.monthlyBudget * 100) : null;
+  }
 
   const [row] = await db.update(categories).set(patch).where(eq(categories.id, id)).returning();
   return ok(row);

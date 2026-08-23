@@ -24,97 +24,92 @@
   --font-mono: var(--ff-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
-/* Light — the canonical theme, matching the landing page. */
+/* Light */
 :root {
-  --bg: #fff8f7;
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #f3ecec;
-  --border: #f0ebea;
-  --border-strong: #c5c5d8;
-  --text: #1e1b1b;
-  --text-muted: #444655;
+  --surface-2: #f4f4f5;
+  --border: rgba(9, 9, 11, 0.08);
+  --border-strong: rgba(9, 9, 11, 0.16);
+  --text: #09090b;
+  --text-muted: #71717a;
 
-  --brass: #4056f4;
-  --brass-bright: #1f38dc;
+  --brass: #6366f1;
+  --brass-bright: #7c3aed;
   --on-brass: #ffffff;
-  --brass-soft: rgba(64, 86, 244, 0.08);
+  --brass-soft: rgba(99, 102, 241, 0.10);
 
-  --rule-red: #ba1a1a;
-  --rule-red-soft: #ffdad6;
-  --credit: #12714d;
-  --credit-soft: #d9efe4;
+  --rule-red: #e11d48;
+  --rule-red-soft: rgba(225, 29, 72, 0.10);
+  --credit: #059669;
+  --credit-soft: rgba(5, 150, 105, 0.10);
 
-  --danger: #ba1a1a;
-  --success: #12714d;
-  --accent: #4056f4;
-  --accent-soft: rgba(64, 86, 244, 0.08);
+  --danger: #e11d48;
+  --success: #059669;
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.10);
 
-  /* An ambient blue glow rather than a grey drop shadow. */
-  --shadow: 0 1px 2px rgba(30, 27, 27, 0.04), 0 18px 40px -22px rgba(64, 86, 244, 0.28);
-  --shadow-lg: 0 24px 56px -20px rgba(64, 86, 244, 0.28);
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 12px 32px -20px rgba(9, 9, 11, 0.18);
+  --shadow-lg: 0 24px 56px -20px rgba(9, 9, 11, 0.24);
 }
 
 /*
- * Dark is a counterpart, not a different brand: same electric blue identity,
- * lifted for contrast on a dark neutral. Kept so anyone whose phone is in dark
- * mode is not thrown into a white screen.
+ * Dark is the primary theme. Deep zinc rather than pitch black: #000 makes
+ * every elevated surface read as a floating rectangle, while #09090b lets a
+ * one-step lift plus a hairline border do the work.
  */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-  --bg: #000000;
-  --surface: #0a0a0d;
-  --surface-2: #141419;
-  --border: #1c1c23;
-  --border-strong: #33333f;
-  --text: #f4f4f7;
-  --text-muted: #9a9aa9;
+:root[data-theme='dark'],
+:root:not([data-theme='light']) {
+  --bg: #09090b;
+  --surface: #121216;
+  --surface-2: #1a1a20;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #fafafa;
+  --text-muted: #a1a1aa;
 
-  --brass: #8b9cff;
-  --brass-bright: #adb8ff;
-  --on-brass: #05050a;
-  --brass-soft: rgba(139, 156, 255, 0.13);
+  --brass: #6366f1;
+  --brass-bright: #7c3aed;
+  --on-brass: #ffffff;
+  --brass-soft: rgba(99, 102, 241, 0.16);
 
-  --rule-red: #ff9d92;
-  --rule-red-soft: rgba(255, 157, 146, 0.13);
-  --credit: #5fd3a0;
-  --credit-soft: rgba(95, 211, 160, 0.13);
+  --rule-red: #f43f5e;
+  --rule-red-soft: rgba(244, 63, 94, 0.14);
+  --credit: #10b981;
+  --credit-soft: rgba(16, 185, 129, 0.14);
 
-  --danger: #ff9d92;
-  --success: #5fd3a0;
-  --accent: #8b9cff;
-  --accent-soft: rgba(139, 156, 255, 0.13);
+  --danger: #f43f5e;
+  --success: #10b981;
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.16);
 
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
-  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.9);
-  }
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.85);
 }
 
-:root[data-theme='dark'] {
-  --bg: #000000;
-  --surface: #0a0a0d;
-  --surface-2: #141419;
-  --border: #1c1c23;
-  --border-strong: #33333f;
-  --text: #f4f4f7;
-  --text-muted: #9a9aa9;
-
-  --brass: #8b9cff;
-  --brass-bright: #adb8ff;
-  --on-brass: #05050a;
-  --brass-soft: rgba(139, 156, 255, 0.13);
-
-  --rule-red: #ff9d92;
-  --rule-red-soft: rgba(255, 157, 146, 0.13);
-  --credit: #5fd3a0;
-  --credit-soft: rgba(95, 211, 160, 0.13);
-
-  --danger: #ff9d92;
-  --success: #5fd3a0;
-  --accent: #8b9cff;
-  --accent-soft: rgba(139, 156, 255, 0.13);
-
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
-  --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.9);
+/* An explicit light choice must beat the dark default above. */
+:root[data-theme='light'] {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f4f4f5;
+  --border: rgba(9, 9, 11, 0.08);
+  --border-strong: rgba(9, 9, 11, 0.16);
+  --text: #09090b;
+  --text-muted: #71717a;
+  --brass: #6366f1;
+  --brass-bright: #7c3aed;
+  --on-brass: #ffffff;
+  --brass-soft: rgba(99, 102, 241, 0.10);
+  --rule-red: #e11d48;
+  --rule-red-soft: rgba(225, 29, 72, 0.10);
+  --credit: #059669;
+  --credit-soft: rgba(5, 150, 105, 0.10);
+  --danger: #e11d48;
+  --success: #059669;
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.10);
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 12px 32px -20px rgba(9, 9, 11, 0.18);
+  --shadow-lg: 0 24px 56px -20px rgba(9, 9, 11, 0.24);
 }
 
 @layer base {
@@ -157,7 +152,7 @@ h1, h2, h3 {
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1rem;
+    border-radius: 0.875rem;
     box-shadow: var(--shadow);
   }
 
@@ -181,7 +176,7 @@ h1, h2, h3 {
     font-size: 16px;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.18s, background 0.18s;
+    transition: border-color 150ms ease-out, background 150ms ease-out;
   }
   .input:focus { border-bottom-color: var(--brass); background: var(--brass-soft); }
   .input::placeholder { color: var(--text-muted); opacity: 0.65; }
@@ -209,7 +204,7 @@ h1, h2, h3 {
     letter-spacing: 0.01em;
     border: 1px solid transparent;
     cursor: pointer;
-    transition: background 0.18s, box-shadow 0.2s, transform 0.06s, border-color 0.18s;
+    transition: background 150ms ease-out, box-shadow 150ms ease-out, transform 60ms ease-out, border-color 150ms ease-out;
     min-height: 44px;
     font-family: inherit;
   }
@@ -241,7 +236,7 @@ h1, h2, h3 {
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.14s;
+    transition: all 150ms ease-out;
     min-height: 38px;
     font-family: inherit;
   }
@@ -253,6 +248,40 @@ h1, h2, h3 {
   }
 
   .muted { color: var(--text-muted); }
+
+  /* Uppercase micro-header, per the type scale. */
+  .micro {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Anything in a list that can be opened. 150ms ease-out everywhere. */
+  .row {
+    transition: background 150ms ease-out;
+    cursor: pointer;
+  }
+  .row:hover { background: var(--surface-2); }
+
+  /* A clickable entity chip — category or person — that opens its inspector. */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
+    max-width: 12rem;
+  }
+  .tag:hover { color: var(--text); border-color: var(--border-strong); }
 
   /*
    * Grouping without boxing. A strip of related figures shares one surface and
@@ -309,6 +338,17 @@ h1, h2, h3 {
 }
 
 .animate-in { animation: slideUp 0.18s ease-out; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade { animation: fadeIn 0.15s ease-out; }
+
+/* Bottom sheet on a phone, side panel from 640px up. */
+@keyframes slideInUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.animate-slide-in { animation: slideInUp 0.22s ease-out; }
+@media (min-width: 640px) {
+  .animate-slide-in { animation: slideInRight 0.22s ease-out; }
+}
 
 /*
  * Every rupee figure. Fixed-width digits so 600 and 11,000 line up in a column

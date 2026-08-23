@@ -1,244 +1,285 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
 import { currentMonth, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
-import type { Group, Person, PersonStat } from '@/lib/types';
-import { Card, EmptyState, ListSkeleton, Modal, SectionTitle } from '@/components/ui';
+import type { Person, PersonStat } from '@/lib/types';
+import { Card, EmptyState, ErrorState, ListSkeleton, Modal, Money } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
+import { LedgerForm } from '@/components/ledger-form';
 import { useShell } from '@/components/app-shell';
+import { useInspector } from '@/components/inspector';
 import { PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
 
-const RELATIONSHIPS = ['self', 'family', 'friend', 'other'] as const;
+/**
+ * People and Peers were two screens for one entity — a contact you spend with
+ * and a contact you lend to are the same person. This hub merges them: spend
+ * and debt sit on the same row, and the row opens the same inspector.
+ */
 
+type PeerSummary = {
+  balances: { personId: string; name: string; color: string; balanceMinor: number; entryCount: number }[];
+  owedToMeMinor: number;
+  owedByMeMinor: number;
+  netMinor: number;
+};
+
+type Filter = 'all' | 'debt' | 'spend';
 
 export default function PeoplePage() {
+  return (
+    <Suspense fallback={<Card><ListSkeleton rows={6} /></Card>}>
+      <PeopleHub />
+    </Suspense>
+  );
+}
+
+function PeopleHub() {
+  const params = useSearchParams();
   const { toast } = useShell();
+  const { openPerson } = useInspector();
   const { mutate } = useSWRConfig();
+
   const [month, setMonth] = useState(currentMonth());
-  const [editing, setEditing] = useState<Person | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [groupModal, setGroupModal] = useState(false);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [ledgerFor, setLedgerFor] = useState<null | { direction: 'out' | 'in'; personId?: string }>(
+    params.get('settle') ? { direction: 'in', personId: params.get('settle')! } : null,
+  );
+  const [addingPerson, setAddingPerson] = useState(false);
 
-  const people = useSWR<{ items: Person[] }>('/api/people?includeInactive=true');
-  const stats = useSWR<{
-    people: PersonStat[];
-    unassignedMinor: number;
-    grandTotalMinor: number;
-    associationTotalMinor: number;
-  }>(`/api/analytics/people?month=${month}`);
-  const groups = useSWR<{ items: Group[] }>('/api/groups');
+  const people = useSWR<{ items: Person[] }>('/api/people');
+  const stats = useSWR<{ people: PersonStat[]; grandTotalMinor: number }>(`/api/analytics/people?month=${month}`);
+  const peers = useSWR<PeerSummary>('/api/ledger');
 
-  const statsById = new Map((stats.data?.people ?? []).map((s) => [s.personId, s]));
-  const active = (people.data?.items ?? []).filter((p) => p.isActive);
-  const hidden = (people.data?.items ?? []).filter((p) => !p.isActive);
+  const spendById = new Map((stats.data?.people ?? []).map((s) => [s.personId, s]));
+  const balById = new Map((peers.data?.balances ?? []).map((b) => [b.personId, b]));
+
+  const rows = useMemo(() => {
+    const all = (people.data?.items ?? []).map((p) => ({
+      person: p,
+      spendMinor: spendById.get(p.id)?.totalMinor ?? 0,
+      count: spendById.get(p.id)?.count ?? 0,
+      balanceMinor: balById.get(p.id)?.balanceMinor ?? 0,
+    }));
+    const filtered =
+      filter === 'debt' ? all.filter((r) => r.balanceMinor !== 0) : filter === 'spend' ? all.filter((r) => r.spendMinor > 0) : all;
+    return filtered.sort((a, b) =>
+      filter === 'debt' ? Math.abs(b.balanceMinor) - Math.abs(a.balanceMinor) : b.spendMinor - a.spendMinor,
+    );
+  }, [people.data, stats.data, peers.data, filter]);
 
   async function refresh() {
     await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
   }
 
+  if (people.error) return <ErrorState message={people.error.message} onRetry={() => people.mutate()} />;
+
+  const net = peers.data?.netMinor ?? 0;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">People</h1>
-          <p className="muted text-sm">Spending associated with each person · {monthLabel(month)}</p>
+          <h1 className="text-xl sm:text-2xl font-semibold">People &amp; Ledger</h1>
+          <p className="muted text-sm">Spending associations and money owed, in one place</p>
         </div>
-        <div className="flex items-center gap-2">
-          <MonthPicker month={month} onChange={setMonth} />
-          <button className="btn btn-primary" onClick={() => setCreating(true)}>
-            + Person
-          </button>
-        </div>
+        <MonthPicker month={month} onChange={setMonth} />
       </div>
 
+      {/* Net position, with the two actions that change it. */}
       <Card>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="micro mb-1.5">Net position</p>
+            <Money
+              minor={Math.abs(net)}
+              className="block text-3xl font-semibold"
+              style={{ color: net === 0 ? 'var(--text)' : net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+            />
+            <p className="muted text-sm mt-1.5">
+              {net === 0
+                ? 'Everything is settled.'
+                : net > 0
+                  ? 'owed to you, on balance'
+                  : 'you owe, on balance'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn btn-ghost text-sm" onClick={() => setLedgerFor({ direction: 'out' })}>
+              + Lend / give
+            </button>
+            <button className="btn btn-ghost text-sm" onClick={() => setLedgerFor({ direction: 'in' })}>
+              − Borrow / receive
+            </button>
+          </div>
+        </div>
+
+        {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
+          <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <p className="micro mb-1">They owe me</p>
+              <Money minor={peers.data.owedToMeMinor} className="text-lg font-semibold" style={{ color: 'var(--credit)' }} />
+            </div>
+            <div>
+              <p className="micro mb-1">I owe</p>
+              <Money minor={peers.data.owedByMeMinor} className="text-lg font-semibold" style={{ color: 'var(--rule-red)' }} />
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {([
+          ['all', 'All contacts'],
+          ['debt', 'Active debt only'],
+          ['spend', 'Top spending'],
+        ] as const).map(([k, label]) => (
+          <button key={k} className="chip" data-selected={filter === k} onClick={() => setFilter(k)}>
+            {label}
+          </button>
+        ))}
+        <button className="chip ml-auto" onClick={() => setAddingPerson(true)}>
+          + Person
+        </button>
+      </div>
+
+      <Card className="!p-0 overflow-hidden">
         {people.isLoading ? (
-          <ListSkeleton rows={5} />
-        ) : active.length === 0 ? (
-          <EmptyState icon="👥" title="No people yet" hint="Add family and friends to track who your spending is with." />
+          <div className="p-4">
+            <ListSkeleton rows={6} />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon="👥"
+            title={filter === 'all' ? 'No people yet' : 'Nothing matches this filter'}
+            hint={
+              filter === 'all'
+                ? 'Add family and friends to track who your spending is with, and who owes what.'
+                : 'Try “All contacts”.'
+            }
+            action={
+              filter === 'all' ? (
+                <button className="btn btn-primary" onClick={() => setAddingPerson(true)}>
+                  Add a person
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <>
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {active
-                .slice()
-                .sort((a, b) => (statsById.get(b.id)?.totalMinor ?? 0) - (statsById.get(a.id)?.totalMinor ?? 0))
-                .map((p) => {
-                  const stat = statsById.get(p.id);
-                  return (
-                    <div key={p.id} className="flex items-center gap-3 py-3">
-                      <Link href={`/people/${p.id}?month=${month}`} className="flex items-center gap-3 flex-1 min-w-0">
-                        <PersonMark name={p.name} color={p.color} size={40} />
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {p.name}
-                            {p.isSelf && <span className="muted font-normal text-xs"> · you</span>}
-                          </p>
-                          <p className="muted text-xs">
-                            <span className="capitalize">{p.relationshipType}</span> · {stat?.count ?? 0}{' '}
-                            {stat?.count === 1 ? 'transaction' : 'transactions'}
-                          </p>
-                        </div>
-                      </Link>
-                      <span className="tabular font-semibold text-sm">{formatINR(stat?.totalMinor ?? 0)}</span>
-                      <button className="muted px-1.5 text-lg leading-none" onClick={() => setEditing(p)} aria-label={`Edit ${p.name}`}>
-                        ⋯
-                      </button>
-                    </div>
-                  );
-                })}
+            {/* Column headers only make sense once there is a table to read. */}
+            <div
+              className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2.5 border-b"
+              style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+            >
+              <span className="micro">Contact</span>
+              <span className="micro w-28 text-right">{monthLabel(month).split(' ')[0]} spend</span>
+              <span className="micro w-28 text-right">Balance</span>
+              <span className="micro w-16 text-right">Action</span>
             </div>
 
-            {stats.data && (
-              <div className="mt-4 pt-4 border-t space-y-1.5" style={{ borderColor: 'var(--border)' }}>
-                {stats.data.unassignedMinor > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="muted">Not linked to anyone</span>
-                    <span className="tabular muted">{formatINR(stats.data.unassignedMinor)}</span>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {rows.map(({ person, spendMinor, count, balanceMinor }) => (
+                <div
+                  key={person.id}
+                  className="row grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-1 items-center px-4 py-3"
+                  onClick={() => openPerson(person.id)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <PersonMark name={person.name} color={person.color} size={36} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {person.name}
+                        {person.isSelf && <span className="muted font-normal text-xs"> · you</span>}
+                      </p>
+                      <p className="muted text-xs capitalize">
+                        {person.relationshipType} · {count} {count === 1 ? 'transaction' : 'transactions'}
+                      </p>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between text-sm font-semibold">
-                  <span>Actual spending this month</span>
-                  <span className="tabular">{formatINR(stats.data.grandTotalMinor)}</span>
+
+                  <Money minor={spendMinor} className="text-sm font-semibold sm:w-28 text-right" />
+
+                  <span className="col-span-2 sm:col-span-1 sm:w-28 text-right text-sm font-semibold num" style={{
+                    color: balanceMinor === 0 ? 'var(--text-muted)' : balanceMinor > 0 ? 'var(--credit)' : 'var(--rule-red)',
+                  }}>
+                    {balanceMinor === 0 ? '—' : `${balanceMinor > 0 ? '+' : '−'}${formatINR(Math.abs(balanceMinor))}`}
+                  </span>
+
+                  <div className="hidden sm:flex justify-end w-16">
+                    {balanceMinor !== 0 && !person.isSelf ? (
+                      <button
+                        className="tag"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLedgerFor({ direction: balanceMinor > 0 ? 'in' : 'out', personId: person.id });
+                        }}
+                      >
+                        Settle
+                      </button>
+                    ) : (
+                      <span className="tag opacity-0 pointer-events-none">—</span>
+                    )}
+                  </div>
                 </div>
-                <p className="muted text-xs leading-relaxed pt-1">
-                  The per-person figures above are an association view of that same total. When one expense involves
-                  several people it appears in full under each of them, so those rows can add up to more than the
-                  month total — that is by design and never inflates what you actually spent.
-                </p>
-              </div>
-            )}
+              ))}
+            </div>
           </>
         )}
       </Card>
 
-      {hidden.length > 0 && (
-        <Card>
-          <SectionTitle>Hidden people</SectionTitle>
-          <div className="flex flex-wrap gap-2">
-            {hidden.map((p) => (
-              <button key={p.id} className="chip" onClick={() => setEditing(p)}>
-                {p.name}
-              </button>
-            ))}
-          </div>
-          <p className="muted text-xs mt-3">Their past expenses still count — they&apos;re just hidden from pickers.</p>
-        </Card>
-      )}
-
-      <Card>
-        <SectionTitle
-          action={
-            <button className="btn btn-ghost text-sm" onClick={() => setGroupModal(true)}>
-              + Group
-            </button>
-          }
-        >
-          Groups
-        </SectionTitle>
-        {groups.data?.items.length ? (
-          <div className="space-y-3">
-            {groups.data.items.map((g) => (
-              <div key={g.id} className="flex items-center gap-3">
-                <span className="text-lg" aria-hidden>
-                  {g.icon}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{g.name}</p>
-                  <p className="muted text-xs truncate">
-                    {g.members.map((m) => m.name).join(', ') || 'No members yet'}
-                  </p>
-                </div>
-                <button
-                  className="muted text-xs hover:underline"
-                  onClick={async () => {
-                    await api.del(`/api/groups/${g.id}`);
-                    await refresh();
-                    toast('Group deleted');
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted text-sm">No groups yet — group people into a family or circle to organise them.</p>
+      <Modal
+        open={!!ledgerFor}
+        onClose={() => setLedgerFor(null)}
+        title={ledgerFor?.direction === 'in' ? 'Money I got' : 'Money I gave'}
+      >
+        {ledgerFor && (
+          <LedgerForm
+            key={`${ledgerFor.direction}-${ledgerFor.personId ?? 'any'}`}
+            defaultDirection={ledgerFor.direction}
+            lockedPersonId={ledgerFor.personId}
+            onSaved={() => {
+              setLedgerFor(null);
+              refresh();
+              toast('Ledger updated');
+            }}
+          />
         )}
-      </Card>
+      </Modal>
 
       <PersonModal
-        open={creating || !!editing}
-        person={editing}
-        onClose={() => {
-          setCreating(false);
-          setEditing(null);
-        }}
+        open={addingPerson}
+        onClose={() => setAddingPerson(false)}
         onDone={async (msg) => {
           await refresh();
           toast(msg);
-          setCreating(false);
-          setEditing(null);
-        }}
-      />
-
-      <GroupModal
-        open={groupModal}
-        people={active}
-        onClose={() => setGroupModal(false)}
-        onDone={async () => {
-          await refresh();
-          toast('Group created');
-          setGroupModal(false);
+          setAddingPerson(false);
         }}
       />
     </div>
   );
 }
 
-function PersonModal({
-  open,
-  person,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  person: Person | null;
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
+const RELATIONSHIPS = ['family', 'friend', 'other'] as const;
+
+function PersonModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (m: string) => void }) {
   const [name, setName] = useState('');
   const [relationshipType, setRelationshipType] = useState<string>('friend');
   const [color, setColor] = useState(PALETTE[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [key, setKey] = useState('');
-
-  // Re-seed the fields whenever a different person is opened.
-  const identity = person?.id ?? 'new';
-  if (key !== identity && open) {
-    setKey(identity);
-    setName(person?.name ?? '');
-    setRelationshipType(person?.relationshipType ?? 'friend');
-    setColor(person?.color ?? PALETTE[0]);
-    setError(null);
-  }
 
   async function save() {
     setBusy(true);
     setError(null);
     try {
-      if (person) {
-        await api.patch(`/api/people/${person.id}`, { name, relationshipType, color });
-        onDone('Person updated');
-      } else {
-        await api.post('/api/people', { name, relationshipType, color });
-        onDone('Person added');
-      }
+      await api.post('/api/people', { name, relationshipType, color });
+      setName('');
+      onDone('Person added');
     } catch (err) {
       setError(err instanceof RequestError ? err.message : 'Could not save');
     } finally {
@@ -246,54 +287,29 @@ function PersonModal({
     }
   }
 
-  async function remove() {
-    if (!person) return;
-    setBusy(true);
-    try {
-      const res = await api.del<{ mode: string; message?: string }>(`/api/people/${person.id}`);
-      onDone(res.message ?? (res.mode === 'disabled' ? 'Person hidden' : 'Person removed'));
-    } catch (err) {
-      setError(err instanceof RequestError ? err.message : 'Could not remove');
-      setBusy(false);
-    }
-  }
-
-  async function toggleActive() {
-    if (!person) return;
-    setBusy(true);
-    await api.patch(`/api/people/${person.id}`, { isActive: !person.isActive });
-    onDone(person.isActive ? 'Person hidden' : 'Person restored');
-    setBusy(false);
-  }
-
   return (
-    <Modal open={open} onClose={onClose} title={person ? `Edit ${person.name}` : 'Add person'}>
+    <Modal open={open} onClose={onClose} title="Add person">
       <div className="space-y-4">
         <div>
-          <label className="label">Name</label>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <label className="label" htmlFor="pname">
+            Name
+          </label>
+          <input id="pname" className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
-
         <div>
           <label className="label">Relationship</label>
           <div className="flex flex-wrap gap-2">
             {RELATIONSHIPS.map((r) => (
-              <button
-                key={r}
-                className="chip capitalize"
-                data-selected={relationshipType === r}
-                onClick={() => setRelationshipType(r)}
-              >
+              <button key={r} className="chip capitalize" data-selected={relationshipType === r} onClick={() => setRelationshipType(r)}>
                 {r}
               </button>
             ))}
           </div>
         </div>
-
         <div>
           <label className="label">Colour</label>
           <div className="flex items-center gap-3">
-            <PersonMark name={name || '?'} color={color} size={44} />
+            <PersonMark name={name || '?'} color={color} size={40} />
             <div className="flex flex-wrap gap-2">
               {PALETTE.map((c) => (
                 <button
@@ -307,95 +323,14 @@ function PersonModal({
             </div>
           </div>
         </div>
-
         {error && (
           <p className="text-sm" style={{ color: 'var(--danger)' }}>
             {error}
           </p>
         )}
-
-        <div className="flex flex-wrap gap-2 justify-end pt-1">
-          {person && !person.isSelf && (
-            <>
-              <button className="btn btn-ghost" onClick={toggleActive} disabled={busy}>
-                {person.isActive ? 'Hide' : 'Restore'}
-              </button>
-              <button className="btn btn-danger" onClick={remove} disabled={busy}>
-                Delete
-              </button>
-            </>
-          )}
+        <div className="flex justify-end">
           <button className="btn btn-primary" onClick={save} disabled={busy || !name.trim()}>
-            {busy ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function GroupModal({
-  open,
-  people,
-  onClose,
-  onDone,
-}: {
-  open: boolean;
-  people: Person[];
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('👥');
-  const [personIds, setPersonIds] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  return (
-    <Modal open={open} onClose={onClose} title="New group">
-      <div className="space-y-4">
-        <div>
-          <label className="label">Group name</label>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Circle" autoFocus />
-        </div>
-        <div>
-          <label className="label">Icon</label>
-          <div className="flex flex-wrap gap-2">
-            {['👥', '🏠', '🎓', '🏢', '✈️', '🎉'].map((i) => (
-              <button key={i} className="chip text-lg px-3" data-selected={icon === i} onClick={() => setIcon(i)}>
-                {i}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="label">Members</label>
-          <div className="flex flex-wrap gap-2">
-            {people.map((p) => (
-              <button
-                key={p.id}
-                className="chip"
-                data-selected={personIds.includes(p.id)}
-                onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex justify-end pt-1">
-          <button
-            className="btn btn-primary"
-            disabled={busy || !name.trim()}
-            onClick={async () => {
-              setBusy(true);
-              await api.post('/api/groups', { name, icon, personIds });
-              setName('');
-              setPersonIds([]);
-              setBusy(false);
-              onDone();
-            }}
-          >
-            Create group
+            {busy ? 'Saving…' : 'Add person'}
           </button>
         </div>
       </div>

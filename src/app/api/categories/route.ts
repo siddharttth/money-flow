@@ -17,6 +17,7 @@ export const GET = withAuth(async (req, session) => {
       kind: categories.kind,
       isActive: categories.isActive,
       sortOrder: categories.sortOrder,
+      monthlyBudgetMinor: categories.monthlyBudgetMinor,
       usageCount: sql<string>`(
         SELECT COUNT(*) FROM ${expenses} e
         WHERE e.category_id = ${categories.id} AND e.deleted_at IS NULL
@@ -59,6 +60,7 @@ export const POST = withAuth(async (req, session) => {
       color: input.color || pickColor(Number(count)),
       kind: input.kind || 'expense',
       sortOrder: input.sortOrder ?? Number(count),
+      monthlyBudgetMinor: input.monthlyBudget != null ? Math.round(input.monthlyBudget * 100) : null,
     })
     .returning();
 

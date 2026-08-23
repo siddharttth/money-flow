@@ -46,6 +46,8 @@ export const categories = pgTable('categories', {
   icon: text('icon').notNull().default('💸'),
   color: text('color').notNull().default('#6366f1'),
   kind: text('kind').notNull().default('expense'), // 'expense' | 'investment'
+  /** Optional monthly cap, in paise. Null means the category is untracked. */
+  monthlyBudgetMinor: integer('monthly_budget_minor'),
   isActive: boolean('is_active').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

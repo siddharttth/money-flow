@@ -103,6 +103,30 @@ uses `EXISTS` rather than a `JOIN` precisely so a multi-person expense is counte
 
 ---
 
+## Screens
+
+| Route | What it is |
+|---|---|
+| `/` | Public landing page |
+| `/dashboard` | Four predictive KPIs, a trend/category toggle, insight rails, recent activity |
+| `/expenses` | Unified feed of expenses **and** ledger entries, grouped by day |
+| `/people` | People & Ledger hub — spend and debt per contact in one table |
+| `/analytics` | Category and person breakdowns |
+| `/settings` | Account, appearance, data, and **Categories & Budgets** |
+
+`/peers` and `/categories` redirect — Peers merged into People (a peer and a contact were always
+one entity) and Categories moved into Settings (it is configuration, not a daily destination).
+
+### The entity inspector
+
+Any person or category name is clickable anywhere and opens the same slide-over inspector:
+lifetime and monthly spend, net ledger balance, and tabbed history for a person; spend, budget
+pacing against an even burn, average transaction size and a filtered transaction list for a
+category. One provider owns it, so no screen wires it up.
+
+`⌘K` opens a command palette over screens, people and categories. `N` adds a transaction,
+`Esc` closes any overlay.
+
 ## Routes
 
 `/` is a public marketing landing page. The app lives under `/dashboard`, `/expenses`,

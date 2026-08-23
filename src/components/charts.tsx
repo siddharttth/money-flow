@@ -30,14 +30,16 @@ function TooltipBox({ label, value }: { label: string; value: number }) {
 
 export function CategoryDonut({
   data,
+  height = 220,
 }: {
   data: { name: string; totalMinor: number; color: string }[];
+  height?: number;
 }) {
   if (!data.length) return null;
   const total = data.reduce((s, d) => s + d.totalMinor, 0);
 
   return (
-    <div className="relative" style={{ height: 220 }}>
+    <div className="relative" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -72,10 +74,10 @@ export function CategoryDonut({
   );
 }
 
-export function DailyTrend({ data }: { data: { date: string; totalMinor: number }[] }) {
+export function DailyTrend({ data, height = 180 }: { data: { date: string; totalMinor: number }[]; height?: number }) {
   if (data.length < 2) return null;
   return (
-    <div style={{ height: 180 }}>
+    <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
           <defs>

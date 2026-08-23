@@ -1,123 +1,108 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, qs } from '@/lib/client';
-import { currentMonth, fullDayLabel, monthRange } from '@/lib/dates';
+import { currentMonth, fullDayLabel, monthRange, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
-import type { Category, Expense, ExpenseList, Person } from '@/lib/types';
-import { Card, EmptyState, ErrorState, ListSkeleton, Modal } from '@/components/ui';
+import type { Category, Person } from '@/lib/types';
+import type { Transaction, TxKind } from '@/lib/transactions';
+import { Card, EmptyState, ErrorState, ListSkeleton, Modal, Money } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { useShell } from '@/components/app-shell';
-import { CategoryIcon, Icon, resolveIcon } from '@/components/icons';
+import { useInspector } from '@/components/inspector';
+import { CategoryIcon, PersonMark } from '@/components/icons';
 
-type Sort = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc';
-
-const SORTS: { value: Sort; label: string }[] = [
-  { value: 'date_desc', label: 'Newest first' },
-  { value: 'date_asc', label: 'Oldest first' },
-  { value: 'amount_desc', label: 'Highest amount' },
-  { value: 'amount_asc', label: 'Lowest amount' },
+const KINDS: { key: TxKind; label: string }[] = [
+  { key: 'expense', label: 'Expenses' },
+  { key: 'lent', label: 'Lent' },
+  { key: 'borrowed', label: 'Borrowed' },
 ];
 
-export default function ExpensesPage() {
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<Card><ListSkeleton rows={6} /></Card>}>
+      <Transactions />
+    </Suspense>
+  );
+}
+
+function Transactions() {
+  const params = useSearchParams();
   const { openAdd, toast } = useShell();
+  const { openPerson, openCategory } = useInspector();
   const { mutate } = useSWRConfig();
 
   const [month, setMonth] = useState(currentMonth());
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
-  const [personIds, setPersonIds] = useState<string[]>([]);
-  const [sort, setSort] = useState<Sort>('date_desc');
+  const [personIds, setPersonIds] = useState<string[]>(params.get('person') ? [params.get('person')!] : []);
+  const [kinds, setKinds] = useState<TxKind[]>([]);
   const [search, setSearch] = useState('');
-  const [minAmount, setMinAmount] = useState('');
-  const [maxAmount, setMaxAmount] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState(150);
 
   const { start, end } = monthRange(month);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const people = useSWR<{ items: Person[] }>('/api/people');
 
-  const key = `/api/expenses${qs({
-    start,
-    end,
-    categoryIds,
-    personIds,
-    sort,
-    search: search.trim(),
-    minAmount,
-    maxAmount,
-    limit,
-  })}`;
-  const { data, error, isLoading, mutate: reload } = useSWR<ExpenseList>(key);
+  const key = `/api/transactions${qs({ start, end, categoryIds, personIds, kinds, search: search.trim(), limit })}`;
+  const { data, error, isLoading } = useSWR<{ items: Transaction[]; hasMore: boolean }>(key);
 
-  // Grouped by day, mirroring how the spreadsheet read — but generated, not typed.
-  const grouped = useMemo(() => {
-    const map = new Map<string, Expense[]>();
-    for (const e of data?.items ?? []) {
-      const list = map.get(e.expenseDate) ?? [];
-      list.push(e);
-      map.set(e.expenseDate, list);
+  // Grouped by day, with a subtotal of actual spending per day.
+  const groups = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const t of data?.items ?? []) {
+      const list = map.get(t.date) ?? [];
+      list.push(t);
+      map.set(t.date, list);
     }
     return [...map.entries()];
   }, [data]);
 
-  const activeFilters = categoryIds.length + personIds.length + (search ? 1 : 0) + (minAmount ? 1 : 0) + (maxAmount ? 1 : 0);
+  const activeFilters = categoryIds.length + personIds.length + kinds.length + (search ? 1 : 0);
+  const today = todayISO();
+
+  function clearFilters() {
+    setCategoryIds([]);
+    setPersonIds([]);
+    setKinds([]);
+    setSearch('');
+  }
 
   async function refreshAll() {
     await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
   }
 
-  async function remove(e: Expense) {
+  async function remove(t: Transaction) {
+    const url = t.kind === 'expense' ? `/api/expenses/${t.id}` : `/api/ledger/${t.id}`;
+    const restore = t.kind === 'expense' ? `/api/expenses/${t.id}/restore` : `/api/ledger/${t.id}/restore`;
     try {
-      await api.del(`/api/expenses/${e.id}`);
+      await api.del(url);
       await refreshAll();
-      // Soft delete means Undo is a real restore, not a re-create — so no
-      // confirmation dialog is needed before deleting.
-      toast(`Deleted ${formatINR(e.amountMinor)} · ${e.category.name}`, 'success', {
+      toast(`Deleted ${formatINR(t.amountMinor)}`, 'success', {
         label: 'Undo',
         onClick: async () => {
-          try {
-            await api.post(`/api/expenses/${e.id}/restore`);
-            await refreshAll();
-            toast('Expense restored');
-          } catch {
-            toast('Could not restore that expense', 'error');
-          }
+          await api.post(restore);
+          await refreshAll();
+          toast('Restored');
         },
       });
     } catch {
-      toast('Could not delete that expense', 'error');
+      toast('Could not delete', 'error');
     }
   }
 
-  async function duplicate(e: Expense) {
-    try {
-      await api.post(`/api/expenses/${e.id}/duplicate`);
-      await refreshAll();
-      toast('Expense duplicated');
-    } catch {
-      toast('Could not duplicate', 'error');
-    }
-  }
-
-  function clearFilters() {
-    setCategoryIds([]);
-    setPersonIds([]);
-    setSearch('');
-    setMinAmount('');
-    setMaxAmount('');
-  }
+  const dayLabelFor = (d: string) => (d === today ? 'Today' : fullDayLabel(d));
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">Expenses</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold">Transactions</h1>
           <p className="muted text-sm">
-            {data
-              ? `${data.total} ${data.total === 1 ? 'transaction' : 'transactions'} · ${formatINR(data.totalMinor)}`
-              : 'Loading…'}
+            {data ? `${data.items.length} shown` : 'Loading…'}
+            {activeFilters > 0 && ' · filtered'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -126,8 +111,8 @@ export default function ExpensesPage() {
             Filters
             {activeFilters > 0 && (
               <span
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] flex items-center justify-center text-white"
-                style={{ background: 'var(--accent)' }}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] flex items-center justify-center"
+                style={{ background: 'var(--brass)', color: 'var(--on-brass)' }}
               >
                 {activeFilters}
               </span>
@@ -136,27 +121,40 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      {activeFilters > 0 && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="muted">Filtered</span>
-          <button className="chip" onClick={clearFilters}>
+      {/* Type filter is one tap — it is the filter people reach for most. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="chip" data-selected={kinds.length === 0} onClick={() => setKinds([])}>
+          Everything
+        </button>
+        {KINDS.map((k) => (
+          <button
+            key={k.key}
+            className="chip"
+            data-selected={kinds.includes(k.key)}
+            onClick={() => setKinds((v) => (v.includes(k.key) ? v.filter((x) => x !== k.key) : [...v, k.key]))}
+          >
+            {k.label}
+          </button>
+        ))}
+        {activeFilters > 0 && (
+          <button className="tag ml-auto" onClick={clearFilters}>
             Clear all ×
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {error ? (
-        <ErrorState message={error.message} onRetry={() => reload()} />
+        <ErrorState message={error.message} />
       ) : isLoading ? (
         <Card>
-          <ListSkeleton rows={6} />
+          <ListSkeleton rows={8} />
         </Card>
-      ) : grouped.length === 0 ? (
+      ) : groups.length === 0 ? (
         <Card>
           <EmptyState
             icon="🧾"
             title="Nothing here"
-            hint={activeFilters ? 'No expenses match these filters.' : 'No expenses recorded for this month yet.'}
+            hint={activeFilters ? 'No transactions match these filters.' : 'No activity recorded this month yet.'}
             action={
               activeFilters ? (
                 <button className="btn btn-ghost" onClick={clearFilters}>
@@ -164,7 +162,7 @@ export default function ExpensesPage() {
                 </button>
               ) : (
                 <button className="btn btn-primary" onClick={() => openAdd()}>
-                  Add expense
+                  Add transaction
                 </button>
               )
             }
@@ -172,25 +170,27 @@ export default function ExpensesPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {grouped.map(([date, items]) => {
-            const dayTotal = items.reduce((s, e) => s + e.amountMinor, 0);
+          {groups.map(([date, items]) => {
+            const spent = items.filter((i) => i.kind === 'expense').reduce((s, i) => s + i.amountMinor, 0);
             return (
               <Card key={date} className="!p-0 overflow-hidden">
                 <div
-                  className="flex items-center justify-between px-4 sm:px-5 py-3 border-b"
+                  className="flex items-center justify-between px-4 py-2.5 border-b"
                   style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
                 >
-                  <span className="text-sm font-medium">{fullDayLabel(date)}</span>
-                  <span className="text-sm font-semibold tabular">{formatINR(dayTotal)}</span>
+                  <span className="text-sm font-semibold">{dayLabelFor(date)}</span>
+                  {spent > 0 && <Money minor={spent} className="text-sm font-semibold" />}
                 </div>
                 <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                  {items.map((e) => (
-                    <ExpenseRow
-                      key={e.id}
-                      expense={e}
-                      onEdit={() => openAdd(e)}
-                      onDuplicate={() => duplicate(e)}
-                      onDelete={() => remove(e)}
+                  {items.map((t) => (
+                    <TxRow
+                      key={`${t.kind}-${t.id}`}
+                      tx={t}
+                      onCategory={openCategory}
+                      onPerson={openPerson}
+                      onFilterCategory={(id) => setCategoryIds([id])}
+                      onFilterPerson={(id) => setPersonIds([id])}
+                      onDelete={() => remove(t)}
                     />
                   ))}
                 </div>
@@ -198,9 +198,9 @@ export default function ExpensesPage() {
             );
           })}
 
-          {data && data.items.length < data.total && (
-            <button className="btn btn-ghost w-full" onClick={() => setLimit((l) => l + 100)}>
-              Load more ({data.total - data.items.length} remaining)
+          {data?.hasMore && (
+            <button className="btn btn-ghost w-full" onClick={() => setLimit((l) => l + 150)}>
+              Load more
             </button>
           )}
         </div>
@@ -214,28 +214,6 @@ export default function ExpensesPage() {
           </div>
 
           <div>
-            <label className="label">Sort</label>
-            <select className="input" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Min ₹</label>
-              <input className="input tabular" inputMode="decimal" value={minAmount} onChange={(e) => setMinAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-            </div>
-            <div>
-              <label className="label">Max ₹</label>
-              <input className="input tabular" inputMode="decimal" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value.replace(/[^0-9.]/g, ''))} />
-            </div>
-          </div>
-
-          <div>
             <label className="label">Categories</label>
             <div className="flex flex-wrap gap-2">
               {cats.data?.items.map((c) => (
@@ -243,14 +221,16 @@ export default function ExpensesPage() {
                   key={c.id}
                   className="chip"
                   data-selected={categoryIds.includes(c.id)}
-                  onClick={() =>
-                    setCategoryIds((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]))
-                  }
+                  onClick={() => setCategoryIds((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]))}
                 >
-                  <Icon name={resolveIcon(c.icon)} size={14} /> {c.name}
+                  <CategoryIcon icon={c.icon} color={c.color} size={18} />
+                  {c.name}
                 </button>
               ))}
             </div>
+            {categoryIds.length > 0 && kinds.some((k) => k !== 'expense') && (
+              <p className="muted text-xs mt-2">Lent and borrowed entries have no category, so they are hidden.</p>
+            )}
           </div>
 
           <div>
@@ -263,16 +243,10 @@ export default function ExpensesPage() {
                   data-selected={personIds.includes(p.id)}
                   onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
                 >
+                  <PersonMark name={p.name} color={p.color} size={18} />
                   {p.name}
                 </button>
               ))}
-              <button
-                className="chip"
-                data-selected={personIds.includes('none')}
-                onClick={() => setPersonIds((x) => (x.includes('none') ? x.filter((y) => y !== 'none') : [...x, 'none']))}
-              >
-                — Nobody
-              </button>
             </div>
           </div>
 
@@ -286,65 +260,92 @@ export default function ExpensesPage() {
           </div>
         </div>
       </Modal>
-
     </div>
   );
 }
 
-function ExpenseRow({
-  expense: e,
-  onEdit,
-  onDuplicate,
+function TxRow({
+  tx,
+  onCategory,
+  onPerson,
+  onFilterCategory,
+  onFilterPerson,
   onDelete,
 }: {
-  expense: Expense;
-  onEdit: () => void;
-  onDuplicate: () => void;
+  tx: Transaction;
+  onCategory: (id: string) => void;
+  onPerson: (id: string) => void;
+  onFilterCategory: (id: string) => void;
+  onFilterPerson: (id: string) => void;
   onDelete: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const { openAdd } = useShell();
+  const isLedger = tx.kind !== 'expense';
 
   return (
-    <div>
-      <div className="flex items-center gap-3 px-4 sm:px-5 py-3">
-        <button onClick={onEdit} className="flex items-center gap-3 min-w-0 flex-1 text-left">
-          <CategoryIcon icon={e.category.icon} color={e.category.color} size={36} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{e.category.name}</p>
-            <p className="muted text-xs truncate">
-              {e.people.length ? e.people.map((p) => p.name).join(', ') : 'No person'}
-              {e.note ? ` · ${e.note}` : ''}
-            </p>
-          </div>
-        </button>
-        <span className="tabular font-medium text-sm shrink-0">{formatINR(e.amountMinor)}</span>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          aria-label="Expense actions"
-          aria-expanded={open}
-          className="muted px-1.5 text-lg leading-none shrink-0"
+    <div className="row group flex items-center gap-3 px-4 py-3">
+      {tx.category ? (
+        <CategoryIcon icon={tx.category.icon} color={tx.category.color} size={34} />
+      ) : (
+        <span
+          className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+          style={{
+            background: tx.kind === 'borrowed' ? 'var(--credit-soft)' : 'var(--rule-red-soft)',
+            color: tx.kind === 'borrowed' ? 'var(--credit)' : 'var(--rule-red)',
+          }}
         >
-          ⋯
-        </button>
+          {tx.kind === 'borrowed' ? '↓' : '↑'}
+        </span>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">
+          {tx.note || tx.category?.name || (tx.kind === 'lent' ? 'Money given' : 'Money received')}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          {tx.category && (
+            <button
+              className="tag"
+              title="Open category · shift-click to filter"
+              onClick={(e) => (e.shiftKey ? onFilterCategory(tx.category!.id) : onCategory(tx.category!.id))}
+            >
+              {tx.category.name}
+            </button>
+          )}
+          {tx.people.map((p) => (
+            <button
+              key={p.id}
+              className="tag"
+              title="Open person · shift-click to filter"
+              onClick={(e) => (e.shiftKey ? onFilterPerson(p.id) : onPerson(p.id))}
+            >
+              <PersonMark name={p.name} color={p.color} size={14} />
+              {p.name}
+            </button>
+          ))}
+          {isLedger && <span className="micro">{tx.kind}</span>}
+        </div>
       </div>
-      {open && (
-        <div className="flex gap-2 px-4 sm:px-5 pb-3 -mt-1 animate-in">
-          {/* Edit is omitted — tapping the row itself already opens it. */}
-          <button className="chip" onClick={onDuplicate}>
-            Duplicate
-          </button>
+
+      {/* Actions appear on hover; always present for touch. */}
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" style={{ transitionDuration: '150ms' }}>
+        {tx.kind === 'expense' && (
           <button
-            className="chip"
-            style={{ color: 'var(--danger)' }}
-            onClick={() => {
-              setOpen(false);
-              onDelete();
+            className="tag"
+            onClick={async () => {
+              const full = await api.get<never>(`/api/expenses/${tx.id}`);
+              openAdd(full);
             }}
           >
-            Delete
+            Edit
           </button>
-        </div>
-      )}
+        )}
+        <button className="tag" style={{ color: 'var(--rule-red)' }} onClick={onDelete}>
+          Delete
+        </button>
+      </div>
+
+      <Money minor={tx.amountMinor} className="text-sm font-semibold shrink-0 w-20 text-right" />
     </div>
   );
 }

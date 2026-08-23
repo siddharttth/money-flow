@@ -43,6 +43,7 @@ export const updateExpenseSchema = z.object({
 
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(60),
+  monthlyBudget: z.number().nonnegative().max(100_000_000).nullable().optional(),
   icon: z.string().trim().max(8).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value').optional(),
   kind: z.enum(['expense', 'investment']).optional(),

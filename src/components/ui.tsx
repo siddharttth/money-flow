@@ -3,8 +3,20 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`card p-4 sm:p-5 ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = '',
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div className={`card p-4 sm:p-5 ${className}`} style={style}>
+      {children}
+    </div>
+  );
 }
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {

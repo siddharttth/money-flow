@@ -5,22 +5,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { api } from '@/lib/client';
 import { Modal, Toast } from './ui';
-import { ExpenseForm } from './expense-form';
+import { InspectorProvider } from './inspector';
+import { CommandPalette } from './command-palette';
+import { AddTransaction } from './add-transaction';
 import type { Expense } from '@/lib/types';
 
+/*
+ * Categories now live inside Settings, and the old Peers screen merged into
+ * People — a person and a peer were always the same entity, so two screens
+ * meant two places to look for one contact.
+ */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: '◎' },
-  { href: '/expenses', label: 'Expenses', icon: '≡' },
-  { href: '/peers', label: 'Peers', icon: '⇄' },
+  { href: '/expenses', label: 'Transactions', icon: '≡' },
   { href: '/people', label: 'People', icon: '☺' },
   { href: '/analytics', label: 'Analytics', icon: '◑' },
-  { href: '/categories', label: 'Categories', icon: '◈' },
   { href: '/settings', label: 'Settings', icon: '⚙' },
 ];
 
-// Only four fit either side of the + button, so the rest live behind "More".
-const MOBILE_PRIMARY = ['/dashboard', '/expenses', '/peers'];
-const MORE_ITEMS = ['/people', '/analytics', '/categories', '/settings'];
+const MOBILE_PRIMARY = ['/dashboard', '/expenses', '/people'];
+const MORE_ITEMS = ['/analytics', '/settings'];
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -64,7 +68,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
       const el = e.target as HTMLElement | null;
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'n' || e.key === 'a') {
+      if (e.key === 'n') {
         e.preventDefault();
         openAdd();
       }
@@ -83,6 +87,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
 
   return (
     <Ctx.Provider value={{ openAdd, toast }}>
+      <InspectorProvider>
       <div className="flex min-h-dvh">
         {/* Desktop sidebar */}
         <aside
@@ -101,8 +106,21 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             <span className="wordmark text-lg" style={{ color: 'var(--brass)' }}>Money Flow</span>
           </Link>
 
-          <button className="btn btn-primary mb-5" onClick={() => openAdd()}>
-            + Add Expense
+          <button className="btn btn-primary mb-2" onClick={() => openAdd()}>
+            + Add transaction
+          </button>
+          <button
+            className="flex items-center justify-between gap-2 mb-5 px-3.5 py-2 rounded-full text-xs transition-colors"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', transitionDuration: '150ms' }}
+            onClick={() => {
+              const ev = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+              window.dispatchEvent(ev);
+            }}
+          >
+            <span>Search…</span>
+            <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface)' }}>
+              ⌘K
+            </kbd>
           </button>
 
           <nav className="flex flex-col gap-0.5">
@@ -231,19 +249,20 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title={editing ? 'Edit expense' : 'Add expense'}
+        title={editing ? 'Edit expense' : 'Add transaction'}
         wide
       >
-        <ExpenseForm
+        <AddTransaction
           key={editing?.id ?? 'new'}
           existing={editing}
-          keepOpenAfterSave={!editing}
-          onSaved={(_e, again) => {
-            toast(editing ? 'Expense updated' : 'Expense saved');
-            if (!again) setAddOpen(false);
+          onSaved={(msg, keepOpen) => {
+            toast(msg);
+            if (!keepOpen) setAddOpen(false);
           }}
         />
       </Modal>
+
+      <CommandPalette onAdd={() => openAdd()} />
 
       {toastMsg && (
         <Toast
@@ -260,6 +279,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           }
         />
       )}
+      </InspectorProvider>
     </Ctx.Provider>
   );
 }
