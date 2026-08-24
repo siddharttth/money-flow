@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { IBM_Plex_Mono, Montserrat, Plus_Jakarta_Sans } from 'next/font/google';
+import { Fraunces, IBM_Plex_Mono, Montserrat, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
 /**
@@ -20,6 +20,20 @@ const ui = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--ff-ui',
+  display: 'swap',
+});
+
+/*
+ * Landing page only. A high-contrast display serif with real character —
+ * Fraunces' optical-size axis lets the huge hero settings tighten the way
+ * watch-dial and masthead type does. The app never loads it for layout.
+ */
+const serif = Fraunces({
+  subsets: ['latin'],
+  // Variable font: the full weight range plus the optical-size axis, so the
+  // huge hero settings can tighten the way display type should.
+  axes: ['SOFT', 'WONK', 'opsz'],
+  variable: '--ff-serif',
   display: 'swap',
 });
 
@@ -52,7 +66,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${display.variable} ${ui.variable} ${mono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${ui.variable} ${mono.variable} ${serif.variable}`}>
       <head>
         {/* Applies the saved theme before first paint so there is no flash. */}
         <script

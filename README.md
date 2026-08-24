@@ -133,11 +133,14 @@ category. One provider owns it, so no screen wires it up.
 `/peers`, `/people`, `/analytics`, `/categories` and `/settings`, all behind the session check
 in `(app)/layout.tsx`.
 
-The landing deliberately uses a **different visual language** from the app — white base,
-electric blue, Montserrat — and every rule is scoped under `.lp` so none of it leaks into the
-ledger UI. `.lp` also pins its own colours, so a visitor whose OS is in dark mode still sees
-the intended design. Its product imagery is real screenshots of the running app, captured from
-seeded data, rather than stock photography.
+The landing runs its own visual language — **"Rolex boutique meets liquid glass"**: deep bottle-green
+lacquer with a grain overlay, gilt gold used sparingly, Fraunces display serif, and frosted panels
+with a real specular top edge. Every rule is scoped under `.lp` so none of it reaches the app, and
+`.lp` pins its own colours so the design holds in either OS theme.
+
+The product previews are **live markup, not screenshots** — the design calls for the preview screens
+to carry the same glass material and gold numerals, which a raster image cannot. The figures in them
+are the app's real values.
 
 ## Design
 

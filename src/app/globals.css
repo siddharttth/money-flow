@@ -372,109 +372,250 @@ h1, h2, h3 {
 
 /*
  * ============================================================
- * MARKETING LANDING ONLY
+ * MARKETING LANDING ONLY — "Rolex boutique meets liquid glass"
  * ------------------------------------------------------------
- * A deliberately different language from the app: white base,
- * electric blue, geometric headlines. Everything is scoped under
- * .lp so none of it can leak into the ledger UI, and .lp pins its
- * own colours so the app's dark theme never bleeds through.
+ * Deep bottle green lacquer, gilt gold used sparingly, and frosted
+ * panels with a real specular edge. Every rule is scoped under .lp so
+ * none of it can reach the app, and .lp pins its own colours so a
+ * visitor in either OS theme sees the intended design.
  * ============================================================
  */
 .lp {
-  --lp-blue: #4056f4;
-  --lp-blue-deep: #1f38dc;
-  --lp-blue-soft: rgba(64, 86, 244, 0.08);
-  --lp-ink: #1e1b1b;
-  --lp-ink-soft: #444655;
-  --lp-outline: #c5c5d8;
-  --lp-surface: #ffffff;
-  --lp-surface-low: #f9f2f1;
-  --lp-ghost: rgba(4, 3, 3, 0.035);
+  --green-900: #00301e;
+  --green-800: #0b4228;
+  --green-700: #145236;
+  --green-600: #1e6b45;
 
-  background: var(--lp-surface);
-  color: var(--lp-ink);
+  --gold-500: #c9a96a;
+  --gold-400: #dcc38a;
+  --gold-700: #8c6f35;
+
+  --ivory-100: #f6f3ea;
+  --ivory-300: #dcd6c4;
+  --ink-900: #0a0a0a;
+
+  --glass-white: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.18);
+
+  /* Bronze rather than red for "you owe", to stay inside the palette. */
+  --bronze: #c2703f;
+
+  --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: relative;
+  color: var(--ivory-100);
   font-family: var(--font-sans);
-  color-scheme: light;
+  color-scheme: dark;
+  /* Lacquer, not a flat fill: a warm pool of light off-centre over the deep base. */
+  background:
+    radial-gradient(120% 80% at 50% -10%, #10583a 0%, transparent 55%),
+    radial-gradient(90% 60% at 85% 20%, rgba(30, 107, 69, 0.45) 0%, transparent 60%),
+    linear-gradient(180deg, var(--green-900) 0%, var(--green-800) 45%, var(--green-900) 100%);
+}
+
+/*
+ * Grain. Without it the gradient reads as a digital fill; at 3% it reads as
+ * lacquered metal. Fixed so it does not swim while the page scrolls.
+ */
+.lp::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .lp-display {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.12;
-}
-
-.lp-label {
-  font-family: var(--font-sans);
-  font-size: 14px;
+  font-family: var(--ff-serif), ui-serif, Georgia, serif;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  font-optical-sizing: auto;
+}
+
+/* The light half of a Rolex-style pairing: bold word, light word. */
+.lp-display-light { font-weight: 300; font-style: normal; }
+
+.lp-gold { color: var(--gold-500); }
+
+/* Case-back inscription: wide tracking with a gold hairline running off it. */
+.lp-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
+  color: var(--gold-500);
+}
+.lp-label::after {
+  content: '';
+  width: clamp(2rem, 8vw, 5rem);
+  height: 1px;
+  background: linear-gradient(to right, var(--gold-700), transparent);
+}
+.lp-label-center { justify-content: center; }
+.lp-label-center::before {
+  content: '';
+  width: clamp(2rem, 8vw, 5rem);
+  height: 1px;
+  background: linear-gradient(to left, var(--gold-700), transparent);
 }
 
-/* Depth here is a soft blue glow rather than a drop shadow. */
-.lp-ambient { box-shadow: 0 20px 40px -10px rgba(64, 86, 244, 0.15); }
-.lp-ambient-lg { box-shadow: 0 40px 80px -24px rgba(64, 86, 244, 0.22); }
-
-.lp-grid {
-  background-image:
-    linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+/* Frosted panel with a top specular highlight, so it has thickness. */
+.glass-panel {
+  position: relative;
+  background: var(--glass-white);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: transform 600ms var(--ease-lux), box-shadow 600ms var(--ease-lux), border-color 600ms var(--ease-lux);
+}
+/* Light catching the curve along the top edge. */
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 22%);
+}
+.glass-lift:hover {
+  transform: scale(1.01);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-/* The oversized background word that anchors a section. */
-.lp-watermark {
-  font-family: var(--font-display);
-  font-weight: 900;
-  letter-spacing: -0.04em;
-  color: var(--lp-ghost);
-  line-height: 0.85;
-  user-select: none;
+/* The gold-accented panel — used once, for the answer card. */
+.glass-gold {
+  border-color: rgba(201, 169, 106, 0.42);
+  background: linear-gradient(180deg, rgba(201, 169, 106, 0.10), rgba(255, 255, 255, 0.05));
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(220, 195, 138, 0.28);
 }
 
-/* Pill buttons are mandatory in this system. */
+/* Muted charcoal panel — the problem card, deliberately duller. */
+.glass-muted {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lp-hairline { height: 1px; background: linear-gradient(to right, transparent, var(--gold-700), transparent); }
+
+/* Pill CTAs. Hover blooms rather than flipping colour. */
 .lp-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   border-radius: 9999px;
-  font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  padding: 0.95rem 2rem;
-  min-height: 48px;
-  transition: transform 0.25s, box-shadow 0.25s, background 0.2s;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 1.05rem 2.1rem;
+  min-height: 50px;
   cursor: pointer;
+  transition: box-shadow 600ms var(--ease-lux), border-color 600ms var(--ease-lux), background 600ms var(--ease-lux);
 }
-.lp-btn-primary { background: var(--lp-blue); color: #fff; }
-.lp-btn-primary:hover { transform: scale(1.04); box-shadow: 0 20px 40px -10px rgba(64, 86, 244, 0.4); }
-.lp-btn-secondary { background: #fff; color: var(--lp-blue); border: 1px solid var(--lp-blue); }
-.lp-btn-secondary:hover { background: var(--lp-blue-soft); }
+.lp-btn-gold {
+  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
+  color: #241a06;
+  border: 1px solid var(--gold-400);
+  box-shadow: 0 6px 20px rgba(201, 169, 106, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.lp-btn-gold:hover {
+  box-shadow: 0 0 0 1px var(--gold-400), 0 10px 40px rgba(201, 169, 106, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.lp-btn-outline {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ivory-100);
+  border: 1px solid rgba(201, 169, 106, 0.45);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.lp-btn-outline:hover {
+  border-color: var(--gold-400);
+  box-shadow: 0 0 30px rgba(201, 169, 106, 0.22);
+}
 
+/* Sub-dial chip — a watch complication, not a tag. */
 .lp-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   border-radius: 9999px;
-  background: var(--lp-blue-soft);
-  color: var(--lp-blue-deep);
-  font-size: 13px;
+  padding: 0.4rem 0.95rem;
+  font-size: 12px;
   font-weight: 600;
-  padding: 0.4rem 0.9rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-400);
+  background: rgba(201, 169, 106, 0.09);
+  border: 1px solid rgba(201, 169, 106, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
-.lp-card {
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 1rem;
-  transition: box-shadow 0.3s, transform 0.3s;
+/* Engraved numerals: serif, tabular, so figures read as struck not typed. */
+.lp-num {
+  font-family: var(--ff-serif), ui-serif, Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.01em;
 }
-.lp-card-glow:hover { box-shadow: 0 24px 48px -16px rgba(64, 86, 244, 0.18); transform: translateY(-2px); }
 
-@media (min-width: 768px) {
-  /* Asymmetry: the winning card lifts out of the grid. */
-  .lp-overlap { transform: translateY(-40px); }
+/* Device frames milled from the same dark material, with a gold rim. */
+.lp-device {
+  position: relative;
+  background: linear-gradient(160deg, #1b2b22 0%, #060f0a 55%, #12201a 100%);
+  padding: 8px;
+  box-shadow:
+    0 40px 90px -30px rgba(0, 0, 0, 0.85),
+    0 2px 0 rgba(255, 255, 255, 0.06) inset;
+}
+.lp-device-screen {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(201, 169, 106, 0.55);
+  background: linear-gradient(180deg, rgba(11, 66, 40, 0.92), rgba(0, 48, 30, 0.96));
+}
+.lp-phone { border-radius: 42px; }
+.lp-phone .lp-device-screen { border-radius: 34px; }
+.lp-browser { border-radius: 18px; }
+.lp-browser .lp-device-screen { border-radius: 12px; }
+
+/* Motion: unhurried. Fade + small rise, no bounce. */
+.lp-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 800ms var(--ease-lux), transform 800ms var(--ease-lux);
+}
+.lp-reveal[data-shown='true'] { opacity: 1; transform: none; }
+
+/* Gold dividers draw themselves in. */
+.lp-draw { transform: scaleX(0); transform-origin: left center; transition: transform 900ms var(--ease-lux); }
+.lp-reveal[data-shown='true'] .lp-draw { transform: scaleX(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal { opacity: 1; transform: none; transition: none; }
+  .lp-draw { transform: none; transition: none; }
+}
+
+/*
+ * Fallback where backdrop-filter is unsupported: fill the panel so text keeps
+ * its contrast instead of sitting on a near-transparent rectangle.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lp .glass-panel { background: rgba(6, 46, 29, 0.92); }
+  .lp .lp-btn-outline { background: rgba(6, 46, 29, 0.9); }
 }
