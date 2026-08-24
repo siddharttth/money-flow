@@ -74,7 +74,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function DashboardMockup() {
   return (
     <MacBook>
-      <div className="grid grid-cols-[150px_1fr] min-h-[430px]">
+      <div className="grid grid-cols-[150px_1fr] min-h-[560px]">
         <div className="flex flex-col gap-1 p-4 pt-9 border-r" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
           <span className="lp-display text-[14px] lp-gold mb-3">Money Flow</span>
           {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((n, i) => (
@@ -93,7 +93,7 @@ export function DashboardMockup() {
         </div>
 
         {/* pt clears the camera housing. */}
-        <div className="p-5 pt-9 space-y-4">
+        <div className="p-5 pt-9 space-y-5">
           <div>
             <p className="text-[10px] tracking-[0.18em] uppercase" style={{ color: 'var(--gold-500)' }}>
               Total spending
@@ -132,6 +132,25 @@ export function DashboardMockup() {
                   <div className="h-[7px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                     <div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} />
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-panel !rounded-xl p-4">
+            <p className="text-[10px] tracking-[0.16em] uppercase mb-3" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
+              Who it was with
+            </p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+              {PEOPLE.map(([n, v]) => (
+                <div key={n} className="flex items-center gap-2">
+                  <Initial name={n} size={18} />
+                  <span className="text-[12px] flex-1 truncate" style={{ color: 'var(--ivory-100)' }}>
+                    {n}
+                  </span>
+                  <span className="lp-num text-[12px]" style={{ color: 'var(--ivory-300)' }}>
+                    ₹{v}
+                  </span>
                 </div>
               ))}
             </div>
