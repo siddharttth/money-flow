@@ -67,7 +67,7 @@ export default async function LandingPage() {
 
       <main className="relative z-10 pt-28 sm:pt-40">
         {/* ------------------------------ Hero ----------------------------- */}
-        <section className="px-5 sm:px-8 text-center pb-14 sm:pb-24">
+        <section className="px-5 sm:px-8 text-center pb-12 sm:pb-16">
           <Reveal>
             <span className="lp-label lp-label-center mb-7">A new standard in personal ledgers</span>
           </Reveal>
@@ -104,7 +104,7 @@ export default async function LandingPage() {
             </p>
           </Reveal>
 
-          <Reveal delay={320} className="mt-14 sm:mt-20">
+          <Reveal delay={320} className="mt-10 sm:mt-14">
             <div className="max-w-5xl mx-auto">
               <DashboardMockup />
             </div>
@@ -112,8 +112,8 @@ export default async function LandingPage() {
         </section>
 
         {/* ---------------------------- The Dilemma ------------------------ */}
-        <section id="dilemma" className="px-5 sm:px-8 py-16 sm:py-28">
-          <Reveal className="text-center mb-12 sm:mb-16">
+        <section id="dilemma" className="px-5 sm:px-8 py-12 sm:py-14">
+          <Reveal className="text-center mb-10 sm:mb-12">
             <span className="lp-label lp-label-center mb-6">The complication</span>
             <h2 className="lp-display text-[1.9rem] sm:text-4xl md:text-5xl max-w-3xl mx-auto">
               The spreadsheet was never
@@ -163,8 +163,8 @@ export default async function LandingPage() {
         </section>
 
         {/* ----------------------------- The Idea -------------------------- */}
-        <section id="idea" className="px-5 sm:px-8 py-16 sm:py-28">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-12 gap-12 md:gap-16 items-center">
+        <section id="idea" className="px-5 sm:px-8 py-12 sm:py-14">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-12 gap-10 md:gap-14 items-center">
             <Reveal className="md:col-span-7">
               <span className="lp-label mb-6">The mechanism</span>
               <h2 className="lp-display text-[1.9rem] sm:text-4xl md:text-[3.1rem] mb-7 mt-5">
@@ -216,8 +216,8 @@ export default async function LandingPage() {
         </section>
 
         {/* ------------------------------ Peers ---------------------------- */}
-        <section id="peers" className="px-5 sm:px-8 py-16 sm:py-28">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-12 gap-12 md:gap-16 items-center">
+        <section id="peers" className="px-5 sm:px-8 py-12 sm:py-14">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-12 gap-10 md:gap-14 items-center">
             <Reveal className="md:col-span-5 order-2 md:order-1">
               <div className="flex justify-center">
                 <PeersMockup />
@@ -263,7 +263,7 @@ export default async function LandingPage() {
         <section className="mt-8">
           <Reveal>
             <div className="lp-hairline" />
-            <div className="px-5 sm:px-8 py-20 sm:py-28 text-center" style={{ background: 'rgba(0, 25, 15, 0.35)' }}>
+            <div className="px-5 sm:px-8 py-16 sm:py-20 text-center" style={{ background: 'rgba(0, 25, 15, 0.35)' }}>
               <h2 className="lp-display text-[2rem] sm:text-5xl mb-5">
                 Precision in
                 <span className="lp-display-light lp-gold"> every entry.</span>

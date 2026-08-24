@@ -423,8 +423,8 @@ h1, h2, h3 {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.032;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 .lp-display {
@@ -469,13 +469,14 @@ h1, h2, h3 {
 .glass-panel {
   position: relative;
   background: var(--glass-white);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
   border: 1px solid var(--glass-border);
   border-radius: 24px;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
   transition: transform 600ms var(--ease-lux), box-shadow 600ms var(--ease-lux), border-color 600ms var(--ease-lux);
 }
 /* Light catching the curve along the top edge. */
@@ -619,3 +620,214 @@ h1, h2, h3 {
   .lp .glass-panel { background: rgba(6, 46, 29, 0.92); }
   .lp .lp-btn-outline { background: rgba(6, 46, 29, 0.9); }
 }
+
+
+/* ============================================================
+ * DEVICE CHROME
+ * Hand-built rather than an npm frameset: the available packages
+ * ship notch-era iPhones and fixed light/dark chrome that cannot be
+ * tinted to this palette. These are CSS + inline SVG so the bezel
+ * gradients, the notch and the Dynamic Island sit in the same colour
+ * system as everything else.
+ * ============================================================ */
+
+/* Spotlight behind a device, so it sits in space rather than on the page. */
+.lp-stage { position: relative; display: flex; justify-content: center; }
+.lp-stage::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8%;
+  width: 116%;
+  height: 116%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(50% 46% at 50% 40%, rgba(201, 169, 106, 0.14) 0%, rgba(30, 107, 69, 0.10) 42%, transparent 72%);
+  filter: blur(12px);
+}
+.lp-stage > * { position: relative; z-index: 1; }
+
+/* ---------------------------- MacBook Pro ----------------------------
+ * Proportions taken from a 14" Pro: very thin, even bezels, a camera
+ * housing in the top bezel, and a tapered base below the hinge.
+ * -------------------------------------------------------------------- */
+.mb { width: 100%; }
+
+.mb-body {
+  position: relative;
+  /* Anodised aluminium: a bright top-left facet falling to near-black. */
+  background: linear-gradient(157deg, #4a4a50 0%, #26262a 12%, #0d0d0f 55%, #1e1e22 88%, #35353a 100%);
+  border-radius: 20px;
+  /* Thin and even, with a slightly deeper chin — as on the real lid. */
+  padding: 7px 7px 9px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.8),
+    0 44px 90px -30px rgba(0, 0, 0, 0.92);
+}
+
+.mb-screen {
+  position: relative;
+  /* Nested radius: body radius minus the bezel, so the corners sit concentric. */
+  border-radius: 13px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.92),
+    inset 0 3px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* Light raking across the display glass. */
+.mb-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 18%, transparent 42%);
+}
+
+.mb-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 128px;
+  height: 17px;
+  background: #000;
+  border-radius: 0 0 9px 9px;
+  z-index: 20;
+}
+.mb-notch::after {
+  content: '';
+  position: absolute;
+  top: 5.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #33454f, #04060a 72%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Hinge, then the base tapering away underneath it. */
+.mb-hinge {
+  position: relative;
+  height: 9px;
+  width: 100.5%;
+  margin: 0 auto;
+  border-radius: 0 0 5px 5px;
+  background: linear-gradient(180deg, #3a3a40 0%, #202024 45%, #0c0c0e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.mb-base {
+  position: relative;
+  height: 11px;
+  width: 112%;
+  margin: 0 auto;
+  border-radius: 0 0 12px 12px;
+  background: linear-gradient(180deg, #2c2c31 0%, #17171a 35%, #0a0a0c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 26px 40px -20px rgba(0, 0, 0, 0.95);
+  /* The lip you grip to open the lid. */
+  clip-path: polygon(0 0, 100% 0, 98.6% 100%, 1.4% 100%);
+}
+.mb-base::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 13%;
+  height: 4px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #08080a, #1c1c20);
+}
+
+/* ------------------------------ iPhone ------------------------------ */
+.ip {
+  position: relative;
+  width: 264px;
+}
+.ip-body {
+  position: relative;
+  /* Brushed titanium band: alternating light and dark facets. */
+  background: linear-gradient(148deg, #8d8d93 0%, #3a3a3e 16%, #6f6f76 34%, #232326 56%, #7a7a81 76%, #2c2c30 100%);
+  border-radius: 52px;
+  padding: 3px;
+  box-shadow: 0 44px 80px -30px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.ip-inner {
+  background: #050506;
+  border-radius: 49px;
+  padding: 8px;
+}
+.ip-screen {
+  position: relative;
+  border-radius: 42px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.9), inset 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+/* Dynamic Island — a pill floating over the content, not a notch. */
+.ip-island {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82px;
+  height: 24px;
+  background: #000;
+  border-radius: 999px;
+  z-index: 20;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+}
+.ip-island::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #24323c, #04060a 70%);
+}
+/* Side hardware — enough to read as an iPhone, no more. */
+.ip-btn {
+  position: absolute;
+  width: 2.5px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8e8e95, #3a3a3e);
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.ip-btn-power { right: -2px; top: 132px; height: 62px; }
+.ip-btn-action { left: -2px; top: 92px; height: 26px; }
+.ip-btn-vol-up { left: -2px; top: 132px; height: 42px; }
+.ip-btn-vol-down { left: -2px; top: 184px; height: 42px; }
+
+/* Ground reflection under a device, as if on a polished dark surface. */
+.lp-reflect {
+  position: relative;
+  margin: 0 auto;
+  height: 84px;
+  width: 84%;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(201, 169, 106, 0.10), transparent 62%);
+  filter: blur(16px);
+  opacity: 0.6;
+  border-radius: 50%;
+}
+
+/* The screen behind a glass panel needs texture, or the blur has nothing to
+   work on and the panel reads as a flat fill. */
+.lp-screen-bg {
+  background:
+    radial-gradient(70% 55% at 22% 8%, rgba(30, 107, 69, 0.55) 0%, transparent 60%),
+    radial-gradient(60% 50% at 88% 82%, rgba(201, 169, 106, 0.10) 0%, transparent 62%),
+    linear-gradient(165deg, #0b4228 0%, #00301e 55%, #062a1b 100%);
+}
+
+/* Devices scale as a unit rather than reflowing, so no size overrides here. */

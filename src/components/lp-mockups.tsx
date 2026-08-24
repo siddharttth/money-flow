@@ -1,143 +1,165 @@
+import { Icon, type IconKey } from './icons';
+import { IPhone, MacBook } from './lp-devices';
+
 /**
- * Live mockups of the product, rendered as markup rather than screenshots.
- *
- * The brief asks for the preview screens to carry the same glass material and
- * gold numerals as the marketing chrome — which a raster screenshot cannot do.
- * The figures below are the real values from the running app, so the previews
- * stay honest while matching the surrounding design.
+ * Product previews as live markup rather than screenshots, so they carry the
+ * same glass material and gilt numerals as the marketing chrome around them.
+ * Every figure below is a real value from the running app.
  */
 
-const CATEGORIES = [
-  ['Investment', '10,000', '#c9a96a', 100],
-  ['Shopping', '4,843', '#8fbfa4', 48],
-  ['Outside Food', '2,921', '#c2703f', 29],
-  ['Misc', '2,140', '#7f9a8c', 21],
-  ['Ciggs / Alc', '1,931', '#a8564a', 19],
-] as const;
+const CATEGORIES: [string, string, IconKey, string, number][] = [
+  ['Investment', '10,000', 'invest', '#c9a96a', 100],
+  ['Shopping', '4,843', 'shop', '#9ec2ad', 48],
+  ['Outside Food', '2,921', 'food', '#c2703f', 29],
+  ['Misc', '2,140', 'misc', '#8aa79a', 21],
+  ['Ciggs / Alc', '1,931', 'smoke', '#b5675a', 19],
+];
 
-const PEOPLE = [
+const PEOPLE: [string, string][] = [
   ['Me', '13,480'],
   ['Sankalp', '3,764'],
   ['Mummy', '2,208'],
   ['Aarya', '2,160'],
-] as const;
+];
 
-function Stat({ label, value, gold = false }: { label: string; value: string; gold?: boolean }) {
+/** Small circular initial badge, matching the app's person marks. */
+function Initial({ name, size = 15 }: { name: string; size?: number }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center shrink-0 rounded-full font-semibold"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.52),
+        background: 'rgba(201,169,106,0.18)',
+        color: 'var(--gold-400)',
+        border: '0.5px solid rgba(201,169,106,0.4)',
+      }}
+      aria-hidden
+    >
+      {name.trim()[0]?.toUpperCase()}
+    </span>
+  );
+}
+
+function Chip({ label, icon, person, on }: { label: string; icon?: IconKey; person?: boolean; on?: boolean }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full border"
+      style={
+        on
+          ? { background: 'rgba(201,169,106,0.18)', borderColor: 'rgba(201,169,106,0.55)', color: 'var(--gold-400)' }
+          : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)', color: 'var(--ivory-300)' }
+      }
+    >
+      {person ? <Initial name={label} size={16} /> : icon ? <Icon name={icon} size={14} /> : null}
+      {label}
+    </span>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="glass-panel !rounded-xl px-3 py-2.5">
-      <p className="text-[8px] tracking-[0.16em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+      <p className="text-[10px] tracking-[0.16em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
         {label}
       </p>
-      <p className={`lp-num text-[15px] mt-1 ${gold ? 'lp-gold' : ''}`} style={{ color: gold ? undefined : 'var(--ivory-100)' }}>
+      <p className="lp-num text-[24px] mt-1" style={{ color: 'var(--ivory-100)' }}>
         ₹{value}
       </p>
     </div>
   );
 }
 
-/** Desktop dashboard, in a milled browser frame. */
 export function DashboardMockup() {
   return (
-    <div className="lp-device lp-browser">
-      <div className="lp-device-screen">
-        {/* Chrome */}
-        <div
-          className="flex items-center gap-1.5 px-3 py-2 border-b"
-          style={{ borderColor: 'rgba(201,169,106,0.18)', background: 'rgba(0,0,0,0.25)' }}
-        >
-          {['#c2703f', '#c9a96a', '#8fbfa4'].map((c) => (
-            <span key={c} className="w-2 h-2 rounded-full" style={{ background: c, opacity: 0.75 }} />
+    <MacBook>
+      <div className="grid grid-cols-[150px_1fr] min-h-[430px]">
+        <div className="flex flex-col gap-1 p-4 pt-9 border-r" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+          <span className="lp-display text-[14px] lp-gold mb-3">Money Flow</span>
+          {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((n, i) => (
+            <span
+              key={n}
+              className="text-[11.5px] px-2 py-1.5 rounded-full"
+              style={{
+                color: i === 0 ? 'var(--gold-400)' : 'var(--ivory-300)',
+                background: i === 0 ? 'rgba(201,169,106,0.13)' : 'transparent',
+                opacity: i === 0 ? 1 : 0.6,
+              }}
+            >
+              {n}
+            </span>
           ))}
-          <span className="ml-3 text-[9px] tracking-[0.14em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.6 }}>
-            Money Flow
-          </span>
         </div>
 
-        <div className="grid grid-cols-[128px_1fr] min-h-[300px] sm:min-h-[380px]">
-          {/* Rail */}
-          <div className="hidden sm:flex flex-col gap-1 p-3 border-r" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-            <span className="lp-display text-[12px] lp-gold mb-3">Money Flow</span>
-            {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((n, i) => (
-              <span
-                key={n}
-                className="text-[9.5px] px-2 py-1.5 rounded-full"
-                style={{
-                  color: i === 0 ? 'var(--gold-400)' : 'var(--ivory-300)',
-                  background: i === 0 ? 'rgba(201,169,106,0.12)' : 'transparent',
-                  opacity: i === 0 ? 1 : 0.62,
-                }}
-              >
-                {n}
-              </span>
-            ))}
+        {/* pt clears the camera housing. */}
+        <div className="p-5 pt-9 space-y-4">
+          <div>
+            <p className="text-[10px] tracking-[0.18em] uppercase" style={{ color: 'var(--gold-500)' }}>
+              Total spending
+            </p>
+            <p className="lp-num lp-gold text-[44px] leading-none mt-1.5">₹24,962</p>
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
+              25 transactions · August 2026
+            </p>
           </div>
 
-          <div className="p-3.5 sm:p-4 space-y-3">
-            <div>
-              <p className="text-[8px] tracking-[0.18em] uppercase" style={{ color: 'var(--gold-500)' }}>
-                Total spending
-              </p>
-              {/* The one figure that gets full gilt. */}
-              <p className="lp-num lp-gold text-[30px] sm:text-[38px] leading-none mt-1.5">₹24,962</p>
-              <p className="text-[9px] mt-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-                25 transactions · August 2026
-              </p>
-            </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Today" value="2,300" />
+            <Stat label="This week" value="5,438" />
+            <Stat label="Daily pace" value="1,085" />
+          </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <Stat label="Today" value="2,300" />
-              <Stat label="This week" value="5,438" />
-              <Stat label="Daily pace" value="1,085" />
-            </div>
-
-            <div className="glass-panel !rounded-xl p-3">
-              <p className="text-[8px] tracking-[0.16em] uppercase mb-2.5" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
-                Where it went
-              </p>
-              <div className="space-y-2">
-                {CATEGORIES.map(([name, amount, color, width]) => (
-                  <div key={name}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[9.5px]" style={{ color: 'var(--ivory-100)' }}>
-                        {name}
-                      </span>
-                      <span className="lp-num text-[9.5px]" style={{ color: 'var(--ivory-100)' }}>
-                        ₹{amount}
-                      </span>
-                    </div>
-                    <div className="h-[2px] rounded-full mt-1" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                      <div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} />
-                    </div>
+          <div className="glass-panel !rounded-xl p-3">
+            <p className="text-[10px] tracking-[0.16em] uppercase mb-3" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
+              Where it went
+            </p>
+            <div className="space-y-2.5">
+              {CATEGORIES.map(([name, amount, icon, color, width]) => (
+                <div key={name}>
+                  {/* Label and amount on their own line, bar cleanly below. */}
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span style={{ color }} className="shrink-0 flex">
+                      <Icon name={icon} size={14} />
+                    </span>
+                    <span className="text-[11.5px] flex-1 truncate" style={{ color: 'var(--ivory-100)' }}>
+                      {name}
+                    </span>
+                    <span className="lp-num text-[11.5px]" style={{ color: 'var(--ivory-100)' }}>
+                      ₹{amount}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="h-[7px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </MacBook>
   );
 }
 
-/** Add-transaction sheet, in a phone frame. */
 export function AddMockup() {
   return (
-    <div className="lp-device lp-phone w-[236px] sm:w-[264px]">
-      <div className="lp-device-screen p-3.5 space-y-3.5 min-h-[440px]">
+    <IPhone>
+      <div className="p-4 pt-12 space-y-4 min-h-[540px]">
         <div className="flex items-center justify-between">
-          <span className="lp-display text-[13px]" style={{ color: 'var(--ivory-100)' }}>
+          <span className="lp-display text-[16px]" style={{ color: 'var(--ivory-100)' }}>
             Add transaction
           </span>
           <span style={{ color: 'var(--ivory-300)', opacity: 0.6 }}>×</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-1 p-1 rounded-full" style={{ background: 'rgba(0,0,0,0.28)' }}>
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-full" style={{ background: 'rgba(0,0,0,0.3)' }}>
           {['Expense', 'I lent', 'I borrowed'].map((t, i) => (
             <span
               key={t}
-              className="text-[8.5px] text-center py-1.5 rounded-full"
+              className="text-[10.5px] text-center py-1.5 rounded-full"
               style={{
-                background: i === 0 ? 'rgba(201,169,106,0.16)' : 'transparent',
+                background: i === 0 ? 'rgba(201,169,106,0.18)' : 'transparent',
                 color: i === 0 ? 'var(--gold-400)' : 'var(--ivory-300)',
                 opacity: i === 0 ? 1 : 0.6,
               }}
@@ -148,100 +170,80 @@ export function AddMockup() {
         </div>
 
         <div>
-          <p className="text-[8px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--gold-500)' }}>
+          <p className="text-[10px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--gold-500)' }}>
             Amount
           </p>
           <div className="glass-panel !rounded-xl px-3 py-3">
-            <span className="lp-num lp-gold text-[26px]">₹350</span>
+            <span className="lp-num lp-gold text-[34px]">₹350</span>
           </div>
         </div>
 
         <div>
-          <p className="text-[8px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+          <p className="text-[10px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
             Category
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {['Outside Food', 'Transport', 'Shopping', 'Bills'].map((c, i) => (
-              <span
-                key={c}
-                className="text-[8.5px] px-2 py-1 rounded-full border"
-                style={
-                  i === 0
-                    ? { background: 'rgba(201,169,106,0.16)', borderColor: 'rgba(201,169,106,0.5)', color: 'var(--gold-400)' }
-                    : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--ivory-300)' }
-                }
-              >
-                {c}
-              </span>
-            ))}
+            <Chip label="Outside Food" icon="food" on />
+            <Chip label="Transport" icon="transport" />
+            <Chip label="Shopping" icon="shop" />
+            <Chip label="Bills" icon="bill" />
           </div>
         </div>
 
         <div>
-          <p className="text-[8px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+          <p className="text-[10px] tracking-[0.16em] uppercase mb-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
             With
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {['Sankalp', 'Me', 'Mummy'].map((c, i) => (
-              <span
-                key={c}
-                className="text-[8.5px] px-2 py-1 rounded-full border"
-                style={
-                  i === 0
-                    ? { background: 'rgba(201,169,106,0.16)', borderColor: 'rgba(201,169,106,0.5)', color: 'var(--gold-400)' }
-                    : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.1)', color: 'var(--ivory-300)' }
-                }
-              >
-                {c}
-              </span>
-            ))}
+            <Chip label="Sankalp" person on />
+            <Chip label="Me" person />
+            <Chip label="Mummy" person />
           </div>
         </div>
 
         <div
-          className="text-[9px] tracking-[0.16em] uppercase text-center py-2.5 rounded-full mt-1"
+          className="text-[11px] tracking-[0.16em] uppercase text-center py-2.5 rounded-full mt-1"
           style={{ background: 'linear-gradient(180deg,var(--gold-400),var(--gold-500))', color: '#241a06' }}
         >
           Save
         </div>
       </div>
-    </div>
+    </IPhone>
   );
 }
 
-/** Peer ledger, in a phone frame. Bronze for what you owe, not red. */
 export function PeersMockup() {
   return (
-    <div className="lp-device lp-phone w-[236px] sm:w-[264px]">
-      <div className="lp-device-screen p-3.5 space-y-3 min-h-[440px]">
-        <span className="lp-display text-[13px]" style={{ color: 'var(--ivory-100)' }}>
+    <IPhone>
+      <div className="p-4 pt-12 space-y-3.5 min-h-[540px]">
+        <span className="lp-display text-[16px]" style={{ color: 'var(--ivory-100)' }}>
           People &amp; Ledger
         </span>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="glass-panel !rounded-xl px-3 py-2.5">
-            <p className="text-[7.5px] tracking-[0.14em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+            <p className="text-[12px] tracking-[0.14em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
               They owe me
             </p>
-            <p className="lp-num text-[15px] mt-1" style={{ color: '#8fbfa4' }}>
+            <p className="lp-num text-[24px] mt-1" style={{ color: '#9ec2ad' }}>
               ₹4,000
             </p>
           </div>
           <div className="glass-panel !rounded-xl px-3 py-2.5">
-            <p className="text-[7.5px] tracking-[0.14em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+            <p className="text-[12px] tracking-[0.14em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.72 }}>
               I owe
             </p>
-            <p className="lp-num text-[15px] mt-1" style={{ color: 'var(--bronze)' }}>
+            <p className="lp-num text-[24px] mt-1" style={{ color: 'var(--bronze)' }}>
               ₹13,950
             </p>
           </div>
         </div>
 
         <div className="glass-panel !rounded-xl px-3 py-2.5">
-          <p className="text-[7.5px] tracking-[0.14em] uppercase" style={{ color: 'var(--gold-500)' }}>
+          <p className="text-[12px] tracking-[0.14em] uppercase" style={{ color: 'var(--gold-500)' }}>
             Net position
           </p>
-          <p className="lp-num text-[19px] mt-1" style={{ color: 'var(--bronze)' }}>
+          <p className="lp-num text-[24px] mt-1" style={{ color: 'var(--bronze)' }}>
             −₹9,950
           </p>
         </div>
@@ -253,35 +255,36 @@ export function PeersMockup() {
             ['Aarya', '500', 'owed'],
             ['Aditi', '13,950', 'owe'],
           ].map(([name, amt, dir]) => (
-            <div key={name} className="flex items-center justify-between px-3 py-2.5">
-              <span className="text-[10px]" style={{ color: 'var(--ivory-100)' }}>
+            <div key={name} className="flex items-center gap-2 px-3 py-2.5">
+              <Initial name={name} />
+              <span className="text-[12px] flex-1" style={{ color: 'var(--ivory-100)' }}>
                 {name}
               </span>
-              <span className="lp-num text-[10px]" style={{ color: dir === 'owed' ? '#8fbfa4' : 'var(--bronze)' }}>
+              <span className="lp-num text-[12px]" style={{ color: dir === 'owed' ? '#9ec2ad' : 'var(--bronze)' }}>
                 {dir === 'owed' ? '+' : '−'}₹{amt}
               </span>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </IPhone>
   );
 }
 
-/** Small people leaderboard used beside the hero copy. */
 export function PeopleStrip() {
   return (
     <div className="glass-panel !rounded-xl px-3 py-2.5 w-full">
-      <p className="text-[8px] tracking-[0.16em] uppercase mb-2" style={{ color: 'var(--gold-500)' }}>
+      <p className="text-[10.5px] tracking-[0.16em] uppercase mb-2" style={{ color: 'var(--gold-500)' }}>
         Who it was with
       </p>
       <div className="space-y-1.5">
         {PEOPLE.map(([n, v]) => (
-          <div key={n} className="flex items-center justify-between">
-            <span className="text-[9.5px]" style={{ color: 'var(--ivory-100)' }}>
+          <div key={n} className="flex items-center gap-2">
+            <Initial name={n} size={16} />
+            <span className="text-[12px] flex-1" style={{ color: 'var(--ivory-100)' }}>
               {n}
             </span>
-            <span className="lp-num text-[9.5px]" style={{ color: 'var(--ivory-300)' }}>
+            <span className="lp-num text-[12px]" style={{ color: 'var(--ivory-300)' }}>
               ₹{v}
             </span>
           </div>
