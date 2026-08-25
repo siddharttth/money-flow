@@ -164,7 +164,7 @@ export function DashboardMockup() {
 export function AddMockup() {
   return (
     <IPhone>
-      <div className="p-4 pt-12 space-y-4 min-h-[540px]">
+      <div className="p-4 pt-12 space-y-4 min-h-[478px]">
         <div className="flex items-center justify-between">
           <span className="lp-display text-[16px]" style={{ color: 'var(--ivory-100)' }}>
             Add transaction
@@ -234,7 +234,7 @@ export function AddMockup() {
 export function PeersMockup() {
   return (
     <IPhone>
-      <div className="p-4 pt-12 space-y-3.5 min-h-[540px]">
+      <div className="p-4 pt-12 space-y-3.5 min-h-[478px]">
         <span className="lp-display text-[16px]" style={{ color: 'var(--ivory-100)' }}>
           People &amp; Ledger
         </span>

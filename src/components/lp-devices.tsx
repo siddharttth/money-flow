@@ -2,16 +2,17 @@ import type { ReactNode } from 'react';
 import { ScaleFrame } from './lp-scale';
 
 /**
- * Device chrome for the marketing page.
+ * Device frames for the marketing page.
  *
- * Hand-built rather than pulled from a device-frameset package: those ship
- * notch-era iPhones with fixed light/dark chrome that cannot be tinted into
- * this palette. CSS gradients give us the aluminium and titanium facets, the
- * camera housing and the Dynamic Island in the same colour system.
+ * Deliberately restrained: a near-black shell, a hairline white border, a
+ * generous radius, and one large directional shadow — the register medicoHUB
+ * uses for its mock-UI panels. Rendered aluminium and titanium read as
+ * metallic noise once a device scales down, and they compete with the screen,
+ * which is the actual subject.
  *
- * Both frames render at a fixed design width inside a ScaleFrame. A mockup
- * that reflows is a broken mockup — at phone widths the dashboard's columns
- * would collapse and every label would truncate.
+ * Both render at a fixed design width inside a ScaleFrame. A mockup that
+ * reflows is a broken mockup: at phone widths the dashboard's columns would
+ * collapse and every label would truncate.
  */
 
 const MACBOOK_DESIGN_WIDTH = 940;
@@ -28,7 +29,6 @@ export function MacBook({ children }: { children: ReactNode }) {
               {children}
             </div>
           </div>
-          <div className="mb-hinge" aria-hidden />
           <div className="mb-base" aria-hidden />
           <div className="lp-reflect" aria-hidden />
         </div>
@@ -43,19 +43,12 @@ export function IPhone({ children }: { children: ReactNode }) {
       <ScaleFrame designWidth={IPHONE_DESIGN_WIDTH} className="flex justify-center">
         <div className="ip">
           <div className="ip-body">
-            <div className="ip-inner">
-              <div className="ip-screen lp-screen-bg text-left">
-                {/* Content flows behind the island, as it does in iOS. */}
-                <div className="ip-island" aria-hidden />
-                {children}
-              </div>
+            <div className="ip-screen lp-screen-bg text-left">
+              {/* Content flows behind the island, as it does in iOS. */}
+              <div className="ip-island" aria-hidden />
+              {children}
             </div>
           </div>
-          <span className="ip-btn ip-btn-action" aria-hidden />
-          <span className="ip-btn ip-btn-vol-up" aria-hidden />
-          <span className="ip-btn ip-btn-vol-down" aria-hidden />
-          <span className="ip-btn ip-btn-power" aria-hidden />
-          <div className="lp-reflect !w-[72%] !h-16" aria-hidden />
         </div>
       </ScaleFrame>
     </div>
