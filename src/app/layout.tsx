@@ -16,8 +16,10 @@ import './globals.css';
  */
 const serif = Fraunces({
   subsets: ['latin'],
-  // Variable font: the full weight range plus the optical-size axis, so the
-  // huge hero settings can tighten the way display type should.
+  // Both styles: without 'italic' next/font ships only the roman, and the
+  // browser fakes the italic by slanting it. Fraunces has a true italic with
+  // different letterforms, which is what the emphasis lines are set in.
+  style: ['normal', 'italic'],
   axes: ['SOFT', 'WONK', 'opsz'],
   variable: '--ff-serif',
   display: 'swap',

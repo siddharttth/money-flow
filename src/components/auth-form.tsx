@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Logo } from './logo';
 import { useState } from 'react';
 import { api, RequestError } from '@/lib/client';
 
@@ -45,8 +46,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 
       <div className="w-full max-w-sm relative z-10">
         <div className="text-center mb-8">
-          <Link href="/" className="wordmark text-2xl inline-block mb-3" style={{ color: 'var(--brass)' }}>
-            Money Flow
+          <Link href="/" aria-label="Money Flow home" className="inline-block mb-4">
+            <Logo height={30} onDark />
           </Link>
           <h1 className="text-xl font-bold mb-1.5">
             {isRegister ? 'Start your ledger' : 'Welcome back'}

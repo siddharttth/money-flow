@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { Reveal } from '@/components/lp-reveal';
+import { Logo } from '@/components/logo';
 import { DashboardPanel, LedgerPanel, MechanismPanels, Ticker } from '@/components/lp-mockups';
 
 /**
@@ -45,8 +46,8 @@ export default async function LandingPage() {
         style={{ borderColor: 'color-mix(in oklab, var(--border-lp) 60%, transparent)', background: 'color-mix(in oklab, var(--background) 80%, transparent)' }}
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="lp-display text-xl tracking-tight">
-            Money <span className="lp-display-em" style={{ color: 'var(--gold)' }}>Flow</span>
+          <Link href="/" aria-label="Money Flow home">
+            <Logo height={26} />
           </Link>
 
           <nav className="hidden gap-8 text-[13px] md:flex" style={{ color: 'var(--muted-fg)' }}>
@@ -313,12 +314,7 @@ export default async function LandingPage() {
       <footer className="py-14" style={{ background: 'var(--forest-ink)', color: 'var(--onforest)' }}>
         {/* Same max-w-6xl container as the page, so it lines up with everything. */}
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-8 px-6 md:flex-row">
-          <span className="lp-display text-xl">
-            Money{' '}
-            <span className="lp-display-em" style={{ color: 'var(--gold)' }}>
-              Flow
-            </span>
-          </span>
+          <Logo height={26} onDark />
 
           <div className="flex gap-8 text-[12px] uppercase tracking-[0.2em]" style={{ color: 'var(--onforest-muted)' }}>
             <Link href="/login" className="lp-hoverable">

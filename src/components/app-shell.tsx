@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { api } from '@/lib/client';
 import { Modal, Toast } from './ui';
+import { Logo } from './logo';
 import { InspectorProvider } from './inspector';
 import { CommandPalette } from './command-palette';
 import { AddTransaction } from './add-transaction';
@@ -102,8 +103,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
         >
           <Link href="/dashboard" className="flex items-center gap-2 px-2 mb-6">
-            <span aria-hidden style={{ width: 4, height: 20, background: 'var(--brass)', borderRadius: 99 }} />
-            <span className="wordmark text-lg" style={{ color: 'var(--brass)' }}>Money Flow</span>
+            <Logo height={24} onDark />
           </Link>
 
           <button className="btn btn-primary mb-2" onClick={() => openAdd()}>
@@ -164,9 +164,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             }}
           >
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <span className="wordmark text-lg" style={{ color: 'var(--brass)' }}>
-                Money Flow
-              </span>
+              <Logo height={22} onDark />
             </Link>
           </header>
 

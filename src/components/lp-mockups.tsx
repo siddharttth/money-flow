@@ -1,4 +1,5 @@
 import { CountUp } from './lp-countup';
+import { Logo } from './logo';
 
 /**
  * Product panels for the landing page — flat, hairline-bordered surfaces
@@ -91,12 +92,7 @@ export function DashboardPanel() {
           className="hidden border-r p-5 md:block"
           style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
         >
-          <span className="lp-display text-[21px]" style={{ color: 'var(--onforest)' }}>
-            Money{' '}
-            <span className="lp-display-em" style={{ color: 'var(--gold-soft)' }}>
-              Flow
-            </span>
-          </span>
+          <Logo height={22} onDark />
           <nav className="mt-8 space-y-1 text-[13px]">
             {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((item, i) => (
               <div
