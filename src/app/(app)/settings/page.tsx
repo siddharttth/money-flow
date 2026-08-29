@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
-import { currentMonth } from '@/lib/dates';
+import { currentMonth, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat } from '@/lib/types';
-import { Card, EmptyState, ListSkeleton, Modal, SectionHead } from '@/components/ui';
+import { Card, EmptyState, ListSkeleton, Modal, Money, PageHeader, SectionHead } from '@/components/ui';
+import { ShareBar } from '@/components/graph';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
@@ -15,12 +16,18 @@ import { PALETTE } from '@/lib/defaults';
 
 type CategoryRow = Category & { monthlyBudgetMinor: number | null };
 
-/** Categories moved in here — they are configuration, not a daily destination. */
+type ThemeChoice = 'system' | 'light' | 'dark';
+
+/**
+ * Configuration, not a daily destination — which is why categories live here
+ * rather than in the nav. The screen is a stack of labelled sections with one
+ * card each, and every card is a full-width tap target list on a phone.
+ */
 export default function SettingsPage() {
   const { toast } = useShell();
   const { openCategory } = useInspector();
   const { mutate } = useSWRConfig();
-  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>('system');
+  const [theme, setTheme] = useState<ThemeChoice>('system');
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -32,15 +39,20 @@ export default function SettingsPage() {
   const active = (cats.data?.items ?? []).filter((c) => c.isActive);
   const disabled = (cats.data?.items ?? []).filter((c) => !c.isActive);
 
+  // Only categories that actually carry a budget belong in the budget summary.
+  const budgeted = active.filter((c) => c.monthlyBudgetMinor);
+  const budgetTotal = budgeted.reduce((s, c) => s + (c.monthlyBudgetMinor ?? 0), 0);
+  const budgetSpent = budgeted.reduce((s, c) => s + (spendById.get(c.id) ?? 0), 0);
+
   useEffect(() => {
     try {
-      setTheme((localStorage.getItem('mf-theme') as 'light' | 'dark') ?? 'system');
+      setTheme((localStorage.getItem('mf-theme') as ThemeChoice) ?? 'system');
     } catch {
       /* storage unavailable */
     }
   }, []);
 
-  function applyTheme(next: 'system' | 'light' | 'dark') {
+  function applyTheme(next: ThemeChoice) {
     setTheme(next);
     try {
       if (next === 'system') {
@@ -69,135 +81,175 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-semibold">Settings</h1>
-        <p className="muted text-sm">Account, categories and data</p>
-      </div>
+    <div className="space-y-7">
+      <PageHeader eyebrow="Settings" title="Preferences" sub="Categories, budgets, appearance and data." />
 
-      <div>
+      {/* ---------- Appearance ---------- */}
+      <section>
+        <SectionHead label="Appearance" />
+        <Card>
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            {THEMES.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => applyTheme(t.value)}
+                aria-pressed={theme === t.value}
+                className="text-left rounded-lg p-2 transition-colors"
+                style={{
+                  border: `1px solid ${theme === t.value ? 'var(--accent)' : 'var(--border)'}`,
+                  background: theme === t.value ? 'var(--accent-soft)' : 'transparent',
+                  transitionDuration: '150ms',
+                }}
+              >
+                <ThemeSwatch kind={t.value} />
+                <span
+                  className="block text-[12.5px] font-semibold mt-2"
+                  style={{ color: theme === t.value ? 'var(--accent)' : 'var(--text)' }}
+                >
+                  {t.label}
+                </span>
+                <span className="muted text-[11px] block leading-snug mt-0.5">{t.hint}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </section>
+
+      {/* ---------- Budgets ---------- */}
+      {budgetTotal > 0 && (
+        <section>
+          <SectionHead label={`Budget · ${monthLabel(currentMonth()).split(' ')[0]}`} />
+          <Card>
+            <div className="flex items-baseline justify-between gap-3 mb-2.5">
+              <Money minor={budgetSpent} className="text-2xl font-semibold" />
+              <span className="num text-[13px] muted">of {formatINR(budgetTotal)}</span>
+            </div>
+            <ShareBar
+              share={budgetSpent / budgetTotal}
+              color={budgetSpent > budgetTotal ? 'var(--rule-red)' : 'var(--brass)'}
+              height={6}
+            />
+            <p className="muted text-[12px] mt-2.5">
+              Across {budgeted.length} budgeted {budgeted.length === 1 ? 'category' : 'categories'}
+              {budgetSpent > budgetTotal
+                ? ` — over by ${formatINR(budgetSpent - budgetTotal)}.`
+                : ` — ${formatINR(budgetTotal - budgetSpent)} left.`}
+            </p>
+          </Card>
+        </section>
+      )}
+
+      {/* ---------- Categories ---------- */}
+      <section>
         <SectionHead
-          label="Categories & budgets"
+          label="Categories"
           action={
             <button className="tag" onClick={() => setCreating(true)}>
               + New
             </button>
           }
         />
-        <Card className="!p-0 overflow-hidden">
+        <div className="card overflow-hidden">
           {cats.isLoading ? (
             <div className="p-4">
               <ListSkeleton rows={6} />
             </div>
           ) : active.length === 0 ? (
-            <EmptyState icon="◈" title="No categories" hint="Add one to start tracking." />
+            <EmptyState title="No categories" hint="Add one to start tracking." />
           ) : (
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {active.map((c, i) => {
                 const spent = spendById.get(c.id) ?? 0;
                 const budget = c.monthlyBudgetMinor;
-                const pct = budget ? Math.min((spent / budget) * 100, 100) : 0;
+                const over = budget ? spent > budget : false;
                 return (
-                  <div key={c.id} className="row flex items-center gap-3 px-4 py-3" onClick={() => openCategory(c.id)}>
+                  <li
+                    key={c.id}
+                    className="row flex items-center gap-3 px-3.5 sm:px-4 py-3"
+                    onClick={() => openCategory(c.id)}
+                  >
                     <CategoryIcon icon={c.icon} color={c.color} size={34} />
+
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">
-                        {c.name}
-                        {c.kind === 'investment' && <span className="micro ml-2">Investment</span>}
-                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-[13.5px] font-semibold truncate flex-1">{c.name}</p>
+                        {budget ? (
+                          <span className="num text-[12px] shrink-0" style={{ color: over ? 'var(--rule-red)' : 'var(--text-muted)' }}>
+                            {formatINR(spent)} / {formatINR(budget)}
+                          </span>
+                        ) : (
+                          <span className="num text-[12px] muted shrink-0">{formatINR(spent)}</span>
+                        )}
+                      </div>
                       {budget ? (
-                        <>
-                          <div className="h-1 rounded-full overflow-hidden mt-1.5 max-w-[13rem]" style={{ background: 'var(--surface-2)' }}>
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${pct}%`, background: spent > budget ? 'var(--rule-red)' : c.color }}
-                            />
-                          </div>
-                          <p className="muted text-xs mt-1 num">
-                            {formatINR(spent)} of {formatINR(budget)}
-                          </p>
-                        </>
+                        <div className="mt-1.5 max-w-sm">
+                          <ShareBar share={spent / budget} color={over ? 'var(--rule-red)' : c.color} height={3} />
+                        </div>
                       ) : (
-                        <p className="muted text-xs mt-0.5">No monthly budget</p>
+                        <p className="muted text-[11px] mt-0.5">
+                          No monthly budget
+                          {c.kind === 'investment' && ' · investment'}
+                        </p>
                       )}
                     </div>
 
-                    <div className="flex flex-col shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button className="muted text-xs leading-none py-0.5" onClick={() => move(i, -1)} aria-label="Move up" disabled={i === 0}>
-                        ▲
-                      </button>
-                      <button
-                        className="muted text-xs leading-none py-0.5"
-                        onClick={() => move(i, 1)}
-                        aria-label="Move down"
-                        disabled={i === active.length - 1}
-                      >
-                        ▼
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="hidden sm:flex flex-col">
+                        <button
+                          className="muted text-[10px] leading-none py-1 px-1 disabled:opacity-30"
+                          onClick={() => move(i, -1)}
+                          aria-label={`Move ${c.name} up`}
+                          disabled={i === 0}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          className="muted text-[10px] leading-none py-1 px-1 disabled:opacity-30"
+                          onClick={() => move(i, 1)}
+                          aria-label={`Move ${c.name} down`}
+                          disabled={i === active.length - 1}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <button className="tag" onClick={() => setEditing(c)}>
+                        Edit
                       </button>
                     </div>
-                    <button
-                      className="tag shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditing(c);
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
-        </Card>
+        </div>
 
         {disabled.length > 0 && (
-          <p className="muted text-xs mt-2">
+          <p className="muted text-[12px] mt-2.5 leading-relaxed">
             {disabled.length} disabled {disabled.length === 1 ? 'category' : 'categories'} —{' '}
             {disabled.map((c) => c.name).join(', ')}. Their history still counts.
           </p>
         )}
-      </div>
+      </section>
 
-      <div>
+      {/* ---------- Account ---------- */}
+      <section>
         <SectionHead label="Account" />
         <Card>
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="muted">Name</dt>
-              <dd className="font-medium truncate">{me.data?.user.name ?? '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="muted">Email</dt>
-              <dd className="font-medium truncate">{me.data?.user.email ?? '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="muted">Currency</dt>
-              <dd className="font-medium">₹ {me.data?.user.currency ?? 'INR'}</dd>
-            </div>
+          <dl className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            <Field label="Name" value={me.data?.user.name} />
+            <Field label="Email" value={me.data?.user.email} />
+            <Field label="Currency" value={`₹ ${me.data?.user.currency ?? 'INR'}`} />
           </dl>
         </Card>
-      </div>
+      </section>
 
-      <div>
-        <SectionHead label="Appearance" />
-        <Card>
-          <div className="flex gap-2">
-            {(['system', 'light', 'dark'] as const).map((t) => (
-              <button key={t} className="chip capitalize" data-selected={theme === t} onClick={() => applyTheme(t)}>
-                {t}
-              </button>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div>
+      {/* ---------- Data ---------- */}
+      <section>
         <SectionHead label="Data" />
         <Card>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-2 gap-2.5">
             <Link href="/settings/import" className="btn btn-ghost justify-start">
-              ↥ Import from Google Sheet
+              Import from Google Sheet
             </Link>
             <button
               className="btn btn-ghost justify-start"
@@ -206,18 +258,22 @@ export default function SettingsPage() {
                 toast('Preparing your export…');
               }}
             >
-              ↧ Export all expenses (CSV)
+              Export everything (CSV)
             </button>
           </div>
-          <p className="muted text-xs mt-3">One row per real transaction — date, amount, category, people and note.</p>
+          <p className="muted text-[12px] mt-3 leading-relaxed">
+            One row per real transaction — date, amount, category, people and note. Nothing is aggregated on the way
+            out, so the file can be re-imported without losing anything.
+          </p>
         </Card>
-      </div>
+      </section>
 
-      <div>
+      {/* ---------- Session ---------- */}
+      <section>
         <SectionHead label="Session" />
         <Card>
           <button
-            className="btn btn-danger"
+            className="btn btn-danger w-full sm:w-auto"
             onClick={async () => {
               await api.post('/api/auth/logout');
               window.location.href = '/login';
@@ -226,7 +282,7 @@ export default function SettingsPage() {
             Sign out
           </button>
         </Card>
-      </div>
+      </section>
 
       <CategoryModal
         open={creating || !!editing}
@@ -242,6 +298,61 @@ export default function SettingsPage() {
           setEditing(null);
         }}
       />
+    </div>
+  );
+}
+
+const THEMES: { value: ThemeChoice; label: string; hint: string }[] = [
+  { value: 'system', label: 'System', hint: 'Follows your device' },
+  { value: 'light', label: 'Paper', hint: 'Cream and forest' },
+  { value: 'dark', label: 'Ink', hint: 'Near-black and gold' },
+];
+
+/**
+ * A miniature of the theme rather than a word for it. The paper and ink
+ * swatches are painted from the raw palette vars directly, so they show the
+ * real thing even while the opposite theme is active.
+ */
+function ThemeSwatch({ kind }: { kind: ThemeChoice }) {
+  const paper = { bg: 'var(--paper-0)', card: 'var(--paper-1)', ink: 'var(--forest)', line: 'var(--paper-line)' };
+  const ink = { bg: 'var(--ink-0)', card: 'var(--ink-1)', ink: 'var(--gold)', line: 'var(--ink-line)' };
+
+  if (kind === 'system') {
+    return (
+      <span className="flex h-12 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+        <SwatchHalf tone={paper} />
+        <SwatchHalf tone={ink} />
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-12 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      <SwatchHalf tone={kind === 'light' ? paper : ink} full />
+    </span>
+  );
+}
+
+function SwatchHalf({
+  tone,
+  full = false,
+}: {
+  tone: { bg: string; card: string; ink: string; line: string };
+  full?: boolean;
+}) {
+  return (
+    <span className={`${full ? 'w-full' : 'w-1/2'} p-1.5 flex flex-col justify-end gap-1`} style={{ background: tone.bg }}>
+      <span className="h-1 rounded-full" style={{ background: tone.ink, width: '55%' }} />
+      <span className="h-1 rounded-full" style={{ background: tone.line, width: '85%' }} />
+      <span className="h-1 rounded-full" style={{ background: tone.line, width: '70%' }} />
+    </span>
+  );
+}
+
+function Field({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="flex justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+      <dt className="muted text-[13px]">{label}</dt>
+      <dd className="text-[13px] font-medium truncate">{value ?? '—'}</dd>
     </div>
   );
 }

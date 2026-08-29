@@ -9,23 +9,25 @@ import { Logo } from './logo';
 import { InspectorProvider } from './inspector';
 import { CommandPalette } from './command-palette';
 import { AddTransaction } from './add-transaction';
+import { NavIcon, type NavIconKey } from './icons';
 import type { Expense } from '@/lib/types';
 
 /*
- * Categories now live inside Settings, and the old Peers screen merged into
+ * Categories live inside Settings, and the old Peers screen merged into
  * People — a person and a peer were always the same entity, so two screens
  * meant two places to look for one contact.
  */
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: '◎' },
-  { href: '/expenses', label: 'Transactions', icon: '≡' },
-  { href: '/people', label: 'People', icon: '☺' },
-  { href: '/analytics', label: 'Analytics', icon: '◑' },
-  { href: '/settings', label: 'Settings', icon: '⚙' },
+const NAV: { href: string; label: string; short: string; icon: NavIconKey }[] = [
+  { href: '/dashboard', label: 'Dashboard', short: 'Home', icon: 'dashboard' },
+  { href: '/expenses', label: 'Transactions', short: 'Ledger', icon: 'ledger' },
+  { href: '/people', label: 'People', short: 'People', icon: 'people' },
+  { href: '/analytics', label: 'Analytics', short: 'Insights', icon: 'analytics' },
+  { href: '/settings', label: 'Settings', short: 'Settings', icon: 'settings' },
 ];
 
-const MOBILE_PRIMARY = ['/dashboard', '/expenses', '/people'];
-const MORE_ITEMS = ['/analytics', '/settings'];
+/** The two that flank the + on a phone, in thumb order. */
+const MOBILE_LEFT = ['/dashboard', '/expenses'];
+const MOBILE_RIGHT = ['/people', '/analytics'];
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -42,7 +44,6 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
   const pathname = usePathname();
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | undefined>();
   const [toastMsg, setToastMsg] = useState<{
     text: string;
@@ -63,7 +64,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
     setAddOpen(true);
   }, []);
 
-  // Desktop shortcut: "n" (or "a") anywhere outside an input opens Add Expense.
+  // Desktop shortcut: "n" anywhere outside an input opens Add transaction.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
@@ -86,197 +87,194 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
     router.refresh();
   }
 
+  const openSearch = () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+
   return (
     <Ctx.Provider value={{ openAdd, toast }}>
       <InspectorProvider>
-      <div className="flex min-h-dvh">
-        {/* Desktop sidebar */}
-        <aside
-          /*
-           * Fixed rather than sticky. `overflow-x: hidden` on <html> (needed so
-           * a stray wide element can never scroll the page sideways) silently
-           * disables position:sticky for every descendant, so the sidebar used
-           * to scroll away with the page. Fixed is immune to that, and the
-           * content column is offset by the same width below.
-           */
-          className="hidden lg:flex flex-col w-60 fixed left-0 top-0 bottom-0 z-40 border-r px-3 py-5 overflow-y-auto"
-          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
-        >
-          <Link href="/dashboard" className="flex items-center gap-2 px-2 mb-6">
-            <Logo height={24} onDark />
-          </Link>
-
-          <button className="btn btn-primary mb-2" onClick={() => openAdd()}>
-            + Add transaction
-          </button>
-          <button
-            className="flex items-center justify-between gap-2 mb-5 px-3.5 py-2 rounded-full text-xs transition-colors"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', transitionDuration: '150ms' }}
-            onClick={() => {
-              const ev = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
-              window.dispatchEvent(ev);
-            }}
+        <div className="flex min-h-dvh">
+          {/*
+           * Fixed, not sticky. The page is `overflow-x: clip`, which no longer
+           * breaks sticky, but a fixed rail is still the honest description:
+           * it does not participate in the content column's scroll at all.
+           */}
+          <aside
+            className="hidden lg:flex flex-col w-[15rem] fixed left-0 top-0 bottom-0 z-40 border-r px-3 py-5 overflow-y-auto"
+            style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
           >
-            <span>Search…</span>
-            <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--surface)' }}>
-              ⌘K
-            </kbd>
-          </button>
-
-          <nav className="flex flex-col gap-0.5">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3.5 py-2.5 rounded-full text-sm font-semibold transition-colors"
-                style={
-                  isActive(item.href)
-                    ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-                    : { color: 'var(--text-muted)' }
-                }
-              >
-                <span aria-hidden className="w-4 text-center">
-                  {item.icon}
-                </span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-            <p className="text-sm font-medium truncate px-3">{user.name}</p>
-            <p className="muted text-xs truncate px-3">{user.email}</p>
-            <button onClick={logout} className="muted text-xs px-3 mt-2 hover:underline">
-              Sign out
-            </button>
-          </div>
-        </aside>
-
-        <div className="flex-1 min-w-0 flex flex-col lg:ml-60">
-          {/* Mobile header */}
-          <header
-            className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b"
-            style={{
-              borderColor: 'var(--border)',
-              background: 'color-mix(in srgb, var(--surface) 88%, transparent)',
-              backdropFilter: 'blur(8px)',
-              paddingTop: 'max(env(safe-area-inset-top), 0.75rem)',
-            }}
-          >
-            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <Logo height={22} onDark />
+            <Link href="/dashboard" className="flex items-center px-2 mb-7" aria-label="Money Flow home">
+              <Logo height={22} />
             </Link>
-          </header>
 
-          <main className="flex-1 w-full app-grid">
-            <div className="px-4 sm:px-6 py-5 pb-28 lg:pb-8 max-w-5xl w-full mx-auto">{children}</div>
-          </main>
-        </div>
-
-        {/* Mobile bottom nav with the + as the centre action */}
-        <nav
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t safe-bottom"
-          style={{
-            borderColor: 'var(--border)',
-            background: 'color-mix(in srgb, var(--surface) 92%, transparent)',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
-          <div className="grid grid-cols-5 items-center">
-            {NAV.filter((n) => MOBILE_PRIMARY.includes(n.href))
-              .slice(0, 2)
-              .map((item) => (
-                <MobileTab key={item.href} {...item} active={isActive(item.href)} />
-              ))}
-
-            <div className="flex justify-center">
-              <button
-                onClick={() => openAdd()}
-                aria-label="Add expense"
-                className="w-14 h-14 -mt-6 rounded-full text-2xl font-light flex items-center justify-center"
-                style={{
-                  background: 'var(--brass)',
-                  color: 'var(--on-brass)',
-                  boxShadow: '0 12px 28px -8px rgba(64, 86, 244, 0.55)',
-                }}
-              >
-                +
-              </button>
-            </div>
-
-            {NAV.filter((n) => MOBILE_PRIMARY.includes(n.href))
-              .slice(2)
-              .map((item) => (
-                <MobileTab key={item.href} {...item} active={isActive(item.href)} />
-              ))}
+            <button className="btn btn-primary w-full mb-2" onClick={() => openAdd()}>
+              <NavIcon name="plus" size={16} />
+              Add transaction
+            </button>
 
             <button
-              onClick={() => setMoreOpen(true)}
-              className="flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium"
-              style={{ color: MORE_ITEMS.some((h) => isActive(h)) ? 'var(--accent)' : 'var(--text-muted)' }}
+              className="flex items-center justify-between gap-2 mb-6 px-3.5 h-9 rounded-full text-xs transition-colors"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', transitionDuration: '150ms' }}
+              onClick={openSearch}
             >
-              <span aria-hidden className="text-lg leading-none">
-                ⋯
-              </span>
-              More
+              <span>Search…</span>
+              <kbd
+                className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                style={{ background: 'var(--surface)', color: 'var(--text-muted)' }}
+              >
+                ⌘K
+              </kbd>
             </button>
-          </div>
-        </nav>
-      </div>
 
-      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
-        <div className="grid grid-cols-2 gap-2">
-          {NAV.filter((n) => MORE_ITEMS.includes(n.href)).map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMoreOpen(false)}
-              className="btn btn-ghost justify-start"
-              style={isActive(item.href) ? { background: 'var(--accent-soft)', color: 'var(--accent)' } : undefined}
+            <nav className="flex flex-col gap-0.5">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
+                  className="flex items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] font-semibold transition-colors"
+                  style={
+                    isActive(item.href)
+                      ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                      : { color: 'var(--text-muted)' }
+                  }
+                >
+                  <NavIcon name={item.icon} size={18} />
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-[13px] font-semibold truncate px-3">{user.name}</p>
+              <p className="muted text-[11px] truncate px-3 mt-0.5">{user.email}</p>
+              <button onClick={logout} className="muted text-[11px] px-3 mt-2 hover:underline">
+                Sign out
+              </button>
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0 flex flex-col lg:ml-[15rem]">
+            {/* Mobile header. Genuinely sticky now that the page is not a
+                scroll container — see overflow-x: clip in globals.css. */}
+            <header
+              className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-14 border-b"
+              style={{
+                borderColor: 'var(--border)',
+                background: 'color-mix(in srgb, var(--bg) 86%, transparent)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                paddingTop: 'env(safe-area-inset-top)',
+                height: 'calc(3.5rem + env(safe-area-inset-top))',
+              }}
             >
-              <span aria-hidden>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+              <Link href="/dashboard" aria-label="Money Flow home" className="flex items-center h-11 pr-3 -my-1">
+                <Logo height={19} />
+              </Link>
+              <div className="flex items-center -mr-2">
+                <button
+                  onClick={openSearch}
+                  aria-label="Search"
+                  className="w-11 h-11 flex items-center justify-center rounded-full"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden>
+                    <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                    <path d="M16 16l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <Link
+                  href="/settings"
+                  aria-label="Settings"
+                  className="w-11 h-11 flex items-center justify-center rounded-full"
+                  style={{ color: isActive('/settings') ? 'var(--accent)' : 'var(--text-muted)' }}
+                >
+                  <NavIcon name="settings" size={19} />
+                </Link>
+              </div>
+            </header>
+
+            <main className="flex-1 w-full app-grid">
+              <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-32 lg:pb-10 max-w-6xl w-full mx-auto">
+                {children}
+              </div>
+            </main>
+          </div>
+
+          {/* Mobile bottom nav, + as the centre action. */}
+          <nav
+            className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t safe-bottom"
+            style={{
+              borderColor: 'var(--border)',
+              background: 'color-mix(in srgb, var(--surface) 92%, transparent)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+            }}
+          >
+            <div className="grid grid-cols-5 items-center max-w-lg mx-auto">
+              {MOBILE_LEFT.map((href) => {
+                const item = NAV.find((n) => n.href === href)!;
+                return <MobileTab key={href} {...item} active={isActive(href)} />;
+              })}
+
+              <div className="flex justify-center">
+                <button
+                  onClick={() => openAdd()}
+                  aria-label="Add transaction"
+                  className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                  style={{
+                    background: 'var(--brass)',
+                    color: 'var(--on-brass)',
+                    border: '3px solid var(--bg)',
+                    boxShadow: '0 10px 24px -10px color-mix(in oklab, var(--brass) 70%, transparent)',
+                    transitionDuration: '80ms',
+                  }}
+                >
+                  <NavIcon name="plus" size={24} />
+                </button>
+              </div>
+
+              {MOBILE_RIGHT.map((href) => {
+                const item = NAV.find((n) => n.href === href)!;
+                return <MobileTab key={href} {...item} active={isActive(href)} />;
+              })}
+            </div>
+          </nav>
         </div>
-        <button className="btn btn-danger w-full mt-3" onClick={logout}>
-          Sign out
-        </button>
-      </Modal>
 
-      <Modal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        title={editing ? 'Edit expense' : 'Add transaction'}
-        wide
-      >
-        <AddTransaction
-          key={editing?.id ?? 'new'}
-          existing={editing}
-          onSaved={(msg, keepOpen) => {
-            toast(msg);
-            if (!keepOpen) setAddOpen(false);
-          }}
-        />
-      </Modal>
+        <Modal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          title={editing ? 'Edit expense' : 'Add transaction'}
+          wide
+        >
+          <AddTransaction
+            key={editing?.id ?? 'new'}
+            existing={editing}
+            onSaved={(msg, keepOpen) => {
+              toast(msg);
+              if (!keepOpen) setAddOpen(false);
+            }}
+          />
+        </Modal>
 
-      <CommandPalette onAdd={() => openAdd()} />
+        <CommandPalette onAdd={() => openAdd()} />
 
-      {toastMsg && (
-        <Toast
-          message={toastMsg.text}
-          tone={toastMsg.tone}
-          action={
-            toastMsg.action && {
-              label: toastMsg.action.label,
-              onClick: () => {
-                toastMsg.action!.onClick();
-                setToastMsg(null);
-              },
+        {toastMsg && (
+          <Toast
+            message={toastMsg.text}
+            tone={toastMsg.tone}
+            action={
+              toastMsg.action && {
+                label: toastMsg.action.label,
+                onClick: () => {
+                  toastMsg.action!.onClick();
+                  setToastMsg(null);
+                },
+              }
             }
-          }
-        />
-      )}
+          />
+        )}
       </InspectorProvider>
     </Ctx.Provider>
   );
@@ -284,25 +282,24 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
 
 function MobileTab({
   href,
-  label,
+  short,
   icon,
   active,
 }: {
   href: string;
-  label: string;
-  icon: string;
+  short: string;
+  icon: NavIconKey;
   active: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium"
+      aria-current={active ? 'page' : undefined}
+      className="flex flex-col items-center justify-center gap-1 h-14 text-[10px] font-semibold tracking-wide"
       style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}
     >
-      <span aria-hidden className="text-lg leading-none">
-        {icon}
-      </span>
-      {label}
+      <NavIcon name={icon} size={20} />
+      {short}
     </Link>
   );
 }

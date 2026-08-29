@@ -113,7 +113,7 @@ export default function PeerDetailPage({ params }: { params: Promise<{ id: strin
             </div>
             {data.entries.length === 0 ? (
               <div className="pb-4">
-                <EmptyState icon="🧾" title="Nothing recorded yet" />
+                <EmptyState title="Nothing recorded yet" />
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>

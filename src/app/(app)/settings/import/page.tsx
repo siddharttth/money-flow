@@ -105,7 +105,6 @@ export default function ImportPage() {
       {done && (
         <Card>
           <EmptyState
-            icon="✅"
             title={`Imported ${done.importedCount} expenses`}
             hint={`₹${done.importedTotal.toLocaleString('en-IN')} added. Your dashboard and analytics are already updated.`}
             action={
@@ -242,7 +241,7 @@ export default function ImportPage() {
             )}
 
             {preview.rows.length === 0 ? (
-              <EmptyState icon="🤔" title="No transactions found" hint="Check that a DATE column is mapped." />
+              <EmptyState title="No transactions found" hint="Check that a DATE column is mapped." />
             ) : (
               <div className="scroll-x">
                 <table className="w-full text-sm min-w-[32rem]">

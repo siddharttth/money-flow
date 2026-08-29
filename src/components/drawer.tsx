@@ -99,7 +99,7 @@ export function Drawer({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="muted text-2xl leading-none px-2 -mr-1 -mt-1 shrink-0 hover:opacity-70 transition-opacity"
+            className="muted text-2xl leading-none w-11 h-11 -mr-2 -mt-2 shrink-0 flex items-center justify-center rounded-full hover:opacity-70 transition-opacity"
             style={{ transitionDuration: '150ms' }}
           >
             ×

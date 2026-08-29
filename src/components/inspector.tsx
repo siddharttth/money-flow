@@ -62,7 +62,7 @@ function Tabs({ tabs, active, onChange }: { tabs: string[]; active: string; onCh
         <button
           key={t}
           onClick={() => onChange(t)}
-          className="flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors"
+          className="flex-1 h-9 rounded-md text-xs font-semibold transition-colors"
           style={{
             transitionDuration: '150ms',
             background: active === t ? 'var(--surface)' : 'transparent',
@@ -97,7 +97,7 @@ function TxRow({ tx, onCategory }: { tx: Transaction; onCategory?: (id: string) 
         <p className="text-sm font-medium truncate">
           {tx.category ? (
             onCategory ? (
-              <button className="hover:underline" onClick={() => onCategory(tx.category!.id)}>
+              <button className="hover:underline py-1.5 -my-1.5" onClick={() => onCategory(tx.category!.id)}>
                 {tx.category.name}
               </button>
             ) : (
@@ -211,7 +211,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
                 ))}
               </div>
             ) : (
-              <EmptyState icon="🧾" title="No shared expenses yet" hint="Tag them on an expense and it shows here." />
+              <EmptyState title="No shared expenses yet" hint="Tag them on an expense and it shows here." />
             )
           ) : data.ledger.length ? (
             <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
@@ -238,7 +238,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
               ))}
             </div>
           ) : (
-            <EmptyState icon="🤝" title="Nothing lent or borrowed" hint="Record it from the People screen." />
+            <EmptyState title="Nothing lent or borrowed" hint="Record it from the People screen." />
           )}
         </>
       )}
@@ -360,7 +360,7 @@ function CategoryInspector({ id, onClose }: { id: string; onClose: () => void })
               ))}
             </div>
           ) : (
-            <EmptyState icon="📭" title="Nothing this month" />
+            <EmptyState title="Nothing this month" />
           )}
         </>
       )}

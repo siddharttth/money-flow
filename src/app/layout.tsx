@@ -54,9 +54,10 @@ export const viewport: Viewport = {
   // Android Chrome resizes the layout around the keyboard with this; iOS is
   // handled via visualViewport in the Modal.
   interactiveWidget: 'resizes-content',
+  // Matches --paper-0 / --ink-0 so the phone's browser chrome continues the page.
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#000000' },
+    { media: '(prefers-color-scheme: light)', color: '#f6f3e5' },
+    { media: '(prefers-color-scheme: dark)', color: '#070f0a' },
   ],
 };
 

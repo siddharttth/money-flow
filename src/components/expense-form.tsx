@@ -192,11 +192,18 @@ export function ExpenseForm({
                 style={
                   categoryId === c.id
                     ? { background: c.color, borderColor: c.color, color: '#fff' }
-                    : { ['--chip-icon' as string]: c.color }
+                    : undefined
                 }
               >
-                {/* Tinted when unselected so the row is scannable by colour. */}
-                <Icon name={resolveIcon(c.icon)} size={15} className={categoryId === c.id ? '' : undefined} />
+                {/* Carries its own colour when unselected, so the grid is
+                    scannable by hue before it is readable by name. */}
+                <span
+                  className="inline-flex"
+                  style={{ color: categoryId === c.id ? 'inherit' : c.color }}
+                  aria-hidden
+                >
+                  <Icon name={resolveIcon(c.icon)} size={15} />
+                </span>
                 {c.name}
               </button>
             ))}

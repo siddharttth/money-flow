@@ -22,7 +22,7 @@ export function Card({
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-3">
-      <h2 className="text-base font-semibold">{children}</h2>
+      <h2 className="text-[15px] font-semibold">{children}</h2>
       {action}
     </div>
   );
@@ -30,18 +30,12 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
 
 /**
  * A section heading that sits on the page rather than inside a card — an
- * uppercase label with a rule trailing off. Used to group content without
- * wrapping every group in another box.
+ * uppercase label with a rule running out to the action on the right. Used to
+ * group content without wrapping every group in another box.
  */
-export function SectionHead({
-  label,
-  action,
-}: {
-  label: string;
-  action?: ReactNode;
-}) {
+export function SectionHead({ label, action }: { label: string; action?: ReactNode }) {
   return (
-    <div className="flex items-center gap-4 mb-3.5">
+    <div className="flex items-center gap-3 sm:gap-4 mb-3">
       <span className="label mb-0 shrink-0">{label}</span>
       <span className="hair flex-1" aria-hidden />
       {action}
@@ -50,22 +44,116 @@ export function SectionHead({
 }
 
 /**
- * Related figures on ONE surface, split by hairlines. Four separate cards in a
- * row read as four unrelated things; this reads as one summary.
+ * The top of every screen. One shape everywhere: a mono eyebrow, a serif
+ * title, and a slot on the right that holds the controls for that screen.
+ * On a phone the controls wrap to their own full-width line rather than
+ * squeezing the title into two words per line.
  */
-export function StatStrip({ items }: { items: { label: string; minor?: number; value?: string; sub?: string }[] }) {
+export function PageHeader({
+  eyebrow,
+  title,
+  sub,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  sub?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-5">
+      <div className="min-w-0">
+        {eyebrow && <p className="label mb-1.5">{eyebrow}</p>}
+        <h1 className="text-[1.6rem] sm:text-3xl font-semibold leading-none">{title}</h1>
+        {sub && <p className="muted text-[13px] mt-2">{sub}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0 max-sm:w-full">{actions}</div>}
+    </header>
+  );
+}
+
+/**
+ * The screen's headline number. Everything else on the page is a footnote to
+ * it, so it gets the largest type in the app and nothing shares its line.
+ */
+export function HeroFigure({
+  label,
+  minor,
+  delta,
+  note,
+}: {
+  label: string;
+  minor: number;
+  delta?: ReactNode;
+  note?: ReactNode;
+}) {
+  return (
+    <div>
+      <p className="label mb-2">{label}</p>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <Money minor={minor} className="text-[2.6rem] sm:text-5xl font-semibold leading-none tracking-tight" />
+        {delta}
+      </div>
+      {note && <p className="muted text-[13px] mt-2.5">{note}</p>}
+    </div>
+  );
+}
+
+/**
+ * The change chip. Spending more is red and spending less is green — the
+ * opposite of a stock ticker, and the right way round for an expense ledger.
+ */
+export function Delta({ pct, invert = false }: { pct: number | null | undefined; invert?: boolean }) {
+  if (pct == null || !Number.isFinite(pct)) return null;
+  const up = pct > 0;
+  const bad = invert ? !up : up;
+  return (
+    <span
+      className="num inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{
+        color: Math.abs(pct) < 0.05 ? 'var(--text-muted)' : bad ? 'var(--rule-red)' : 'var(--credit)',
+        background: Math.abs(pct) < 0.05 ? 'var(--surface-2)' : bad ? 'var(--rule-red-soft)' : 'var(--credit-soft)',
+      }}
+    >
+      {up ? '\u2191' : '\u2193'} {Math.abs(pct).toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%
+    </span>
+  );
+}
+
+/**
+ * Related figures on ONE surface, split by hairlines. Separate cards in a row
+ * read as unrelated things; this reads as one summary. Two per row on a phone,
+ * which keeps every figure at a readable size instead of shrinking to fit four.
+ */
+export function StatStrip({
+  items,
+  cols = 4,
+}: {
+  items: { label: string; minor?: number; value?: string; sub?: string; tone?: string }[];
+  cols?: 2 | 3 | 4;
+}) {
+  const wide = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' }[cols];
   return (
     <div className="card overflow-hidden">
-      <div className="grid grid-cols-2 sm:grid-cols-4 hair-grid">
+      <div className={`grid grid-cols-2 ${wide} hair-grid`}>
         {items.map((it) => (
-          <div key={it.label} className="px-4 py-3.5 sm:px-5 sm:py-4 min-w-0">
-            <p className="label mb-1 truncate">{it.label}</p>
+          <div key={it.label} className="px-3.5 py-3 sm:px-5 sm:py-4 min-w-0">
+            <p className="label mb-1.5 truncate">{it.label}</p>
             {it.minor !== undefined ? (
-              <Money minor={it.minor} className="text-lg sm:text-xl font-semibold" />
+              <Money
+                minor={it.minor}
+                className="text-[17px] sm:text-xl font-semibold"
+                style={it.tone ? { color: it.tone } : undefined}
+              />
             ) : (
-              <p className="text-lg sm:text-xl font-semibold truncate">{it.value ?? '—'}</p>
+              <p
+                className="text-[17px] sm:text-xl font-semibold truncate"
+                style={it.tone ? { color: it.tone } : undefined}
+              >
+                {it.value ?? '\u2014'}
+              </p>
             )}
-            {it.sub && <p className="muted text-xs mt-1 truncate">{it.sub}</p>}
+            {it.sub && <p className="muted text-[11px] mt-1 truncate">{it.sub}</p>}
           </div>
         ))}
       </div>
@@ -73,23 +161,101 @@ export function StatStrip({ items }: { items: { label: string; minor?: number; v
   );
 }
 
-/** Consistent placeholder for "nothing here yet" across every list in the app. */
+/**
+ * A line of prose with the figures set in mono — the "insight" voice used
+ * across Analytics. Reads as a sentence, but every number is still a number.
+ */
+export function Insight({ children, tone }: { children: ReactNode; tone?: 'warn' | 'good' }) {
+  return (
+    <p
+      className="text-[13px] leading-relaxed pl-3 border-l-2"
+      style={{
+        borderColor: tone === 'warn' ? 'var(--rule-red)' : tone === 'good' ? 'var(--credit)' : 'var(--border-strong)',
+        color: 'var(--text-muted)',
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+/** Segmented control. One row, equal widths, 38px tall — thumb-sized. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  className = '',
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`inline-flex p-0.5 rounded-full ${className}`}
+      style={{ background: 'var(--surface-2)' }}
+      role="tablist"
+    >
+      {options.map((o) => (
+        <button
+          key={o.value}
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          className="flex-1 px-3 sm:px-4 h-[34px] rounded-full text-xs font-semibold whitespace-nowrap transition-colors"
+          style={{
+            transitionDuration: '150ms',
+            background: value === o.value ? 'var(--surface)' : 'transparent',
+            color: value === o.value ? 'var(--text)' : 'var(--text-muted)',
+            boxShadow: value === o.value ? 'var(--shadow)' : 'none',
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Nothing here yet. The mark is drawn rather than an emoji — emoji brought
+ * their own palette and cartoon weight into a page built from two colours.
+ */
 export function EmptyState({
-  icon = '🗒️',
   title,
   hint,
   action,
 }: {
-  icon?: string;
   title: string;
   hint?: string;
   action?: ReactNode;
 }) {
   return (
     <div className="text-center py-10 px-4">
-      <div className="text-4xl mb-3">{icon}</div>
-      <p className="font-medium">{title}</p>
-      {hint && <p className="muted text-sm mt-1 max-w-sm mx-auto">{hint}</p>}
+      <svg
+        width="34"
+        height="34"
+        viewBox="0 0 24 24"
+        className="mx-auto mb-3"
+        style={{ color: 'var(--border-strong)' }}
+        aria-hidden
+      >
+        <rect
+          x="3.5"
+          y="3.5"
+          width="17"
+          height="17"
+          rx="3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeDasharray="3 3"
+        />
+        <path d="M8 12h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      <p className="font-semibold text-sm">{title}</p>
+      {hint && <p className="muted text-[13px] mt-1.5 max-w-xs mx-auto leading-relaxed">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -284,7 +450,7 @@ export function Modal({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="muted text-2xl leading-none px-3 -mr-2 -my-2 py-2"
+            className="muted -mr-2 w-11 h-11 flex items-center justify-center rounded-full text-2xl leading-none"
           >
             ×
           </button>

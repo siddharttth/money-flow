@@ -121,3 +121,28 @@ export function PersonMark({ name, color, size = 36 }: { name: string; color: st
     </span>
   );
 }
+
+/**
+ * Navigation marks. Kept separate from the category set: those are chosen by
+ * the user and render in a category's colour, these are fixed furniture and
+ * always render in currentColor at a single weight.
+ */
+export type NavIconKey = 'dashboard' | 'ledger' | 'people' | 'analytics' | 'settings' | 'more' | 'plus';
+
+const NAV_PATHS: Record<NavIconKey, React.ReactNode> = {
+  dashboard: <><rect {...P} x="3.5" y="3.5" width="7" height="9" rx="1.5" /><rect {...P} x="3.5" y="15.5" width="7" height="5" rx="1.5" /><rect {...P} x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect {...P} x="13.5" y="11.5" width="7" height="9" rx="1.5" /></>,
+  ledger: <><path {...P} d="M4 4.5h16v15H4z" /><path {...P} d="M8 4.5v15M11.5 9h5M11.5 13h5" /></>,
+  people: <><circle {...P} cx="9" cy="8.5" r="3.5" /><path {...P} d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path {...P} d="M16 5.6a3.5 3.5 0 010 5.8M17.5 14.9c2 .8 3.5 2.6 3.5 5.1" /></>,
+  analytics: <><path {...P} d="M4 19.5h16" /><path {...P} d="M7 19.5v-6M12 19.5V6.5M17 19.5v-9" /></>,
+  settings: <><circle {...P} cx="12" cy="12" r="3" /><path {...P} d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6" /></>,
+  more: <><circle cx="5" cy="12" r="1.7" fill="currentColor" /><circle cx="12" cy="12" r="1.7" fill="currentColor" /><circle cx="19" cy="12" r="1.7" fill="currentColor" /></>,
+  plus: <><path {...P} d="M12 5.5v13M5.5 12h13" /></>,
+};
+
+export function NavIcon({ name, size = 20 }: { name: NavIconKey; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false">
+      {NAV_PATHS[name]}
+    </svg>
+  );
+}

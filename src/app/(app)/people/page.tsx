@@ -7,8 +7,19 @@ import { api, RequestError } from '@/lib/client';
 import { currentMonth, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Person, PersonStat } from '@/lib/types';
-import { Card, EmptyState, ErrorState, ListSkeleton, Modal, Money } from '@/components/ui';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  HeroFigure,
+  ListSkeleton,
+  Modal,
+  Money,
+  PageHeader,
+  Segmented,
+} from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
+import { ShareBar } from '@/components/graph';
 import { LedgerForm } from '@/components/ledger-form';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
@@ -17,8 +28,12 @@ import { PALETTE } from '@/lib/defaults';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
- * and a contact you lend to are the same person. This hub merges them: spend
- * and debt sit on the same row, and the row opens the same inspector.
+ * and a contact you lend to are the same person. This hub merges them: the
+ * month's spending association and the running balance sit on one row, and the
+ * row opens one inspector.
+ *
+ * The two figures are deliberately never added. Spend is "money that left, and
+ * this person was there"; balance is "money that is owed". Different things.
  */
 
 type PeerSummary = {
@@ -32,7 +47,13 @@ type Filter = 'all' | 'debt' | 'spend';
 
 export default function PeoplePage() {
   return (
-    <Suspense fallback={<Card><ListSkeleton rows={6} /></Card>}>
+    <Suspense
+      fallback={
+        <Card>
+          <ListSkeleton rows={6} />
+        </Card>
+      }
+    >
       <PeopleHub />
     </Suspense>
   );
@@ -55,10 +76,9 @@ function PeopleHub() {
   const stats = useSWR<{ people: PersonStat[]; grandTotalMinor: number }>(`/api/analytics/people?month=${month}`);
   const peers = useSWR<PeerSummary>('/api/ledger');
 
-  const spendById = new Map((stats.data?.people ?? []).map((s) => [s.personId, s]));
-  const balById = new Map((peers.data?.balances ?? []).map((b) => [b.personId, b]));
-
   const rows = useMemo(() => {
+    const spendById = new Map((stats.data?.people ?? []).map((s) => [s.personId, s]));
+    const balById = new Map((peers.data?.balances ?? []).map((b) => [b.personId, b]));
     const all = (people.data?.items ?? []).map((p) => ({
       person: p,
       spendMinor: spendById.get(p.id)?.totalMinor ?? 0,
@@ -66,11 +86,17 @@ function PeopleHub() {
       balanceMinor: balById.get(p.id)?.balanceMinor ?? 0,
     }));
     const filtered =
-      filter === 'debt' ? all.filter((r) => r.balanceMinor !== 0) : filter === 'spend' ? all.filter((r) => r.spendMinor > 0) : all;
+      filter === 'debt'
+        ? all.filter((r) => r.balanceMinor !== 0)
+        : filter === 'spend'
+          ? all.filter((r) => r.spendMinor > 0)
+          : all;
     return filtered.sort((a, b) =>
       filter === 'debt' ? Math.abs(b.balanceMinor) - Math.abs(a.balanceMinor) : b.spendMinor - a.spendMinor,
     );
   }, [people.data, stats.data, peers.data, filter]);
+
+  const maxSpend = Math.max(1, ...rows.map((r) => r.spendMinor));
 
   async function refresh() {
     await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
@@ -79,87 +105,98 @@ function PeopleHub() {
   if (people.error) return <ErrorState message={people.error.message} onRetry={() => people.mutate()} />;
 
   const net = peers.data?.netMinor ?? 0;
+  const owedToMe = peers.data?.owedToMeMinor ?? 0;
+  const owedByMe = peers.data?.owedByMeMinor ?? 0;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold">People &amp; Ledger</h1>
-          <p className="muted text-sm">Spending associations and money owed, in one place</p>
-        </div>
-        <MonthPicker month={month} onChange={setMonth} />
-      </div>
+      <PageHeader
+        eyebrow="People"
+        title="Who it was with"
+        actions={<MonthPicker month={month} onChange={setMonth} />}
+      />
 
-      {/* Net position, with the two actions that change it. */}
-      <Card>
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* The net position, and the only two actions that change it. */}
+      <Card className="!p-5 sm:!p-6">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-end">
           <div>
-            <p className="micro mb-1.5">Net position</p>
-            <Money
+            <HeroFigure
+              label="Net position"
               minor={Math.abs(net)}
-              className="block text-3xl font-semibold"
-              style={{ color: net === 0 ? 'var(--text)' : net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+              note={
+                net === 0
+                  ? 'Everything is settled.'
+                  : net > 0
+                    ? 'owed to you, on balance'
+                    : 'you owe, on balance'
+              }
             />
-            <p className="muted text-sm mt-1.5">
-              {net === 0
-                ? 'Everything is settled.'
-                : net > 0
-                  ? 'owed to you, on balance'
-                  : 'you owe, on balance'}
-            </p>
+            {(owedToMe > 0 || owedByMe > 0) && (
+              <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                <div>
+                  <p className="label mb-1.5">They owe me</p>
+                  <Money minor={owedToMe} className="text-lg font-semibold" style={{ color: 'var(--credit)' }} />
+                  <div className="mt-2">
+                    <ShareBar
+                      share={owedToMe / Math.max(owedToMe, owedByMe)}
+                      color="var(--credit)"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="label mb-1.5">I owe</p>
+                  <Money minor={owedByMe} className="text-lg font-semibold" style={{ color: 'var(--rule-red)' }} />
+                  <div className="mt-2">
+                    <ShareBar
+                      share={owedByMe / Math.max(owedToMe, owedByMe)}
+                      color="var(--rule-red)"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost text-sm" onClick={() => setLedgerFor({ direction: 'out' })}>
-              + Lend / give
+
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 w-full lg:w-52">
+            {/* Short enough to stay on one line at 390px — a two-line label
+                made the pair different heights. */}
+            <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'out' })}>
+              Lend out
             </button>
-            <button className="btn btn-ghost text-sm" onClick={() => setLedgerFor({ direction: 'in' })}>
-              − Borrow / receive
+            <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'in' })}>
+              Borrow
             </button>
           </div>
         </div>
-
-        {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
-          <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div>
-              <p className="micro mb-1">They owe me</p>
-              <Money minor={peers.data.owedToMeMinor} className="text-lg font-semibold" style={{ color: 'var(--credit)' }} />
-            </div>
-            <div>
-              <p className="micro mb-1">I owe</p>
-              <Money minor={peers.data.owedByMeMinor} className="text-lg font-semibold" style={{ color: 'var(--rule-red)' }} />
-            </div>
-          </div>
-        )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {([
-          ['all', 'All contacts'],
-          ['debt', 'Active debt only'],
-          ['spend', 'Top spending'],
-        ] as const).map(([k, label]) => (
-          <button key={k} className="chip" data-selected={filter === k} onClick={() => setFilter(k)}>
-            {label}
-          </button>
-        ))}
-        <button className="chip ml-auto" onClick={() => setAddingPerson(true)}>
+      <div className="flex items-center justify-between gap-3">
+        <Segmented
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'debt', label: 'Owing' },
+            { value: 'spend', label: 'Spending' },
+          ]}
+        />
+        <button className="chip shrink-0" onClick={() => setAddingPerson(true)}>
           + Person
         </button>
       </div>
 
-      <Card className="!p-0 overflow-hidden">
+      <div className="card overflow-hidden">
         {people.isLoading ? (
           <div className="p-4">
             <ListSkeleton rows={6} />
           </div>
         ) : rows.length === 0 ? (
           <EmptyState
-            icon="👥"
             title={filter === 'all' ? 'No people yet' : 'Nothing matches this filter'}
             hint={
               filter === 'all'
-                ? 'Add family and friends to track who your spending is with, and who owes what.'
-                : 'Try “All contacts”.'
+                ? 'Add the people you spend with, and the ones who owe you, to see both on one row.'
+                : 'Try “All”.'
             }
             action={
               filter === 'all' ? (
@@ -171,47 +208,99 @@ function PeopleHub() {
           />
         ) : (
           <>
-            {/* Column headers only make sense once there is a table to read. */}
+            {/* Column headings earn their place only once there is a table. */}
             <div
-              className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2.5 border-b"
+              className="hidden sm:grid grid-cols-[minmax(0,1fr)_7rem_7rem_4.5rem] gap-4 px-4 py-2 border-b"
               style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
             >
               <span className="micro">Contact</span>
-              <span className="micro w-28 text-right">{monthLabel(month).split(' ')[0]} spend</span>
-              <span className="micro w-28 text-right">Balance</span>
-              <span className="micro w-16 text-right">Action</span>
+              <span className="micro text-right">{monthLabel(month).split(' ')[0]} spend</span>
+              <span className="micro text-right">Balance</span>
+              <span className="micro text-right">Settle</span>
             </div>
 
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {rows.map(({ person, spendMinor, count, balanceMinor }) => (
-                <div
+                <li
                   key={person.id}
-                  className="row grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-1 items-center px-4 py-3"
+                  className="row px-3.5 sm:px-4 py-3"
                   onClick={() => openPerson(person.id)}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <PersonMark name={person.name} color={person.color} size={36} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {person.name}
-                        {person.isSelf && <span className="muted font-normal text-xs"> · you</span>}
-                      </p>
-                      <p className="muted text-xs capitalize">
-                        {person.relationshipType} · {count} {count === 1 ? 'transaction' : 'transactions'}
-                      </p>
+                  <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_7rem_4.5rem] sm:gap-4 sm:items-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <PersonMark name={person.name} color={person.color} size={34} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13.5px] font-semibold truncate">
+                          {person.name}
+                          {person.isSelf && <span className="muted font-normal text-[11px]"> · you</span>}
+                        </p>
+                        <p className="muted text-[11px] capitalize mt-0.5">
+                          {person.relationshipType}
+                          {count > 0 && ` · ${count} ${count === 1 ? 'transaction' : 'transactions'}`}
+                        </p>
+                      </div>
+                      {/* On a phone the balance rides up next to the name,
+                          where the eye already is. */}
+                      <span className="sm:hidden shrink-0 text-right">
+                        <Money minor={spendMinor} className="text-[13.5px] font-semibold block" />
+                        {balanceMinor !== 0 && (
+                          <span
+                            className="num text-[11px] font-semibold"
+                            style={{ color: balanceMinor > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+                          >
+                            {balanceMinor > 0 ? '+' : '−'}
+                            {formatINR(Math.abs(balanceMinor))}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="hidden sm:block text-right">
+                      <Money minor={spendMinor} className="text-[13px] font-semibold" />
+                      {spendMinor > 0 && (
+                        <div className="mt-1.5">
+                          <ShareBar share={spendMinor / maxSpend} color={person.color} height={3} />
+                        </div>
+                      )}
+                    </div>
+
+                    <span
+                      className="num hidden sm:block text-right text-[13px] font-semibold"
+                      style={{
+                        color:
+                          balanceMinor === 0
+                            ? 'var(--text-muted)'
+                            : balanceMinor > 0
+                              ? 'var(--credit)'
+                              : 'var(--rule-red)',
+                      }}
+                    >
+                      {balanceMinor === 0 ? '—' : `${balanceMinor > 0 ? '+' : '−'}${formatINR(Math.abs(balanceMinor))}`}
+                    </span>
+
+                    <div className="hidden sm:flex justify-end">
+                      {balanceMinor !== 0 && !person.isSelf ? (
+                        <button
+                          className="tag"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLedgerFor({ direction: balanceMinor > 0 ? 'in' : 'out', personId: person.id });
+                          }}
+                        >
+                          Settle
+                        </button>
+                      ) : (
+                        <span aria-hidden className="micro">
+                          —
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <Money minor={spendMinor} className="text-sm font-semibold sm:w-28 text-right" />
-
-                  <span className="col-span-2 sm:col-span-1 sm:w-28 text-right text-sm font-semibold num" style={{
-                    color: balanceMinor === 0 ? 'var(--text-muted)' : balanceMinor > 0 ? 'var(--credit)' : 'var(--rule-red)',
-                  }}>
-                    {balanceMinor === 0 ? '—' : `${balanceMinor > 0 ? '+' : '−'}${formatINR(Math.abs(balanceMinor))}`}
-                  </span>
-
-                  <div className="hidden sm:flex justify-end w-16">
-                    {balanceMinor !== 0 && !person.isSelf ? (
+                  {/* Settling is a real action on a phone too, just not one
+                      that gets a column. */}
+                  {balanceMinor !== 0 && !person.isSelf && (
+                    <div className="sm:hidden mt-2.5 pl-[2.875rem]">
                       <button
                         className="tag"
                         onClick={(e) => {
@@ -219,18 +308,22 @@ function PeopleHub() {
                           setLedgerFor({ direction: balanceMinor > 0 ? 'in' : 'out', personId: person.id });
                         }}
                       >
-                        Settle
+                        Settle {formatINR(Math.abs(balanceMinor))}
                       </button>
-                    ) : (
-                      <span className="tag opacity-0 pointer-events-none">—</span>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </li>
               ))}
-            </div>
+            </ul>
           </>
         )}
-      </Card>
+      </div>
+
+      <p className="muted text-[12px] leading-relaxed max-w-2xl">
+        Spend is an <em>association</em>: the full amount of any transaction tagged with this person. Two people on one
+        ₹800 dinner both show ₹800, and the month still counted ₹800 once. Balance is separate money — what is actually
+        owed, either way.
+      </p>
 
       <Modal
         open={!!ledgerFor}
@@ -297,17 +390,22 @@ function PersonModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
           <input id="pname" className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
         <div>
-          <label className="label">Relationship</label>
+          <span className="label">Relationship</span>
           <div className="flex flex-wrap gap-2">
             {RELATIONSHIPS.map((r) => (
-              <button key={r} className="chip capitalize" data-selected={relationshipType === r} onClick={() => setRelationshipType(r)}>
+              <button
+                key={r}
+                className="chip capitalize"
+                data-selected={relationshipType === r}
+                onClick={() => setRelationshipType(r)}
+              >
                 {r}
               </button>
             ))}
           </div>
         </div>
         <div>
-          <label className="label">Colour</label>
+          <span className="label">Colour</span>
           <div className="flex items-center gap-3">
             <PersonMark name={name || '?'} color={color} size={40} />
             <div className="flex flex-wrap gap-2">
