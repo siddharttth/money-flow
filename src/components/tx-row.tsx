@@ -19,12 +19,21 @@ import { useShell } from './app-shell';
 export function TransactionRow({
   tx,
   showDate = false,
+  amountMinor,
+  count = 1,
+  onOpen,
   onDelete,
   onFilterCategory,
   onFilterPerson,
 }: {
   tx: Transaction;
   showDate?: boolean;
+  /** The cluster's total, when this row stands for more than one entry. */
+  amountMinor?: number;
+  /** How many entries this row folds together. 1 means it is a plain row. */
+  count?: number;
+  /** Opens the cluster's individual entries. Required when count > 1. */
+  onOpen?: () => void;
   /** Omitted on read-only lists like the dashboard's recent activity. */
   onDelete?: () => void;
   onFilterCategory?: (id: string) => void;
@@ -34,13 +43,20 @@ export function TransactionRow({
   const { openAdd } = useShell();
   const isLedger = tx.kind !== 'expense';
 
+  const clustered = count > 1;
+  const shown = amountMinor ?? tx.amountMinor;
   const title = tx.note || tx.category?.name || (tx.kind === 'lent' ? 'Money given' : 'Money received');
   // An untitled expense already shows its category as the title; repeating it
   // as a tag underneath was the same word twice on every second row.
   const showCategoryTag = !!tx.category && title !== tx.category.name;
 
+  const Tag = clustered ? 'button' : 'div';
+
   return (
-    <div className="row group flex items-start gap-3 px-3.5 sm:px-4 py-3">
+    <Tag
+      {...(clustered ? { type: 'button' as const, onClick: onOpen } : {})}
+      className={`row group flex items-start gap-3 px-3.5 sm:px-4 py-3 ${clustered ? 'w-full text-left' : ''}`}
+    >
       {tx.category ? (
         <CategoryIcon icon={tx.category.icon} color={tx.category.color} size={34} />
       ) : (
@@ -68,7 +84,16 @@ export function TransactionRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <p className="text-[13.5px] font-semibold truncate flex-1">{title}</p>
-          <Money minor={tx.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
+          {clustered && (
+            <span
+              className="num text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+              title={`${count} entries on this day`}
+            >
+              ×{count}
+            </span>
+          )}
+          <Money minor={shown} className="text-[13.5px] font-semibold shrink-0" />
         </div>
 
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -109,7 +134,15 @@ export function TransactionRow({
 
           {/* Actions reveal on hover with a pointer, and are always present for
               touch — a hidden action on a phone is no action at all. */}
-          {onDelete && (
+          {/* The count already sits next to the amount, so this only has to
+              say that the row opens. */}
+          {clustered && (
+            <span className="micro ml-auto" style={{ color: 'var(--accent)' }}>
+              View →
+            </span>
+          )}
+
+          {!clustered && onDelete && (
             <span className="ml-auto flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity duration-150">
               {tx.kind === 'expense' && (
                 <button
@@ -129,6 +162,6 @@ export function TransactionRow({
           )}
         </div>
       </div>
-    </div>
+    </Tag>
   );
 }

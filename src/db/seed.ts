@@ -29,7 +29,11 @@ type Row = [day: number, amount: number, category: string, person: string | null
 const AUGUST: Row[] = [
   [1, 599, 'Bills / Recharge', 'Me', 'Mobile recharge'],
   [2, 484, 'Outside Food', 'Sankalp', 'Lunch'],
+  // Three small runs on one day — the ledger folds these into a single
+  // ₹430 row with the entries a tap away.
   [3, 250, 'Ciggs / Alc', 'Me', null],
+  [3, 120, 'Ciggs / Alc', 'Me', null],
+  [3, 60, 'Ciggs / Alc', 'Me', null],
   [4, 1200, 'Shopping', null, 'Kurta'],
   [5, 320, 'Fruits / Veggies', 'Mummy', 'Weekly veggies'],
   [5, 90, 'Transport', 'Me', 'Auto'],

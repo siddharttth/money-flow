@@ -4,10 +4,11 @@ import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, qs } from '@/lib/client';
-import { currentMonth, fullDayLabel, monthLabel, monthRange, todayISO } from '@/lib/dates';
+import { currentMonth, dayLabel, fullDayLabel, monthLabel, monthRange, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, Person } from '@/lib/types';
 import type { Transaction, TxKind } from '@/lib/transactions';
+import { clusterTransactions, type TxCluster } from '@/lib/cluster';
 import {
   Card,
   EmptyState,
@@ -60,6 +61,7 @@ function Transactions() {
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(150);
+  const [openCluster, setOpenCluster] = useState<{ cluster: TxCluster; date: string } | null>(null);
 
   const { start, end } = monthRange(month);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
@@ -68,6 +70,11 @@ function Transactions() {
   const key = `/api/transactions${qs({ start, end, categoryIds, personIds, kinds, search: search.trim(), limit })}`;
   const { data, error, isLoading } = useSWR<{ items: Transaction[]; hasMore: boolean }>(key);
 
+  /*
+   * Grouped by day, then folded within the day: three identical cigarette runs
+   * become one ₹45 row with the entries a tap away. Clustering is display only
+   * — the day's subtotal below still adds the individual amounts.
+   */
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>();
     for (const t of data?.items ?? []) {
@@ -75,7 +82,11 @@ function Transactions() {
       list.push(t);
       map.set(t.date, list);
     }
-    return [...map.entries()];
+    return [...map.entries()].map(([date, items]) => ({
+      date,
+      items,
+      clusters: clusterTransactions(items),
+    }));
   }, [data]);
 
   /** Spending, lending and borrowing never mix into one figure. */
@@ -222,8 +233,14 @@ function Transactions() {
           />
         </Card>
       ) : (
-        <div className="card overflow-hidden">
-          {groups.map(([date, items], groupIndex) => {
+        /*
+         * `overflow-clip`, not `overflow-hidden`. Both round off the corners of
+         * the list, but `hidden` makes this div a scroll container — and a
+         * sticky child then pins relative to THAT box, so every day heading sat
+         * 56px down inside the card, permanently covering its own first row.
+         */
+        <div className="card overflow-clip">
+          {groups.map(({ date, items, clusters }, groupIndex) => {
             const spent = items.filter((i) => i.kind === 'expense').reduce((s, i) => s + i.amountMinor, 0);
             return (
               <section key={date}>
@@ -245,11 +262,14 @@ function Transactions() {
                   </span>
                 </h2>
                 <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                  {items.map((t) => (
+                  {clusters.map((c) => (
                     <TransactionRow
-                      key={`${t.kind}-${t.id}`}
-                      tx={t}
-                      onDelete={() => remove(t)}
+                      key={c.key}
+                      tx={c.lead}
+                      amountMinor={c.totalMinor}
+                      count={c.items.length}
+                      onOpen={() => setOpenCluster({ cluster: c, date })}
+                      onDelete={c.items.length === 1 ? () => remove(c.lead) : undefined}
                       onFilterCategory={(id) => setCategoryIds([id])}
                       onFilterPerson={(id) => setPersonIds([id])}
                     />
@@ -270,6 +290,15 @@ function Transactions() {
           )}
         </div>
       )}
+
+      <ClusterModal
+        open={openCluster}
+        onClose={() => setOpenCluster(null)}
+        onDelete={async (t) => {
+          await remove(t);
+          setOpenCluster(null);
+        }}
+      />
 
       <Modal open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters">
         <div className="space-y-5">
@@ -334,5 +363,67 @@ function Transactions() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+/**
+ * The entries behind a clustered row. Nothing here is new information — it is
+ * the same rows the ledger would have printed, which is the point: folding them
+ * up must never make one unreachable.
+ */
+function ClusterModal({
+  open,
+  onClose,
+  onDelete,
+}: {
+  open: { cluster: TxCluster; date: string } | null;
+  onClose: () => void;
+  onDelete: (t: Transaction) => void;
+}) {
+  const { openAdd } = useShell();
+  const lead = open?.cluster.lead;
+  const title = lead
+    ? lead.note || lead.category?.name || (lead.kind === 'lent' ? 'Money given' : 'Money received')
+    : '';
+
+  return (
+    <Modal open={!!open} onClose={onClose} title={title}>
+      {open && lead && (
+        <>
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <Money minor={open.cluster.totalMinor} className="text-3xl font-semibold" />
+            <span className="micro">{dayLabel(open.date)}</span>
+          </div>
+          <p className="muted text-[13px] mb-5">
+            {open.cluster.items.length} entries
+            {lead.category ? ` · ${lead.category.name}` : ''}
+            {lead.people.length ? ` · ${lead.people.map((p) => p.name).join(', ')}` : ''}
+          </p>
+
+          <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {open.cluster.items.map((t) => (
+              <li key={`${t.kind}-${t.id}`} className="flex items-center gap-3 py-2.5">
+                <Money minor={t.amountMinor} className="text-[14px] font-semibold flex-1" />
+                {t.kind === 'expense' && (
+                  <button
+                    className="tag"
+                    onClick={async () => {
+                      const full = await api.get<never>(`/api/expenses/${t.id}`);
+                      onClose();
+                      openAdd(full);
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+                <button className="tag" style={{ color: 'var(--rule-red)' }} onClick={() => onDelete(t)}>
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Modal>
   );
 }
