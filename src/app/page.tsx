@@ -310,22 +310,37 @@ export default async function LandingPage() {
 
       </main>
 
-      <footer
-        className="lp-dark px-5 sm:px-10 py-12 flex flex-col sm:flex-row items-center justify-between gap-6"
-      >
-        <span className="lp-display text-[19px]">
-          Money <span className="lp-display-em" style={{ color: 'var(--gold-500)' }}>Flow</span>
-        </span>
-        <div className="flex flex-wrap justify-center gap-8 text-[10px] tracking-[0.18em] uppercase" style={{ color: 'var(--ivory-300)' }}>
-          <Link href="/login" className="hover:opacity-70">Sign in</Link>
-          <Link href="/register" className="hover:opacity-70">Create account</Link>
-          <a href="https://github.com/siddharttth/money-flow" target="_blank" rel="noreferrer" className="hover:opacity-70">
-            Source
-          </a>
+      <footer className="py-14" style={{ background: 'var(--forest-ink)', color: 'var(--onforest)' }}>
+        {/* Same max-w-6xl container as the page, so it lines up with everything. */}
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-8 px-6 md:flex-row">
+          <span className="lp-display text-xl">
+            Money{' '}
+            <span className="lp-display-em" style={{ color: 'var(--gold)' }}>
+              Flow
+            </span>
+          </span>
+
+          <div className="flex gap-8 text-[12px] uppercase tracking-[0.2em]" style={{ color: 'var(--onforest-muted)' }}>
+            <Link href="/login" className="lp-hoverable">
+              Sign in
+            </Link>
+            <Link href="/register" className="lp-hoverable">
+              Create account
+            </Link>
+            <a
+              href="https://github.com/siddharttth/money-flow"
+              target="_blank"
+              rel="noreferrer"
+              className="lp-hoverable"
+            >
+              Source
+            </a>
+          </div>
+
+          <p className="font-mono text-[11px]" style={{ color: 'var(--onforest-muted)' }}>
+            © {new Date().getFullYear()} Money Flow
+          </p>
         </div>
-        <span className="text-[10px] tracking-[0.14em]" style={{ color: 'var(--ivory-300)', opacity: 0.6 }}>
-          © {new Date().getFullYear()} Money Flow
-        </span>
       </footer>
     </div>
   );
