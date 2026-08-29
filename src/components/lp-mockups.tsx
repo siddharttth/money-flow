@@ -366,51 +366,69 @@ export function MechanismPanels() {
 }
 
 export function LedgerPanel() {
+  const hair = 'color-mix(in oklab, var(--onforest) 10%, transparent)';
+  const balances: [string, number][] = [
+    ['Mummy', 2500],
+    ['Sankalp', 1000],
+    ['Aarya', 500],
+    ['Aditi', -13950],
+  ];
+
   return (
-    <div className="lp-panel p-4 sm:p-5">
-      <div className="lp-panel-deep p-5">
-        <p className="text-[9.5px] tracking-[0.2em] uppercase mb-4" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-          People &amp; Ledger
-        </p>
+    // One box, not two — the section already provides the forest surround.
+    <div className="rounded-lg border p-6" style={{ borderColor: hair, background: 'var(--forest-ink)' }}>
+      <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+        People &amp; Ledger
+      </p>
 
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            ['They owe me', '₹4,000', 'var(--ivory-100)'],
-            ['I owe', '₹13,950', 'var(--ivory-100)'],
-            ['Net position', '−₹9,950', 'var(--gold-500)'],
-          ].map(([k, v, c]) => (
-            <div key={k} className="lp-panel px-3 py-3">
-              <p className="text-[8.5px] tracking-[0.16em] uppercase leading-relaxed" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-                {k}
-              </p>
-              <p className="lp-num text-[16px] mt-1.5" style={{ color: c }}>
-                {v}
-              </p>
-            </div>
-          ))}
-        </div>
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {[
+          ['They owe me', '₹4,000'],
+          ['I owe', '₹13,950'],
+          ['Net position', '−₹9,950'],
+        ].map(([label, value], i) => (
+          <div
+            key={label}
+            className="rounded border p-3"
+            style={{ borderColor: hair, background: 'color-mix(in oklab, var(--onforest) 4%, transparent)' }}
+          >
+            <p className="lp-eyebrow text-[8px]" style={{ color: 'var(--onforest-muted)' }}>
+              {label}
+            </p>
+            <p
+              className="lp-display lp-tab mt-1"
+              style={{ color: i === 2 ? 'var(--gold-soft)' : 'var(--onforest)' }}
+            >
+              {value}
+            </p>
+          </div>
+        ))}
+      </div>
 
-        <div className="lp-rows mt-5">
-          {[
-            ['Mummy', '+₹2,500'],
-            ['Sankalp', '+₹1,000'],
-            ['Aarya', '+₹500'],
-            ['Aditi', '−₹13,950'],
-          ].map(([name, amount]) => (
-            <div key={name} className="flex items-center gap-3 py-3">
-              <Initial name={name} />
-              <span className="text-[12.5px] flex-1" style={{ color: 'var(--ivory-100)' }}>
-                {name}
-              </span>
+      <div className="mt-5 space-y-1">
+        {balances.map(([name, amt]) => (
+          <div
+            key={name}
+            className="flex items-center justify-between border-b py-2.5 text-[13px] last:border-0"
+            style={{ borderColor: hair }}
+          >
+            <span className="flex items-center gap-3" style={{ color: 'var(--onforest)' }}>
               <span
-                className="lp-mono text-[12px]"
-                style={{ color: amount.startsWith('−') ? 'var(--gold-500)' : 'var(--ivory-100)' }}
+                className="flex h-7 w-7 items-center justify-center rounded-full border font-mono text-[10px]"
+                style={{
+                  borderColor: 'color-mix(in oklab, var(--onforest) 20%, transparent)',
+                  color: 'var(--gold-soft)',
+                }}
               >
-                {amount}
+                {name[0]}
               </span>
-            </div>
-          ))}
-        </div>
+              {name}
+            </span>
+            <span className="lp-tab" style={{ color: amt >= 0 ? 'var(--onforest)' : 'var(--gold-soft)' }}>
+              {amt >= 0 ? '+' : '−'}₹{Math.abs(amt).toLocaleString('en-IN')}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

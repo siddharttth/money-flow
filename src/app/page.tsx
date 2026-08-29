@@ -284,22 +284,30 @@ export default async function LandingPage() {
         </section>
 
         {/* --------------------------- Closing band ------------------------ */}
-        <section className="lp-paper px-5 sm:px-10 py-24 sm:py-36 text-center">
-          <Reveal>
-            <h2 className="lp-display text-[36px] sm:text-[58px] max-w-3xl mx-auto">
-              Precision in{' '}
-              <span className="lp-display-em" style={{ color: 'var(--green-600)' }}>
-                every entry.
-              </span>
-            </h2>
-            <p className="text-[15px] max-w-md mx-auto mt-7" style={{ color: 'var(--ink-soft)' }}>
-              Bring your months across from the sheet, and keep the habit that took you years to build.
-            </p>
-            <Link href={href} className="lp-btn lp-btn-solid mt-10">
-              {cta}
-            </Link>
-          </Reveal>
+        {/* Ruled again here, per the reference, with a hairline above. */}
+        <section id="begin" className="lp-paper border-t" style={{ borderColor: 'var(--border-lp)' }}>
+          <div className="mx-auto max-w-6xl px-6 py-28 text-center md:py-40">
+            <Reveal>
+              <h2 className="lp-display mx-auto max-w-2xl text-5xl leading-[1.05] md:text-7xl">
+                Precision in{' '}
+                <span className="lp-display-em" style={{ color: 'color-mix(in oklab, var(--forest) 70%, transparent)' }}>
+                  every entry.
+                </span>
+              </h2>
+            </Reveal>
+            <Reveal delay={150}>
+              <p className="mx-auto mt-8 max-w-md text-[15px] leading-relaxed" style={{ color: 'var(--muted-fg)' }}>
+                Bring your months across from the sheet, and keep the habit that took you years to build.
+              </p>
+            </Reveal>
+            <Reveal delay={280}>
+              <Link href={href} className="lp-btn lp-btn-solid mt-10 !px-8 !py-4">
+                {cta}
+              </Link>
+            </Reveal>
+          </div>
         </section>
+
       </main>
 
       <footer
