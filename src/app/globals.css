@@ -473,6 +473,14 @@ h1, h2, h3 {
 }
 .lp-label-start::before { display: none; }
 
+/* Eyebrow treatment without the flanking rules — used for captions. */
+.lp-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
 .lp-btn {
   display: inline-flex;
   align-items: center;

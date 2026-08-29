@@ -82,9 +82,12 @@ export default async function LandingPage() {
         {/* ------------------------------ Hero ----------------------------- */}
         <section id="top" className="lp-paper mx-auto max-w-6xl px-6 pt-40 md:pt-48 pb-24 text-center">
           <Reveal>
-            <span className="lp-label mb-9" style={{ color: 'var(--ink-soft)' }}>
-              A new standard in personal ledgers
-            </span>
+            {/* Flex wrapper, so the inline-flex eyebrow gets no line-box leading. */}
+            <div className="flex justify-center">
+              <span className="lp-label" style={{ color: 'var(--muted-fg)' }}>
+                A new standard in personal ledgers
+              </span>
+            </div>
           </Reveal>
 
           <Reveal delay={120}>
@@ -100,7 +103,7 @@ export default async function LandingPage() {
 
           <Reveal delay={240}>
             <p
-              className="text-[15px] sm:text-[16px] max-w-xl mx-auto mt-9 leading-relaxed"
+              className="text-[15px] max-w-xl mx-auto mt-8 leading-relaxed"
               style={{ color: 'var(--ink-soft)' }}
             >
               Built with the discipline of a ledger and the ease of nothing at all. What you spent on and who
@@ -109,18 +112,15 @@ export default async function LandingPage() {
           </Reveal>
 
           <Reveal delay={360}>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-10">
-              <Link href={href} className="lp-btn lp-btn-solid w-full sm:w-auto">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              <Link href={href} className="lp-btn lp-btn-solid">
                 {cta}
               </Link>
-              <a href="#mechanism" className="lp-btn lp-btn-outline w-full sm:w-auto">
+              <a href="#mechanism" className="lp-btn lp-btn-outline">
                 Discover the mechanism
               </a>
             </div>
-            <p
-              className="text-[10px] tracking-[0.2em] uppercase mt-9"
-              style={{ color: 'var(--ink-soft)', opacity: 0.7 }}
-            >
+            <p className="lp-eyebrow mt-10 text-[10px]" style={{ color: 'var(--muted-fg)' }}>
               Self-hosted · Your sheet imported in a single pass
             </p>
           </Reveal>
