@@ -249,21 +249,33 @@ export default function SettingsPage() {
         <Card>
           <div className="grid sm:grid-cols-2 gap-2.5">
             <Link href="/settings/import" className="btn btn-ghost justify-start">
-              Import from Google Sheet
+              Import a sheet
             </Link>
             <button
               className="btn btn-ghost justify-start"
               onClick={() => {
                 window.location.href = '/api/export';
-                toast('Preparing your export…');
+                toast('Building your workbook…');
               }}
             >
-              Export everything (CSV)
+              Export to a spreadsheet
             </button>
           </div>
           <p className="muted text-[12px] mt-3 leading-relaxed">
-            One row per real transaction — date, amount, category, people and note. Nothing is aggregated on the way
-            out, so the file can be re-imported without losing anything.
+            The export is a workbook, not a list: a tab per month laid out as day × category with its own totals,
+            a PEERS tab for the lending ledger, and a TRANSACTIONS tab holding the flat rows with notes and people
+            intact — which is what makes the file re-importable without losing anything. Opens in Google Sheets and
+            Excel.{' '}
+            <button
+              className="underline"
+              style={{ color: 'var(--accent)' }}
+              onClick={() => {
+                window.location.href = '/api/export?format=csv';
+                toast('Preparing the CSV…');
+              }}
+            >
+              Plain CSV instead
+            </button>
           </p>
         </Card>
       </section>

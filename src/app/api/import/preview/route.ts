@@ -1,8 +1,8 @@
 import { db } from '@/db';
-import { people } from '@/db/schema';
+import { categories, people } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { ApiError, ok, withAuth } from '@/lib/api';
-import { buildPreview, inferMapping, type ColumnMapping } from '@/lib/importer';
+import { previewSheet, type ColumnMapping } from '@/lib/importer';
 import Papa from 'papaparse';
 
 /**
@@ -24,19 +24,22 @@ export const POST = withAuth(async (req, session) => {
 
   if (!parsed.meta.fields?.length) throw new ApiError(422, 'Could not read a header row from that CSV');
 
-  const known = await db
-    .select({ name: people.name })
-    .from(people)
-    .where(eq(people.userId, session.userId));
+  // The account's own names are what let a misspelled header land on an
+  // existing category or person instead of creating a near-duplicate.
+  const [knownPeople, knownCategories] = await Promise.all([
+    db.select({ name: people.name }).from(people).where(eq(people.userId, session.userId)),
+    db.select({ name: categories.name }).from(categories).where(eq(categories.userId, session.userId)),
+  ]);
 
-  const mapping: ColumnMapping[] =
-    Array.isArray(body.mapping) && body.mapping.length
-      ? body.mapping
-      : inferMapping(parsed.meta.fields, known.map((p) => p.name));
+  const mapping: ColumnMapping[] | undefined =
+    Array.isArray(body.mapping) && body.mapping.length ? body.mapping : undefined;
 
-  const preview = buildPreview(parsed.data, mapping, {
+  const preview = previewSheet(parsed.data, parsed.meta.fields, {
+    mapping,
     fallbackYear: body.fallbackYear ? Number(body.fallbackYear) : undefined,
     fallbackCategory: body.fallbackCategory || 'Misc',
+    knownPeople: knownPeople.map((p) => p.name),
+    knownCategories: knownCategories.map((c) => c.name),
   });
 
   if (parsed.errors.length) {

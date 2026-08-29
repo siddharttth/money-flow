@@ -83,6 +83,27 @@ export async function getPeerBalances(userId: string): Promise<PeerBalance[]> {
 }
 
 /** Headline figures: the sheet's GIVEN and TAKEN totals, plus the net. */
+/** Every live entry, oldest first — the export's PEERS tab. */
+export async function listAllLedgerEntries(userId: string): Promise<LedgerEntryDTO[]> {
+  const rows = await db
+    .select({ entry: ledgerEntries, person: people })
+    .from(ledgerEntries)
+    .innerJoin(people, eq(people.id, ledgerEntries.personId))
+    .where(live(userId))
+    .orderBy(asc(ledgerEntries.entryDate), asc(ledgerEntries.createdAt));
+
+  return rows.map(({ entry, person }) => ({
+    id: entry.id,
+    direction: entry.direction as LedgerDirection,
+    amount: entry.amountMinor / 100,
+    amountMinor: entry.amountMinor,
+    entryDate: entry.entryDate,
+    note: entry.note,
+    person: { id: person.id, name: person.name, avatar: person.avatar, color: person.color },
+    createdAt: entry.createdAt.toISOString(),
+  }));
+}
+
 export async function getPeerSummary(userId: string) {
   const balances = await getPeerBalances(userId);
   const owedToMeMinor = balances.filter((b) => b.balanceMinor > 0).reduce((s, b) => s + b.balanceMinor, 0);

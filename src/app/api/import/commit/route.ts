@@ -87,9 +87,21 @@ export const POST = withAuth(async (req, session) => {
         source: 'import',
         importBatchId: batchId,
       });
-      if (row.personName) {
-        const person = await ensurePerson(row.personName);
-        pendingLinks.push({ index: i, personId: person.id });
+      /*
+       * A flat sheet can name several people on one transaction — the export
+       * writes them joined with " | ". They are associations with one expense,
+       * never several expenses, so they all link to the same row.
+       */
+      const names = (row.personName ?? '')
+        .split('|')
+        .map((n) => n.trim())
+        .filter(Boolean);
+
+      if (names.length) {
+        for (const name of names) {
+          const person = await ensurePerson(name);
+          pendingLinks.push({ index: i, personId: person.id });
+        }
       } else if (selfId) {
         pendingLinks.push({ index: i, personId: selfId });
       }

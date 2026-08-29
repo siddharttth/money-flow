@@ -13,6 +13,11 @@
  */
 
 export const CATEGORY_ALIASES: Record<string, string> = {
+  // Real headers from the sheet this app replaced, typos and all.
+  MSSIL: 'Misc',
+  MISCL: 'Misc',
+  TANSPORT: 'Transport',
+  TRANPORT: 'Transport',
   'BILLS/RECHARGE': 'Bills / Recharge',
   'BILLS / RECHARGE': 'Bills / Recharge',
   BILLS: 'Bills / Recharge',
@@ -32,8 +37,15 @@ export const CATEGORY_ALIASES: Record<string, string> = {
   INVESTMENT: 'Investment',
 };
 
-/** Columns that are people, not categories, in the original sheet. */
-export const PERSON_COLUMNS = ['MSSIL', 'ADITI', 'MUMMY', 'AARYA', 'SANKALP'];
+/*
+ * Columns that are people, not categories.
+ *
+ * MSSIL used to be in this list, which was wrong and expensive: in the sheet
+ * it sits between TANSPORT and INVESTMENT and it is a misspelling of MISC. As
+ * a person column it invented a contact named "Mssil" and filed a month of
+ * miscellaneous spending under them.
+ */
+export const PERSON_COLUMNS = ['ADITI', 'MUMMY', 'MUMMA', 'PAPA', 'AARYA', 'SANKALP'];
 
 /** Columns that carry no expense data. */
 export const IGNORED_COLUMNS = ['DATE', 'TOTAL', 'TOTALS', 'SUM', 'NOTES', 'NOTE', 'REMARKS', ''];
@@ -58,6 +70,8 @@ export type ImportedRow = {
 };
 
 export type ImportPreview = {
+  /** Which shape the sheet turned out to be. Shown in the preview UI. */
+  layout?: SheetLayout;
   mapping: ColumnMapping[];
   rows: ImportedRow[];
   warnings: string[];
@@ -70,8 +84,68 @@ export type ImportPreview = {
 
 const norm = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
 
-/** Guess whether each CSV column is the date, a category, a person, or noise. */
-export function inferMapping(headers: string[], knownPeople: string[] = []): ColumnMapping[] {
+/** Strips everything but letters and digits, for comparing headers loosely. */
+const squash = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** Levenshtein, capped — used only on short header strings. */
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length || !b.length) return Math.max(a.length, b.length);
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Matches a sheet header to a category that already exists.
+ *
+ * Headers in a hand-kept spreadsheet are typed by a person over years:
+ * "TANSPORT", "Ciggs/Alc", "outside food". An exact lookup created a brand new
+ * category for each variant, quietly splitting a year of history in two. This
+ * allows one edit per five characters, which is enough for a typo and a
+ * plural but not enough to confuse two real categories.
+ */
+export function matchCategory(header: string, known: string[]): string | null {
+  const key = norm(header);
+  if (CATEGORY_ALIASES[key]) return CATEGORY_ALIASES[key];
+
+  const target = squash(header);
+  if (!target) return null;
+
+  let best: { name: string; distance: number } | null = null;
+  for (const name of known) {
+    const candidate = squash(name);
+    if (candidate === target) return name;
+    const distance = editDistance(target, candidate);
+    if (distance <= Math.max(1, Math.floor(candidate.length / 5)) && (!best || distance < best.distance)) {
+      best = { name, distance };
+    }
+  }
+  return best?.name ?? null;
+}
+
+/**
+ * Guess whether each CSV column is the date, a category, a person, or noise.
+ *
+ * `knownCategories` is what makes this forgiving: with the account's real
+ * category names in hand, a misspelled header lands on the existing category
+ * instead of creating a near-duplicate.
+ */
+export function inferMapping(
+  headers: string[],
+  knownPeople: string[] = [],
+  knownCategories: string[] = [],
+): ColumnMapping[] {
   const peopleSet = new Set([...PERSON_COLUMNS, ...knownPeople.map(norm)]);
   return headers.map((header) => {
     const key = norm(header);
@@ -81,9 +155,117 @@ export function inferMapping(headers: string[], knownPeople: string[] = []): Col
     return {
       header,
       role: 'category' as const,
-      target: CATEGORY_ALIASES[key] ?? titleCase(header),
+      target: matchCategory(header, knownCategories) ?? titleCase(header),
     };
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * Layout detection
+ * ------------------------------------------------------------------ */
+
+export type SheetLayout = 'wide' | 'flat';
+
+/**
+ * A month grid, or a list of transactions?
+ *
+ * The app's own export writes both — a tab per month and a flat TRANSACTIONS
+ * tab — and a user will paste in whichever one they happened to be looking at.
+ * The flat one is recognised by carrying its amount in a single column, which
+ * a grid never does.
+ */
+export function detectLayout(headers: string[]): SheetLayout {
+  const keys = headers.map(norm);
+  const hasAmount = keys.some((k) => k === 'AMOUNT' || k === 'AMT' || k === 'VALUE');
+  const hasCategory = keys.some((k) => k === 'CATEGORY' || k === 'CAT');
+  return hasAmount && hasCategory ? 'flat' : 'wide';
+}
+
+/** People are stored joined; accept the separators a human might type. */
+export function splitPeople(raw: string): string[] {
+  return raw
+    .split(/[|,;&]|\band\b/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * A flat list — one transaction per row, exactly what the app exports.
+ * Nothing needs reconstructing here, so notes and multi-person tags survive a
+ * round trip through a spreadsheet untouched.
+ */
+export function buildFlatPreview(
+  records: Record<string, string>[],
+  opts: { fallbackYear?: number; knownCategories?: string[] } = {},
+): ImportPreview {
+  const headers = Object.keys(records[0] ?? {});
+  const find = (...names: string[]) => headers.find((h) => names.includes(norm(h)));
+
+  const dateCol = find('DATE');
+  const amountCol = find('AMOUNT', 'AMT', 'VALUE');
+  const catCol = find('CATEGORY', 'CAT');
+  const peopleCol = find('PEOPLE', 'PERSON', 'WHO', 'WITH');
+  const noteCol = find('NOTE', 'NOTES', 'DESCRIPTION', 'REMARKS', 'DETAILS');
+
+  // The mapping is only shown, not used, in flat mode — every row names its
+  // own category — so each entry says what the column was read as.
+  const mapping: ColumnMapping[] = headers.map((header) => {
+    if (header === dateCol) return { header, role: 'date' as const, target: 'date' };
+    if (header === catCol) return { header, role: 'category' as const, target: 'category per row' };
+    if (header === peopleCol) return { header, role: 'person' as const, target: 'people per row' };
+    if (header === amountCol) return { header, role: 'ignore' as const, target: 'amount' };
+    if (header === noteCol) return { header, role: 'ignore' as const, target: 'note' };
+    return { header, role: 'ignore' as const, target: '' };
+  });
+
+  const rows: ImportedRow[] = [];
+  const warnings: string[] = [];
+  let skippedRows = 0;
+
+  if (!dateCol || !amountCol || !catCol) {
+    warnings.push('A flat sheet needs Date, Amount and Category columns.');
+    return { mapping, rows, warnings, computedTotal: 0, sheetTotal: null, skippedRows: records.length };
+  }
+
+  for (const record of records) {
+    const date = parseSheetDate(record[dateCol] ?? '', opts.fallbackYear);
+    const amount = parseAmount(record[amountCol] ?? '');
+    if (!date || amount <= 0) {
+      if (Object.values(record).some((v) => String(v ?? '').trim())) skippedRows++;
+      continue;
+    }
+
+    const rawCategory = (record[catCol] ?? '').trim();
+    const categoryName =
+      matchCategory(rawCategory, opts.knownCategories ?? []) ?? titleCase(rawCategory || 'Misc');
+    const people = peopleCol ? splitPeople(record[peopleCol] ?? '') : [];
+    const note = noteCol ? (record[noteCol] ?? '').trim() || null : null;
+
+    // One row per person keeps the shape the wide importer produces; the
+    // writer collapses them back onto a single expense.
+    if (people.length <= 1) {
+      rows.push({
+        amount,
+        categoryName,
+        expenseDate: date,
+        personName: people[0] ?? null,
+        note,
+        matchKind: people.length ? 'paired' : 'category-only',
+      });
+    } else {
+      rows.push({
+        amount,
+        categoryName,
+        expenseDate: date,
+        personName: people.join(' | '),
+        note,
+        matchKind: 'paired',
+      });
+    }
+  }
+
+  const computedTotal = round2(rows.reduce((sum, r) => sum + r.amount, 0));
+  return { mapping, rows, warnings, computedTotal, sheetTotal: computedTotal, skippedRows };
 }
 
 function titleCase(s: string): string {
@@ -333,4 +515,49 @@ export function buildPreview(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * The one entry point: work out what shape the sheet is, then read it that way.
+ *
+ * A wide month grid has to be reconstructed — several columns on one row are
+ * several transactions, and a person column tags an amount rather than adding
+ * to it. A flat list needs none of that. Guessing wrong is expensive in both
+ * directions, so the decision is made once, here, and reported back.
+ */
+export function previewSheet(
+  records: Record<string, string>[],
+  headers: string[],
+  opts: {
+    mapping?: ColumnMapping[];
+    fallbackYear?: number;
+    fallbackCategory?: string;
+    knownPeople?: string[];
+    knownCategories?: string[];
+  } = {},
+): ImportPreview {
+  const layout = detectLayout(headers);
+
+  if (layout === 'flat') {
+    return {
+      ...buildFlatPreview(records, {
+        fallbackYear: opts.fallbackYear,
+        knownCategories: opts.knownCategories,
+      }),
+      layout,
+    };
+  }
+
+  const mapping =
+    opts.mapping?.length ?? 0
+      ? opts.mapping!
+      : inferMapping(headers, opts.knownPeople ?? [], opts.knownCategories ?? []);
+
+  return {
+    ...buildPreview(records, mapping, {
+      fallbackYear: opts.fallbackYear,
+      fallbackCategory: opts.fallbackCategory,
+    }),
+    layout,
+  };
 }

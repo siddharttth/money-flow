@@ -6,7 +6,7 @@ import { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
 import { dayLabel } from '@/lib/dates';
 import type { ColumnMapping, ImportPreview } from '@/lib/importer';
-import { Card, EmptyState, SectionTitle } from '@/components/ui';
+import { Card, EmptyState, PageHeader, SectionTitle } from '@/components/ui';
 import { useShell } from '@/components/app-shell';
 
 const ROLES: ColumnMapping['role'][] = ['date', 'category', 'person', 'ignore'];
@@ -23,6 +23,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ importedCount: number; importedTotal: number } | null>(null);
   const [fallbackYear, setFallbackYear] = useState(String(new Date().getFullYear()));
+  const [pasted, setPasted] = useState('');
 
   async function onFile(file: File) {
     setError(null);
@@ -94,13 +95,11 @@ export default function ImportPage() {
         ‹ Settings
       </Link>
 
-      <div>
-        <h1 className="text-xl sm:text-2xl font-semibold">Import from Google Sheet</h1>
-        <p className="muted text-sm mt-1">
-          Export one month tab as CSV and drop it here. Category and person columns get turned into real transactions
-          — an ₹800 row tagged to Sankalp stays one ₹800 expense, never ₹1,600.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Data"
+        title="Import a sheet"
+        sub="Two shapes are understood, and which one you gave is worked out for you: a month grid with a column per category, or a flat list of transactions like this app's own export."
+      />
 
       {done && (
         <Card>
@@ -117,11 +116,11 @@ export default function ImportPage() {
       )}
 
       <Card>
-        <SectionTitle>1 · Choose your CSV</SectionTitle>
+        <SectionTitle>1 · Give it the data</SectionTitle>
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,text/tab-separated-values"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -130,9 +129,33 @@ export default function ImportPage() {
         />
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn btn-primary" onClick={() => fileRef.current?.click()} disabled={busy}>
-            Choose file
+            Choose a file
           </button>
           {fileName && <span className="muted text-sm truncate">{fileName}</span>}
+        </div>
+
+        {/* Pasting beats downloading: select the range in the sheet, copy,
+            paste. The clipboard carries it as tab-separated text, which the
+            parser detects on its own. */}
+        <div className="mt-4">
+          <label className="label" htmlFor="paste">
+            …or paste straight from the sheet
+          </label>
+          <textarea
+            id="paste"
+            className="input font-mono text-[12px]"
+            rows={4}
+            placeholder="Select the rows in Google Sheets including the header, copy, and paste here"
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            onBlur={() => {
+              const text = pasted.trim();
+              if (!text) return;
+              setFileName('pasted from the clipboard');
+              setCsv(text);
+              runPreview(text);
+            }}
+          />
         </div>
 
         <div className="mt-4 max-w-[14rem]">
@@ -159,9 +182,18 @@ export default function ImportPage() {
         <>
           <Card>
             <SectionTitle>2 · Check the column mapping</SectionTitle>
+            <p
+              className="text-[13px] mb-3 pl-3 border-l-2"
+              style={{ borderColor: 'var(--accent)', color: 'var(--text-muted)' }}
+            >
+              {preview.layout === 'flat'
+                ? 'Read as a flat list — one transaction per row, so nothing needs reconstructing. Notes and multi-person tags come across as they are.'
+                : 'Read as a month grid — each filled cell on a row becomes its own transaction, and a person column tags an amount rather than adding to it.'}
+            </p>
             <p className="muted text-sm mb-4">
-              Person columns must be marked <strong>Person</strong> — marking one as a category is what would double
-              your totals.
+              {preview.layout === 'flat'
+                ? 'Nothing to change here; the columns below are what each one was understood as.'
+                : 'Person columns must be marked Person — marking one as a category is what would double your totals.'}
             </p>
             <div className="space-y-2">
               {preview.mapping.map((m) => (
@@ -174,7 +206,7 @@ export default function ImportPage() {
                         className="chip capitalize text-xs"
                         data-selected={m.role === r}
                         onClick={() => setRole(m.header, r)}
-                        disabled={busy}
+                        disabled={busy || preview.layout === 'flat'}
                       >
                         {r}
                       </button>
