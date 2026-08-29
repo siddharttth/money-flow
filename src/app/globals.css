@@ -372,433 +372,174 @@ h1, h2, h3 {
 
 /*
  * ============================================================
- * MARKETING LANDING ONLY — "Rolex boutique meets liquid glass"
+ * MARKETING LANDING ONLY
  * ------------------------------------------------------------
- * Deep bottle green lacquer, gilt gold used sparingly, and frosted
- * panels with a real specular edge. Every rule is scoped under .lp so
- * none of it can reach the app, and .lp pins its own colours so a
- * visitor in either OS theme sees the intended design.
+ * A ledger book: warm ruled paper as the dominant canvas, with
+ * deep green bands where the product is shown. No device frames
+ * and no glass — the panels are flat, the way a printed ledger is.
+ * Everything is scoped under .lp so none of it reaches the app.
  * ============================================================
  */
 .lp {
-  --green-900: #00301e;
-  --green-800: #0b4228;
-  --green-700: #145236;
-  --green-600: #1e6b45;
+  --green-900: #0a2d1c;
+  --green-800: #123d27;
+  --green-700: #1c4b33;
+  --green-600: #2f6547;
 
   --gold-500: #c9a96a;
   --gold-400: #dcc38a;
-  --gold-700: #8c6f35;
+  --gold-600: #a98a4b;
 
-  --ivory-100: #f6f3ea;
-  --ivory-300: #dcd6c4;
-  --ink-900: #0a0a0a;
+  --paper: #f2ede0;
+  --paper-2: #e9e3d3;
+  --rule: rgba(10, 45, 28, 0.09);
 
-  --glass-white: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.18);
-
-  /* Bronze rather than red for "you owe", to stay inside the palette. */
-  --bronze: #c2703f;
+  --ink: #14251c;
+  --ink-soft: #4a5a50;
+  --ivory-100: #f3efe4;
+  --ivory-300: #c9cfc6;
 
   --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
 
-  position: relative;
-  color: var(--ivory-100);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
-  color-scheme: dark;
-  /* Lacquer, not a flat fill: a warm pool of light off-centre over the deep base. */
-  background:
-    radial-gradient(120% 80% at 50% -10%, #10583a 0%, transparent 55%),
-    radial-gradient(90% 60% at 85% 20%, rgba(30, 107, 69, 0.45) 0%, transparent 60%),
-    linear-gradient(180deg, var(--green-900) 0%, var(--green-800) 45%, var(--green-900) 100%);
+  color-scheme: light;
 }
 
-/*
- * Grain. Without it the gradient reads as a digital fill; at 3% it reads as
- * lacquered metal. Fixed so it does not swim while the page scrolls.
- */
-.lp::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.055;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Ruled paper. The lines are the texture — no noise overlay needed. */
+.lp-paper {
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 47px,
+    var(--rule) 47px,
+    var(--rule) 48px
+  );
+}
+
+.lp-dark {
+  background: var(--green-900);
+  color: var(--ivory-100);
 }
 
 .lp-display {
   font-family: var(--ff-serif), ui-serif, Georgia, serif;
   font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.05;
+  letter-spacing: -0.022em;
+  line-height: 1.06;
   font-optical-sizing: auto;
 }
+/* The second half of the Rolex-style pairing: bold statement, light echo. */
+.lp-display-em {
+  font-family: var(--ff-serif), ui-serif, Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
 
-/* The light half of a Rolex-style pairing: bold word, light word. */
-.lp-display-light { font-weight: 300; font-style: normal; }
-
-.lp-gold { color: var(--gold-500); }
-
-/* Case-back inscription: wide tracking with a gold hairline running off it. */
+/* Case-back inscription, with a rule running out of each side. */
 .lp-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.9rem;
-  font-size: 11px;
+  gap: 1rem;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold-500);
 }
+.lp-label::before,
 .lp-label::after {
   content: '';
-  width: clamp(2rem, 8vw, 5rem);
+  width: clamp(1.5rem, 5vw, 3rem);
   height: 1px;
-  background: linear-gradient(to right, var(--gold-700), transparent);
+  background: currentColor;
+  opacity: 0.35;
 }
-.lp-label-center { justify-content: center; }
-.lp-label-center::before {
-  content: '';
-  width: clamp(2rem, 8vw, 5rem);
-  height: 1px;
-  background: linear-gradient(to left, var(--gold-700), transparent);
-}
+.lp-label-start::before { display: none; }
 
-/* Frosted panel with a top specular highlight, so it has thickness. */
-.glass-panel {
-  position: relative;
-  background: var(--glass-white);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  backdrop-filter: blur(32px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
-  transition: transform 600ms var(--ease-lux), box-shadow 600ms var(--ease-lux), border-color 600ms var(--ease-lux);
-}
-/* Light catching the curve along the top edge. */
-.glass-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 22%);
-}
-.glass-lift:hover {
-  transform: scale(1.01);
-  border-color: rgba(255, 255, 255, 0.26);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-/* The gold-accented panel — used once, for the answer card. */
-.glass-gold {
-  border-color: rgba(201, 169, 106, 0.42);
-  background: linear-gradient(180deg, rgba(201, 169, 106, 0.10), rgba(255, 255, 255, 0.05));
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(220, 195, 138, 0.28);
-}
-
-/* Muted charcoal panel — the problem card, deliberately duller. */
-.glass-muted {
-  background: rgba(0, 0, 0, 0.22);
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.lp-hairline { height: 1px; background: linear-gradient(to right, transparent, var(--gold-700), transparent); }
-
-/* Pill CTAs. Hover blooms rather than flipping colour. */
 .lp-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  border-radius: 9999px;
-  font-size: 11.5px;
+  border-radius: 2px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.17em;
   text-transform: uppercase;
-  padding: 1.05rem 2.1rem;
-  min-height: 50px;
+  padding: 1.1rem 2.2rem;
+  min-height: 52px;
   cursor: pointer;
-  transition: box-shadow 600ms var(--ease-lux), border-color 600ms var(--ease-lux), background 600ms var(--ease-lux);
+  transition: background 400ms var(--ease-lux), color 400ms var(--ease-lux), border-color 400ms var(--ease-lux);
 }
-.lp-btn-gold {
-  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
-  color: #241a06;
-  border: 1px solid var(--gold-400);
-  box-shadow: 0 6px 20px rgba(201, 169, 106, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-.lp-btn-gold:hover {
-  box-shadow: 0 0 0 1px var(--gold-400), 0 10px 40px rgba(201, 169, 106, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-.lp-btn-outline {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ivory-100);
-  border: 1px solid rgba(201, 169, 106, 0.45);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-}
-.lp-btn-outline:hover {
-  border-color: var(--gold-400);
-  box-shadow: 0 0 30px rgba(201, 169, 106, 0.22);
-}
+.lp-btn-solid { background: var(--green-900); color: var(--paper); border: 1px solid var(--green-900); }
+.lp-btn-solid:hover { background: var(--green-700); border-color: var(--green-700); }
+.lp-btn-outline { background: transparent; color: var(--ink); border: 1px solid rgba(10, 45, 28, 0.28); }
+.lp-btn-outline:hover { border-color: var(--green-900); }
+.lp-btn-gold { background: var(--gold-500); color: #23180a; border: 1px solid var(--gold-500); }
+.lp-btn-gold:hover { background: var(--gold-400); border-color: var(--gold-400); }
 
-/* Sub-dial chip — a watch complication, not a tag. */
+/* Numbered / bulleted rows separated by hairlines, as in a printed table. */
+.lp-rows > * { border-bottom: 1px solid var(--rule); }
+.lp-rows > *:first-child { border-top: 1px solid var(--rule); }
+.lp-dark .lp-rows > * { border-color: rgba(243, 239, 228, 0.13); }
+
+/* Panels inside the dark bands: flat, hairline-bordered, slightly lifted. */
+.lp-panel {
+  background: var(--green-800);
+  border: 1px solid rgba(243, 239, 228, 0.10);
+  border-radius: 4px;
+}
+.lp-panel-deep { background: #071f13; border: 1px solid rgba(243, 239, 228, 0.08); border-radius: 4px; }
+
+/* Chips read as small stamped labels, not pills with fills. */
 .lp-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 9999px;
-  padding: 0.4rem 0.95rem;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--gold-400);
-  background: rgba(201, 169, 106, 0.09);
-  border: 1px solid rgba(201, 169, 106, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  padding: 0.34rem 0.8rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ivory-300);
+  border: 1px solid rgba(243, 239, 228, 0.16);
 }
+.lp-chip-on { color: var(--gold-400); border-color: rgba(201, 169, 106, 0.55); background: rgba(201, 169, 106, 0.08); }
 
-/* Engraved numerals: serif, tabular, so figures read as struck not typed. */
+/* Engraved figures. */
 .lp-num {
   font-family: var(--ff-serif), ui-serif, Georgia, serif;
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
   letter-spacing: -0.01em;
 }
-
-/* Device frames milled from the same dark material, with a gold rim. */
-.lp-device {
-  position: relative;
-  background: linear-gradient(160deg, #1b2b22 0%, #060f0a 55%, #12201a 100%);
-  padding: 8px;
-  box-shadow:
-    0 40px 90px -30px rgba(0, 0, 0, 0.85),
-    0 2px 0 rgba(255, 255, 255, 0.06) inset;
+.lp-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
-.lp-device-screen {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(201, 169, 106, 0.55);
-  background: linear-gradient(180deg, rgba(11, 66, 40, 0.92), rgba(0, 48, 30, 0.96));
-}
-.lp-phone { border-radius: 42px; }
-.lp-phone .lp-device-screen { border-radius: 34px; }
-.lp-browser { border-radius: 18px; }
-.lp-browser .lp-device-screen { border-radius: 12px; }
 
-/* Motion: unhurried. Fade + small rise, no bounce. */
+/* The figures ticker between hero and product. */
+.lp-ticker { overflow: hidden; white-space: nowrap; }
+.lp-ticker-track {
+  display: inline-flex;
+  align-items: center;
+  animation: lp-marquee 46s linear infinite;
+}
+@keyframes lp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-ticker-track { animation: none; }
+}
+
 .lp-reveal {
   opacity: 0;
-  transform: translateY(26px);
+  transform: translateY(22px);
   transition: opacity 800ms var(--ease-lux), transform 800ms var(--ease-lux);
 }
 .lp-reveal[data-shown='true'] { opacity: 1; transform: none; }
-
-/* Gold dividers draw themselves in. */
-.lp-draw { transform: scaleX(0); transform-origin: left center; transition: transform 900ms var(--ease-lux); }
-.lp-reveal[data-shown='true'] .lp-draw { transform: scaleX(1); }
-
 @media (prefers-reduced-motion: reduce) {
   .lp-reveal { opacity: 1; transform: none; transition: none; }
-  .lp-draw { transform: none; transition: none; }
 }
-
-/*
- * Fallback where backdrop-filter is unsupported: fill the panel so text keeps
- * its contrast instead of sitting on a near-transparent rectangle.
- */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .lp .glass-panel { background: rgba(6, 46, 29, 0.92); }
-  .lp .lp-btn-outline { background: rgba(6, 46, 29, 0.9); }
-}
-
-
-/* ============================================================
- * DEVICE CHROME
- * Hand-built rather than an npm frameset: the available packages
- * ship notch-era iPhones and fixed light/dark chrome that cannot be
- * tinted to this palette. These are CSS + inline SVG so the bezel
- * gradients, the notch and the Dynamic Island sit in the same colour
- * system as everything else.
- * ============================================================ */
-
-/* Spotlight behind a device, so it sits in space rather than on the page. */
-.lp-stage { position: relative; display: flex; justify-content: center; }
-.lp-stage::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -8%;
-  width: 116%;
-  height: 116%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(50% 46% at 50% 40%, rgba(201, 169, 106, 0.14) 0%, rgba(30, 107, 69, 0.10) 42%, transparent 72%);
-  filter: blur(12px);
-}
-.lp-stage > * { position: relative; z-index: 1; }
-
-/* ------------------------- DEVICE FRAMES -------------------------
- * Restrained, in the spirit of medicoHUB's mock-UI panels: a near-black
- * shell, a hairline white border rather than a rendered material, a
- * generous radius, and one large directional shadow doing the lifting.
- * The previous aluminium and titanium gradients read as metallic noise
- * once the device scaled down; the screen should be the subject.
- * ---------------------------------------------------------------- */
-
-.mb { width: 100%; }
-
-.mb-body {
-  position: relative;
-  background: #06070c;
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  border-radius: 26px;
-  padding: 10px 10px 12px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    -18px 26px 60px rgba(0, 0, 0, 0.5),
-    0 60px 90px -50px rgba(0, 0, 0, 0.9);
-}
-
-.mb-screen {
-  position: relative;
-  border-radius: 17px;
-  overflow: hidden;
-  /* A single hairline, not a moulded bezel. */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-/* Whisper of light across the glass. */
-.mb-screen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 15;
-  background: linear-gradient(118deg, rgba(255, 255, 255, 0.045) 0%, transparent 34%);
-}
-
-.mb-notch {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 112px;
-  height: 15px;
-  background: #06070c;
-  border-radius: 0 0 10px 10px;
-  z-index: 20;
-}
-
-/* A slim shelf, so the lid reads as a laptop without a chunky base. */
-.mb-base {
-  position: relative;
-  height: 8px;
-  width: 101.5%;
-  margin: 0 auto;
-  background: linear-gradient(180deg, #0e0f16 0%, #06070c 100%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-top: 0;
-  border-radius: 0 0 10px 10px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-.mb-base::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  width: 9%;
-  height: 3px;
-  border-radius: 0 0 4px 4px;
-  background: rgba(255, 255, 255, 0.07);
-}
-.mb-base::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -18px;
-  transform: translateX(-50%);
-  width: 86%;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  filter: blur(18px);
-  z-index: -1;
-}
-
-/* ------------------------------ iPhone ------------------------------ */
-.ip { position: relative; width: 300px; }
-
-.ip-body {
-  position: relative;
-  background: #06070c;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 54px;
-  padding: 10px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    -14px 22px 50px rgba(0, 0, 0, 0.5),
-    0 50px 80px -44px rgba(0, 0, 0, 0.9);
-}
-
-.ip-screen {
-  position: relative;
-  border-radius: 45px;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-.ip-screen::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 15;
-  background: linear-gradient(122deg, rgba(255, 255, 255, 0.05) 0%, transparent 30%);
-}
-
-.ip-island {
-  position: absolute;
-  top: 11px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 88px;
-  height: 26px;
-  background: #06070c;
-  border-radius: 999px;
-  z-index: 20;
-}
-
-/* Ground reflection under a device, as if on a polished dark surface. */
-.lp-reflect {
-  position: relative;
-  margin: 0 auto;
-  height: 84px;
-  width: 84%;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(201, 169, 106, 0.10), transparent 62%);
-  filter: blur(16px);
-  opacity: 0.6;
-  border-radius: 50%;
-}
-
-/* The screen behind a glass panel needs texture, or the blur has nothing to
-   work on and the panel reads as a flat fill. */
-.lp-screen-bg {
-  background:
-    radial-gradient(70% 55% at 22% 8%, rgba(30, 107, 69, 0.55) 0%, transparent 60%),
-    radial-gradient(60% 50% at 88% 82%, rgba(201, 169, 106, 0.10) 0%, transparent 62%),
-    linear-gradient(165deg, #0b4228 0%, #00301e 55%, #062a1b 100%);
-}
-
-/* Devices scale as a unit rather than reflowing, so no size overrides here. */
