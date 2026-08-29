@@ -254,11 +254,11 @@ export function MechanismPanels() {
           ['Sankalp', '₹800'],
           ['August total', '₹800'],
         ].map(([label, value]) => (
-          <div key={label} className="rounded border px-3 py-5 text-center" style={{ borderColor: hair, background: wash }}>
+          <div key={label} className="rounded border px-3 py-4 text-center" style={{ borderColor: hair, background: wash }}>
             <p className="lp-eyebrow text-[8px]" style={{ color: 'var(--onforest-muted)' }}>
               {label}
             </p>
-            <p className="lp-display lp-tab mt-1 text-lg" style={{ color: 'var(--gold-soft)' }}>
+            <p className="lp-display lp-tab mt-3 text-lg" style={{ color: 'var(--gold-soft)' }}>
               {value}
             </p>
           </div>
