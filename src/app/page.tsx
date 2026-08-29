@@ -130,7 +130,7 @@ export default async function LandingPage() {
         <section className="py-20 md:py-28" style={{ background: 'var(--forest)', color: 'var(--onforest)' }}>
           <Ticker />
           <Reveal>
-            <div className="mx-auto mt-16 max-w-6xl px-6 md:mt-20">
+            <div className="mx-auto mt-16 max-w-6xl px-6">
               <DashboardPanel />
             </div>
           </Reveal>

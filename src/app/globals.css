@@ -545,6 +545,9 @@ h1, h2, h3 {
   letter-spacing: 0.02em;
 }
 
+/* Tabular figures in the running face — not a switch to mono. */
+.lp-tab { font-variant-numeric: tabular-nums; }
+
 /* Figures ticker — the reference runs this fast. */
 .lp-ticker { overflow: hidden; white-space: nowrap; }
 .lp-ticker-track { display: inline-flex; align-items: center; animation: lp-tick 14s linear infinite; }

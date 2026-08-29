@@ -65,13 +65,8 @@ export function Ticker() {
       >
         {run.map(([name, amount], i) => (
           <span key={i} className="flex shrink-0 items-center gap-10">
-            <span>
-              {name}{' '}
-              <span className="lp-mono" style={{ color: 'var(--gold-soft)' }}>
-                ₹{amount}
-              </span>
-            </span>
-            <span className="opacity-40">·</span>
+            {name} ₹{amount}
+            <span style={{ color: 'var(--gold)' }}>·</span>
           </span>
         ))}
       </div>
@@ -164,7 +159,7 @@ export function DashboardPanel() {
                   <div key={name}>
                     <div className="flex justify-between text-[13px]">
                       <span style={{ color: 'var(--onforest)' }}>{name}</span>
-                      <span className="lp-mono" style={{ color: 'var(--onforest-muted)' }}>
+                      <span className="lp-tab" style={{ color: 'var(--onforest-muted)' }}>
                         ₹{amt.toLocaleString('en-IN')}
                       </span>
                     </div>
@@ -206,7 +201,7 @@ export function DashboardPanel() {
                       </span>
                       {name}
                     </span>
-                    <span className="lp-mono" style={{ color: 'var(--onforest-muted)' }}>
+                    <span className="lp-tab" style={{ color: 'var(--onforest-muted)' }}>
                       ₹{amount}
                     </span>
                   </div>
