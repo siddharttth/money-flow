@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, IBM_Plex_Mono, Montserrat, Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
+import { Fraunces, IBM_Plex_Mono, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 
 /**
@@ -9,20 +9,6 @@ import './globals.css';
  * face. Plex Mono stays for rupee figures only — fixed-width digits are why a
  * ledger column is scannable, and no proportional face gives that.
  */
-const display = Montserrat({
-  subsets: ['latin'],
-  weight: ['600', '700', '900'],
-  variable: '--ff-display',
-  display: 'swap',
-});
-
-const ui = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--ff-ui',
-  display: 'swap',
-});
-
 /*
  * Landing page only. A high-contrast display serif with real character —
  * Fraunces' optical-size axis lets the huge hero settings tighten the way
@@ -37,7 +23,7 @@ const serif = Fraunces({
   display: 'swap',
 });
 
-/* Landing page only — the reference's UI face. */
+/* The UI face, across the marketing page and the app. */
 const grotesk = Space_Grotesk({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -74,7 +60,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${display.variable} ${ui.variable} ${mono.variable} ${serif.variable} ${grotesk.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${serif.variable} ${grotesk.variable} ${mono.variable}`}>
       <head>
         {/* Applies the saved theme before first paint so there is no flash. */}
         <script

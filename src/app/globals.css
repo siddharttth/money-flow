@@ -19,8 +19,8 @@
   /* next/font publishes --ff-*; these compose the real fallback stacks on top.
      Naming both sides --font-display would be a self-reference, which CSS
      treats as a cycle and drops, silently losing the fallbacks. */
-  --font-sans: var(--ff-ui), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--ff-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--ff-serif), ui-serif, Georgia, serif;
   --font-mono: var(--ff-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
@@ -183,9 +183,10 @@ h1, h2, h3 {
 
   .label {
     display: block;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 0.4rem;
@@ -251,9 +252,10 @@ h1, h2, h3 {
 
   /* Uppercase micro-header, per the type scale. */
   .micro {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
@@ -417,7 +419,7 @@ h1, h2, h3 {
 
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: 'tnum' 1;
   color-scheme: light;
 }
@@ -439,14 +441,14 @@ h1, h2, h3 {
 .lp-dark { background: var(--forest-ink); color: var(--onforest); }
 
 .lp-display {
-  font-family: var(--ff-serif), Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 400;
   font-optical-sizing: auto;
   letter-spacing: -0.025em;
   line-height: 1.05;
 }
 .lp-display-em {
-  font-family: var(--ff-serif), Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 400;
   font-style: italic;
   font-optical-sizing: auto;
@@ -533,7 +535,7 @@ h1, h2, h3 {
 }
 
 .lp-num {
-  font-family: var(--ff-serif), Georgia, serif;
+  font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
