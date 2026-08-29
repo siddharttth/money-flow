@@ -75,7 +75,14 @@ export function FlowCurve({
 
   const active = hover != null ? points[Math.min(hover, points.length - 1)] : null;
 
+  /*
+   * Mouse only. A finger dragged up the page still emits pointermove across
+   * this chart, so on a phone every scroll past the dashboard ran a setState
+   * per frame and re-rendered the whole curve — the main thread was busy
+   * exactly when the next tap arrived, which is how taps get dropped.
+   */
   function onMove(e: React.PointerEvent) {
+    if (e.pointerType !== 'mouse') return;
     const box = wrapRef.current?.getBoundingClientRect();
     if (!box) return;
     const ratio = (e.clientX - box.left) / box.width;
@@ -109,6 +116,16 @@ export function FlowCurve({
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         style={{ touchAction: 'pan-y', display: 'block' }}
+        onPointerDown={(e) => {
+          // A deliberate tap still reads the curve; a scroll past it does not.
+          if (e.pointerType === 'mouse') return;
+          const box = wrapRef.current?.getBoundingClientRect();
+          if (!box) return;
+          const ratio = (e.clientX - box.left) / box.width;
+          const day = Math.round(ratio * (monthDays - 1)) + 1;
+          const idx = points.findIndex((p) => p.day >= day);
+          setHover(idx === -1 ? points.length - 1 : idx);
+        }}
       >
         <defs>
           <linearGradient id={`fill-${gid}`} x1="0" y1="0" x2="0" y2="1">

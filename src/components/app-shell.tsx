@@ -159,11 +159,15 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
                 scroll container — see overflow-x: clip in globals.css. */}
             <header
               className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-14 border-b"
+              /*
+               * Opaque, not translucent-and-blurred. backdrop-filter on a
+               * fixed element makes the compositor re-sample everything behind
+               * it on every frame of scroll — on a phone that is a permanent
+               * tax on the main thread, paid hardest right where taps land.
+               */
               style={{
                 borderColor: 'var(--border)',
-                background: 'color-mix(in srgb, var(--bg) 86%, transparent)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                background: 'var(--bg)',
                 paddingTop: 'env(safe-area-inset-top)',
                 height: 'calc(3.5rem + env(safe-area-inset-top))',
               }}
@@ -204,12 +208,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
           {/* Mobile bottom nav, + as the centre action. */}
           <nav
             className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t safe-bottom"
-            style={{
-              borderColor: 'var(--border)',
-              background: 'color-mix(in srgb, var(--surface) 92%, transparent)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-            }}
+            style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
           >
             <div className="grid grid-cols-5 items-center max-w-lg mx-auto">
               {MOBILE_LEFT.map((href) => {

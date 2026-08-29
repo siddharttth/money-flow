@@ -198,7 +198,20 @@
    */
   button, a, [role='button'], [role='tab'], label, input, select, textarea, summary {
     touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+   * Keep the native tap highlight, tinted to the theme.
+   *
+   * Killing it was a mistake: iOS only applies :active to an element that
+   * carries its own touch listener, and React attaches everything at the root
+   * — so the :active states meant to replace it never fired, and a tap that
+   * HAD registered showed nothing at all. People then tapped again. The native
+   * highlight paints on touchdown, before any JavaScript runs, and cannot be
+   * missed.
+   */
+  * {
+    -webkit-tap-highlight-color: color-mix(in oklab, var(--accent) 18%, transparent);
   }
 
   /* One focus ring, in the theme's accent. The browser default is a blue that
