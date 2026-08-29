@@ -17,8 +17,8 @@ export function Logo({
   onDark?: boolean;
   className?: string;
 }) {
-  // Intrinsic 759x344 after trimming.
-  const width = Math.round((height * 759) / 344);
+  // Intrinsic 900x409, trimmed to the mark's own bounds.
+  const width = Math.round((height * 900) / 409);
 
   return (
     <Image
