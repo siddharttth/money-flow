@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, IBM_Plex_Mono, Montserrat, Plus_Jakarta_Sans } from 'next/font/google';
+import { Fraunces, IBM_Plex_Mono, Montserrat, Plus_Jakarta_Sans, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 
 /**
@@ -37,6 +37,14 @@ const serif = Fraunces({
   display: 'swap',
 });
 
+/* Landing page only — the reference's UI face. */
+const grotesk = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--ff-grotesk',
+  display: 'swap',
+});
+
 const mono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
@@ -66,7 +74,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${display.variable} ${ui.variable} ${mono.variable} ${serif.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${ui.variable} ${mono.variable} ${serif.variable} ${grotesk.variable}`}>
       <head>
         {/* Applies the saved theme before first paint so there is no flash. */}
         <script

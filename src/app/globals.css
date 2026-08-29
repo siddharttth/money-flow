@@ -374,79 +374,92 @@ h1, h2, h3 {
  * ============================================================
  * MARKETING LANDING ONLY
  * ------------------------------------------------------------
- * A ledger book: warm ruled paper as the dominant canvas, with
- * deep green bands where the product is shown. No device frames
- * and no glass — the panels are flat, the way a printed ledger is.
- * Everything is scoped under .lp so none of it reaches the app.
+ * Tokens ported verbatim from the approved reference, in OKLCH.
+ * Fraunces for display, Space Grotesk for UI, Plex Mono for
+ * eyebrows and figures. Scoped under .lp, which pins its own
+ * colours, so none of it reaches the app.
  * ============================================================
  */
 .lp {
-  --green-900: #0a2d1c;
-  --green-800: #123d27;
-  --green-700: #1c4b33;
-  --green-600: #2f6547;
+  /* ---- reference palette, exact ---- */
+  --background: oklch(0.962 0.018 96);
+  --foreground: oklch(0.24 0.05 152);
+  --card: oklch(0.978 0.014 96);
+  --primary: oklch(0.32 0.07 152);
+  --muted-fg: oklch(0.45 0.03 140);
+  --gold: oklch(0.72 0.1 88);
+  --gold-soft: oklch(0.82 0.1 92);
+  --forest: oklch(0.3 0.065 152);
+  --forest-deep: oklch(0.24 0.055 152);
+  --forest-ink: oklch(0.2 0.045 152);
+  --onforest: oklch(0.93 0.03 96);
+  --onforest-muted: oklch(0.72 0.035 120);
+  --border-lp: oklch(0.87 0.02 110);
+  --rule: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --radius-lp: 0.25rem;
 
-  --gold-500: #c9a96a;
-  --gold-400: #dcc38a;
-  --gold-600: #a98a4b;
-
-  --paper: #f2ede0;
-  --paper-2: #e9e3d3;
-  --rule: rgba(10, 45, 28, 0.09);
-
-  --ink: #14251c;
-  --ink-soft: #4a5a50;
-  --ivory-100: #f3efe4;
-  --ivory-300: #c9cfc6;
+  /* ---- aliases used across the page markup ---- */
+  --paper: var(--background);
+  --paper-2: var(--card);
+  --ink: var(--foreground);
+  --ink-soft: var(--muted-fg);
+  --green-900: var(--forest-ink);
+  --green-800: var(--forest-deep);
+  --green-700: var(--forest);
+  --green-600: var(--primary);
+  --gold-500: var(--gold);
+  --gold-400: var(--gold-soft);
+  --gold-600: var(--gold);
+  --ivory-100: var(--onforest);
+  --ivory-300: var(--onforest-muted);
 
   --ease-lux: cubic-bezier(0.22, 1, 0.36, 1);
 
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1;
   color-scheme: light;
 }
 
-/* Ruled paper. The lines are the texture — no noise overlay needed. */
+.lp ::selection { background: var(--gold); color: var(--forest-deep); }
+
+/* Ruled paper — 35px gauge, one hairline at 8% of the ink. */
 .lp-paper {
-  background-color: var(--paper);
+  background-color: var(--background);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent 47px,
-    var(--rule) 47px,
-    var(--rule) 48px
+    transparent 35px,
+    var(--rule) 35px,
+    var(--rule) 36px
   );
 }
 
-.lp-dark {
-  background: var(--green-900);
-  color: var(--ivory-100);
-}
+.lp-dark { background: var(--forest-ink); color: var(--onforest); }
 
 .lp-display {
-  font-family: var(--ff-serif), ui-serif, Georgia, serif;
+  font-family: var(--ff-serif), Georgia, serif;
   font-weight: 600;
   letter-spacing: -0.022em;
   line-height: 1.06;
   font-optical-sizing: auto;
 }
-/* The second half of the Rolex-style pairing: bold statement, light echo. */
 .lp-display-em {
-  font-family: var(--ff-serif), ui-serif, Georgia, serif;
+  font-family: var(--ff-serif), Georgia, serif;
   font-weight: 400;
   font-style: italic;
   letter-spacing: -0.02em;
 }
 
-/* Case-back inscription, with a rule running out of each side. */
+/* Eyebrow: mono, wide-tracked, with a rule running out of each side. */
 .lp-label {
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
+  gap: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
 }
 .lp-label::before,
@@ -463,37 +476,38 @@ h1, h2, h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.17em;
+  border-radius: var(--radius-lp);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   padding: 1.1rem 2.2rem;
   min-height: 52px;
   cursor: pointer;
   transition: background 400ms var(--ease-lux), color 400ms var(--ease-lux), border-color 400ms var(--ease-lux);
 }
-.lp-btn-solid { background: var(--green-900); color: var(--paper); border: 1px solid var(--green-900); }
-.lp-btn-solid:hover { background: var(--green-700); border-color: var(--green-700); }
-.lp-btn-outline { background: transparent; color: var(--ink); border: 1px solid rgba(10, 45, 28, 0.28); }
-.lp-btn-outline:hover { border-color: var(--green-900); }
-.lp-btn-gold { background: var(--gold-500); color: #23180a; border: 1px solid var(--gold-500); }
-.lp-btn-gold:hover { background: var(--gold-400); border-color: var(--gold-400); }
+.lp-btn-solid { background: var(--forest-ink); color: var(--background); border: 1px solid var(--forest-ink); }
+.lp-btn-solid:hover { background: var(--forest); border-color: var(--forest); }
+.lp-btn-outline { background: transparent; color: var(--foreground); border: 1px solid var(--border-lp); }
+.lp-btn-outline:hover { border-color: var(--forest-ink); }
+.lp-btn-gold { background: var(--gold); color: var(--forest-deep); border: 1px solid var(--gold); }
+.lp-btn-gold:hover { background: var(--gold-soft); border-color: var(--gold-soft); }
 
-/* Numbered / bulleted rows separated by hairlines, as in a printed table. */
 .lp-rows > * { border-bottom: 1px solid var(--rule); }
 .lp-rows > *:first-child { border-top: 1px solid var(--rule); }
-.lp-dark .lp-rows > * { border-color: rgba(243, 239, 228, 0.13); }
+.lp-dark .lp-rows > * { border-color: color-mix(in oklab, var(--onforest) 13%, transparent); }
 
-/* Panels inside the dark bands: flat, hairline-bordered, slightly lifted. */
 .lp-panel {
-  background: var(--green-800);
-  border: 1px solid rgba(243, 239, 228, 0.10);
-  border-radius: 4px;
+  background: var(--forest-deep);
+  border: 1px solid color-mix(in oklab, var(--onforest) 10%, transparent);
+  border-radius: var(--radius-lp);
 }
-.lp-panel-deep { background: #071f13; border: 1px solid rgba(243, 239, 228, 0.08); border-radius: 4px; }
+.lp-panel-deep {
+  background: color-mix(in oklab, var(--forest-ink) 92%, black);
+  border: 1px solid color-mix(in oklab, var(--onforest) 8%, transparent);
+  border-radius: var(--radius-lp);
+}
 
-/* Chips read as small stamped labels, not pills with fills. */
 .lp-chip {
   display: inline-flex;
   align-items: center;
@@ -501,15 +515,17 @@ h1, h2, h3 {
   border-radius: 999px;
   padding: 0.34rem 0.8rem;
   font-size: 11px;
-  font-weight: 500;
-  color: var(--ivory-300);
-  border: 1px solid rgba(243, 239, 228, 0.16);
+  color: var(--onforest-muted);
+  border: 1px solid color-mix(in oklab, var(--onforest) 16%, transparent);
 }
-.lp-chip-on { color: var(--gold-400); border-color: rgba(201, 169, 106, 0.55); background: rgba(201, 169, 106, 0.08); }
+.lp-chip-on {
+  color: var(--gold-soft);
+  border-color: color-mix(in oklab, var(--gold) 55%, transparent);
+  background: color-mix(in oklab, var(--gold) 8%, transparent);
+}
 
-/* Engraved figures. */
 .lp-num {
-  font-family: var(--ff-serif), ui-serif, Georgia, serif;
+  font-family: var(--ff-serif), Georgia, serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
@@ -519,27 +535,22 @@ h1, h2, h3 {
   letter-spacing: 0.02em;
 }
 
-/* The figures ticker between hero and product. */
+/* Figures ticker — the reference runs this fast. */
 .lp-ticker { overflow: hidden; white-space: nowrap; }
-.lp-ticker-track {
-  display: inline-flex;
-  align-items: center;
-  animation: lp-marquee 46s linear infinite;
-}
-@keyframes lp-marquee {
+.lp-ticker-track { display: inline-flex; align-items: center; animation: lp-tick 14s linear infinite; }
+@keyframes lp-tick {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-ticker-track { animation: none; }
 }
 
 .lp-reveal {
   opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 800ms var(--ease-lux), transform 800ms var(--ease-lux);
+  transform: translateY(26px);
+  transition: opacity 900ms var(--ease-lux), transform 900ms var(--ease-lux);
 }
 .lp-reveal[data-shown='true'] { opacity: 1; transform: none; }
+
 @media (prefers-reduced-motion: reduce) {
+  .lp-ticker-track { animation: none; }
   .lp-reveal { opacity: 1; transform: none; transition: none; }
 }
