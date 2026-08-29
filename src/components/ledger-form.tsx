@@ -71,7 +71,12 @@ export function LedgerForm({
   const amountRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    amountRef.current?.focus();
+    /*
+     * Only where a keyboard is already present. iOS will not raise the software
+     * keyboard for a programmatic focus — it needs a real gesture — so on a
+     * phone this bought nothing and cost a scroll jump as the sheet opened.
+     */
+    if (window.matchMedia('(pointer: fine)').matches) amountRef.current?.focus();
   }, []);
 
   // "Me" is excluded — you cannot lend to yourself.
@@ -293,10 +298,7 @@ export function LedgerForm({
         </p>
       )}
 
-      <div
-        className="sticky bottom-0 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 px-4 sm:px-5 pt-3 pb-4 sm:pb-5 flex items-center gap-3 border-t"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-      >
+      <div className="sheet-actions">
         {/* Says what is missing rather than leaving a dead grey button. */}
         <p className="muted text-xs flex-1 sm:text-right">
           {!amountValid ? 'Enter an amount' : !personId ? 'Pick a person' : ''}

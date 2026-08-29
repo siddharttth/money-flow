@@ -70,8 +70,12 @@ export function ExpenseForm({
 
   useEffect(() => {
     setRecents(readRecents());
-    // Autofocus the amount field — it is always the first thing typed.
-    amountRef.current?.focus();
+    /*
+     * Only where a keyboard is already present. iOS will not raise the software
+     * keyboard for a programmatic focus — it needs a real gesture — so on a
+     * phone this bought nothing and cost a scroll jump as the sheet opened.
+     */
+    if (window.matchMedia('(pointer: fine)').matches) amountRef.current?.focus();
   }, []);
 
   const categories = useMemo(
@@ -212,12 +216,7 @@ export function ExpenseForm({
       </div>
 
       <div>
-        <label className="label">
-          Person
-          <span className="normal-case font-normal tracking-normal">
-            {multi ? ' — tap to add or remove' : ' — tap to switch'}
-          </span>
-        </label>
+        <span className="label">Person</span>
         <ChipRow>
           {people.map((p) => (
             <button
@@ -310,10 +309,7 @@ export function ExpenseForm({
       {/* Sticky so Save stays reachable without scrolling back down the sheet.
           One row only — three stacked buttons ate half a phone screen. Cancel is
           omitted because the sheet's × and Esc already close it. */}
-      <div
-        className="sticky bottom-0 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 px-4 sm:px-5 pt-3 pb-4 sm:pb-5 flex gap-2 sm:justify-end border-t"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-      >
+      <div className="sheet-actions sm:justify-end">
         {!existing && keepOpenAfterSave && (
           <button
             type="button"

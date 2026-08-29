@@ -379,18 +379,50 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  /** Keep the focused field visible once the keyboard has finished animating. */
+  /**
+   * Keep a focused field clear of the keyboard — and nothing more than that.
+   *
+   * This used to centre every focused field. Combined with the amount input
+   * autofocusing on mount, the sheet opened and then immediately scrolled
+   * itself so the amount sat mid-panel, leaving a band of dead space under the
+   * header and pushing the rest below the fold. It read as the sheet shaking
+   * on open.
+   *
+   * Two rules now: ignore focus while the sheet is still animating in, and
+   * scroll by the smallest amount that works — a field already fully visible
+   * does not move at all.
+   */
   useEffect(() => {
     if (!open) return;
     const el = dialogRef.current;
     if (!el) return;
+
+    // The entrance transition is 180ms; anything inside that window is the
+    // sheet arriving, not the user choosing a field.
+    let settled = false;
+    const settle = setTimeout(() => {
+      settled = true;
+    }, 260);
+
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
-      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+      if (!settled || !/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Wait for the keyboard, then move only if the field is not fully in view.
+      setTimeout(() => {
+        const scroller = target.closest('[data-modal-scroll]');
+        if (!scroller) return;
+        const a = target.getBoundingClientRect();
+        const b = scroller.getBoundingClientRect();
+        if (a.top >= b.top && a.bottom <= b.bottom) return;
+        target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 250);
     };
+
     el.addEventListener('focusin', onFocusIn);
-    return () => el.removeEventListener('focusin', onFocusIn);
+    return () => {
+      clearTimeout(settle);
+      el.removeEventListener('focusin', onFocusIn);
+    };
   }, [open]);
 
   if (!open) return null;
@@ -456,7 +488,15 @@ export function Modal({
           </button>
         </div>
         {/* Only this region scrolls, so the sticky footer inside it stays put. */}
-        <div className="p-4 sm:p-5 overflow-y-auto overscroll-contain flex-1 safe-bottom">{children}</div>
+        {/* scroll-padding keeps a field scrolled to the edge from landing
+            under the sticky action bar that every form pins to the bottom. */}
+        <div
+          data-modal-scroll
+          className="sheet-body overflow-y-auto overscroll-contain flex-1"
+          style={{ scrollPaddingBottom: '5.5rem', scrollPaddingTop: '0.5rem' }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
