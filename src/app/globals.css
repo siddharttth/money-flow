@@ -419,6 +419,13 @@ h1, h2, h3 {
   .sheet-body {
     --sheet-pad: 1rem;
     padding: var(--sheet-pad);
+    /*
+     * Reserve the scrollbar's space whether or not it is showing. The sheet's
+     * height changes as you switch between Expense and a loan, or add a second
+     * person — and every time the scrollbar appeared or vanished, everything
+     * inside jumped sideways by its width.
+     */
+    scrollbar-gutter: stable;
   }
   @media (min-width: 640px) {
     .sheet-body { --sheet-pad: 1.25rem; }

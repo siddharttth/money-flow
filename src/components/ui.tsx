@@ -329,7 +329,7 @@ export function Modal({
   // early return would be called conditionally and break hook ordering.
   const swallowNextClick = useRef(false);
   // null until measured, so SSR and no-visualViewport browsers fall back to inset-0.
-  const [area, setArea] = useState<{ top: number; height: number } | null>(null);
+  const [area, setArea] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -351,16 +351,33 @@ export function Modal({
       top: body.style.top,
       width: body.style.width,
       overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
     };
+    /*
+     * Pinning the body takes the page's scrollbar away with it. Where that
+     * scrollbar occupies real width — Windows, Linux, macOS set to always show
+     * them — the page and this centred sheet both slide right by its width the
+     * moment the sheet opens, and back again when it closes. Holding the space
+     * open keeps everything still.
+     */
+    const gutter = window.innerWidth - document.documentElement.clientWidth;
     body.style.position = 'fixed';
     body.style.top = `-${scrollY}px`;
     body.style.width = '100%';
     body.style.overflow = 'hidden';
+    if (gutter > 0) body.style.paddingRight = `${gutter}px`;
 
     const vv = window.visualViewport;
     const sync = () => {
       if (!vv) return;
-      setArea({ top: vv.offsetTop, height: vv.height });
+      /*
+       * Both axes, not just the vertical one. The overlay was pinned to the
+       * layout viewport horizontally, so any time the visual viewport was
+       * offset sideways — an iOS pinch, a rubber-band pan, the keyboard
+       * animating in — the sheet drifted left and right against the screen
+       * while the page behind it stayed put.
+       */
+      setArea({ top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height });
     };
     sync();
     vv?.addEventListener('resize', sync);
@@ -374,6 +391,7 @@ export function Modal({
       body.style.top = prev.top;
       body.style.width = prev.width;
       body.style.overflow = prev.overflow;
+      body.style.paddingRight = prev.paddingRight;
       window.scrollTo(0, scrollY);
       setArea(null);
     };
@@ -458,8 +476,12 @@ export function Modal({
 
   return (
     <div
-      className="fixed left-0 right-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-[2px]"
-      style={area ? { top: area.top, height: area.height } : { top: 0, bottom: 0 }}
+      className="fixed z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-[2px]"
+      style={
+        area
+          ? { top: area.top, left: area.left, width: area.width, height: area.height }
+          : { top: 0, bottom: 0, left: 0, right: 0 }
+      }
       onPointerDown={onBackdropPointerDown}
       onClick={onBackdropClick}
     >
