@@ -91,7 +91,7 @@ export function DashboardPanel() {
           className="hidden border-r p-5 md:block"
           style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
         >
-          <span className="lp-display text-[17px]" style={{ color: 'var(--onforest)' }}>
+          <span className="lp-display text-[21px]" style={{ color: 'var(--onforest)' }}>
             Money{' '}
             <span className="lp-display-em" style={{ color: 'var(--gold-soft)' }}>
               Flow
@@ -133,7 +133,7 @@ export function DashboardPanel() {
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="rounded border p-3"
+                className="rounded border px-3 py-4"
                 style={{
                   borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)',
                   background: 'color-mix(in oklab, var(--onforest) 4%, transparent)',
