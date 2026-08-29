@@ -440,17 +440,17 @@ h1, h2, h3 {
 
 .lp-display {
   font-family: var(--ff-serif), Georgia, serif;
-  font-weight: 550;
-  font-variation-settings: 'opsz' 144, 'SOFT' 0, 'WONK' 0;
-  letter-spacing: -0.022em;
-  line-height: 1.06;
+  font-weight: 400;
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
 }
 .lp-display-em {
   font-family: var(--ff-serif), Georgia, serif;
   font-weight: 400;
   font-style: italic;
-  font-variation-settings: 'opsz' 144, 'SOFT' 0, 'WONK' 1;
-  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
 }
 
 /* Eyebrow: mono, wide-tracked, with a rule running out of each side. */
@@ -478,19 +478,18 @@ h1, h2, h3 {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lp);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  padding: 1.1rem 2.2rem;
-  min-height: 52px;
+  padding: 0.875rem 1.75rem;
   cursor: pointer;
-  transition: background 400ms var(--ease-lux), color 400ms var(--ease-lux), border-color 400ms var(--ease-lux);
+  transition: transform 400ms var(--ease-lux), background 400ms var(--ease-lux), border-color 400ms var(--ease-lux);
 }
-.lp-btn-solid { background: var(--forest-ink); color: var(--background); border: 1px solid var(--forest-ink); }
-.lp-btn-solid:hover { background: var(--forest); border-color: var(--forest); }
+.lp-btn:hover { transform: scale(1.04); }
+.lp-btn-solid { background: var(--forest); color: var(--onforest); border: 1px solid var(--forest); }
 .lp-btn-outline { background: transparent; color: var(--foreground); border: 1px solid var(--border-lp); }
-.lp-btn-outline:hover { border-color: var(--forest-ink); }
+.lp-btn-outline:hover { border-color: var(--forest); }
 .lp-btn-gold { background: var(--gold); color: var(--forest-deep); border: 1px solid var(--gold); }
 .lp-btn-gold:hover { background: var(--gold-soft); border-color: var(--gold-soft); }
 
@@ -538,7 +537,7 @@ h1, h2, h3 {
 
 /* Figures ticker — the reference runs this fast. */
 .lp-ticker { overflow: hidden; white-space: nowrap; }
-.lp-ticker-track { display: inline-flex; align-items: center; animation: lp-tick 38s linear infinite; }
+.lp-ticker-track { display: inline-flex; align-items: center; animation: lp-tick 14s linear infinite; }
 @keyframes lp-tick {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -555,3 +554,19 @@ h1, h2, h3 {
   .lp-ticker-track { animation: none; }
   .lp-reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* Caret in the mocked amount field. */
+@keyframes lp-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.lp-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1.15em;
+  margin-left: 0.1rem;
+  transform: translateY(0.08em);
+  background: var(--gold);
+  animation: lp-blink 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .lp-caret { animation: none; } }

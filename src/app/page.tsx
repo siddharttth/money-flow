@@ -72,24 +72,25 @@ export default async function LandingPage() {
 
       <main className="pt-[72px]">
         {/* ------------------------------ Hero ----------------------------- */}
-        <section className="lp-paper px-5 sm:px-10 pt-20 sm:pt-28 pb-16 sm:pb-24 text-center">
+        <section className="lp-paper mx-auto max-w-6xl px-6 pt-28 sm:pt-40 pb-20 sm:pb-24 text-center">
           <Reveal>
             <span className="lp-label mb-9" style={{ color: 'var(--ink-soft)' }}>
               A new standard in personal ledgers
             </span>
           </Reveal>
 
-          <Reveal delay={70}>
-            <h1 className="lp-display text-[38px] leading-[1.08] sm:text-[62px] md:text-[76px] max-w-5xl mx-auto mt-7">
+          <Reveal delay={120}>
+            <h1 className="lp-display text-5xl md:text-7xl max-w-4xl mx-auto mt-8">
               Every rupee, accounted for.
               <br />
-              <span className="lp-display-em" style={{ color: 'var(--green-600)' }}>
+              {/* forest at 70% — the softness is opacity, not a lighter green. */}
+              <span className="lp-display-em" style={{ color: 'color-mix(in oklab, var(--forest) 70%, transparent)' }}>
                 Every relationship, remembered.
               </span>
             </h1>
           </Reveal>
 
-          <Reveal delay={140}>
+          <Reveal delay={240}>
             <p
               className="text-[15px] sm:text-[16px] max-w-xl mx-auto mt-9 leading-relaxed"
               style={{ color: 'var(--ink-soft)' }}
@@ -99,7 +100,7 @@ export default async function LandingPage() {
             </p>
           </Reveal>
 
-          <Reveal delay={210}>
+          <Reveal delay={360}>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mt-10">
               <Link href={href} className="lp-btn lp-btn-solid w-full sm:w-auto">
                 {cta}
@@ -121,7 +122,7 @@ export default async function LandingPage() {
         <Ticker />
 
         {/* --------------------------- The product ------------------------- */}
-        <section className="lp-dark px-5 sm:px-10 py-16 sm:py-24">
+        <section className="px-5 sm:px-10 pb-16 sm:pb-24" style={{ background: 'var(--forest)' }}>
           <Reveal>
             <div className="max-w-6xl mx-auto">
               <DashboardPanel />

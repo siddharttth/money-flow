@@ -54,31 +54,27 @@ function Initial({ name, size = 22 }: { name: string; size?: number }) {
 export function Ticker() {
   const run = [...TICKER, ...TICKER];
   return (
-    <div className="lp-ticker lp-dark py-4 border-y" style={{ borderColor: 'rgba(243,239,228,0.10)' }}>
-      <div className="lp-ticker-track">
-        {/* Duplicated so the loop is seamless at -50%. */}
-        {[0, 1].map((copy) => (
-          <div key={copy} className="flex items-center shrink-0">
-            {run.map(([name, amount], i) => (
-              <span key={`${copy}-${i}`} className="flex items-center shrink-0">
-                <span
-                  className="text-[10.5px] tracking-[0.2em] uppercase"
-                  style={{ color: 'var(--ivory-300)' }}
-                >
-                  {name}
-                </span>
-                <span className="lp-mono text-[10.5px] ml-2.5" style={{ color: 'var(--gold-400)' }}>
+    <section className="py-16 sm:py-20" style={{ background: 'var(--forest)' }}>
+      <div
+        className="lp-ticker border-y py-3"
+        style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+      >
+        {/* Duplicated so the -50% loop is seamless. */}
+        <div className="lp-ticker-track w-max gap-10 font-mono text-[11px] uppercase tracking-[0.25em]" style={{ color: 'var(--onforest-muted)' }}>
+          {run.map(([name, amount], i) => (
+            <span key={i} className="flex items-center gap-10 shrink-0">
+              <span>
+                {name}{' '}
+                <span className="lp-mono" style={{ color: 'var(--gold-soft)' }}>
                   ₹{amount}
                 </span>
-                <span className="mx-7 opacity-30" style={{ color: 'var(--ivory-300)' }}>
-                  ·
-                </span>
               </span>
-            ))}
-          </div>
-        ))}
+              <span className="opacity-40">·</span>
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -251,6 +247,7 @@ export function MechanismPanels() {
         </p>
         <p className="lp-num text-[26px] mb-5" style={{ color: 'var(--ivory-100)' }}>
           ₹350
+          <span className="lp-caret" aria-hidden />
         </p>
 
         <p className="text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
