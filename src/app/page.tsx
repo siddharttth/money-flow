@@ -40,39 +40,47 @@ export default async function LandingPage() {
   return (
     <div className="lp min-h-dvh overflow-x-hidden">
       {/* ------------------------------ Nav ------------------------------ */}
-      <nav
-        className="fixed top-0 inset-x-0 z-50 h-[72px] flex items-center justify-between px-5 sm:px-10 border-b"
-        style={{ background: 'var(--paper)', borderColor: 'var(--rule)' }}
+      <header
+        className="fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md"
+        style={{ borderColor: 'color-mix(in oklab, var(--border-lp) 60%, transparent)', background: 'color-mix(in oklab, var(--background) 80%, transparent)' }}
       >
-        <Link href="/" className="lp-display text-[21px]">
-          Money <span className="lp-display-em" style={{ color: 'var(--gold-600)' }}>Flow</span>
-        </Link>
-
-        <div className="hidden md:flex items-center gap-9 text-[14px]" style={{ color: 'var(--ink-soft)' }}>
-          <a href="#movement" className="hover:opacity-60 transition-opacity">The Movement</a>
-          <a href="#mechanism" className="hover:opacity-60 transition-opacity">The Mechanism</a>
-          <a href="#ledger" className="hover:opacity-60 transition-opacity">The Ledger</a>
-        </div>
-
-        <div className="flex items-center gap-5">
-          {!session && (
-            <Link
-              href="/login"
-              className="hidden sm:block text-[10.5px] tracking-[0.18em] uppercase"
-              style={{ color: 'var(--ink-soft)' }}
-            >
-              Sign in
-            </Link>
-          )}
-          <Link href={href} className="lp-btn lp-btn-solid !px-5 !py-2.5 !min-h-0 !text-[10px]">
-            {session ? 'Enter' : 'Get started'}
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <Link href="/" className="lp-display text-xl tracking-tight">
+            Money <span className="lp-display-em" style={{ color: 'var(--gold)' }}>Flow</span>
           </Link>
-        </div>
-      </nav>
 
-      <main className="pt-[72px]">
+          <nav className="hidden gap-8 text-[13px] md:flex" style={{ color: 'var(--muted-fg)' }}>
+            {[
+              ['The Movement', '#movement'],
+              ['The Mechanism', '#mechanism'],
+              ['The Ledger', '#ledger'],
+            ].map(([label, target]) => (
+              <a key={target} href={target} className="transition-colors hover:opacity-70">
+                {label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-4">
+            {!session && (
+              <Link
+                href="/login"
+                className="hidden sm:block text-[11px] tracking-[0.2em] uppercase"
+                style={{ color: 'var(--muted-fg)' }}
+              >
+                Sign in
+              </Link>
+            )}
+            <Link href={href} className="lp-btn lp-btn-solid !px-5 !py-2.5 !text-[11px]">
+              {session ? 'Enter' : 'Get started'}
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main>
         {/* ------------------------------ Hero ----------------------------- */}
-        <section className="lp-paper mx-auto max-w-6xl px-6 pt-28 sm:pt-40 pb-20 sm:pb-24 text-center">
+        <section id="top" className="lp-paper mx-auto max-w-6xl px-6 pt-40 md:pt-48 pb-24 text-center">
           <Reveal>
             <span className="lp-label mb-9" style={{ color: 'var(--ink-soft)' }}>
               A new standard in personal ledgers
