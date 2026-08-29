@@ -143,7 +143,7 @@ export default async function LandingPage() {
             <Reveal>
               <div>
                 <span className="lp-label">The complication</span>
-                <h2 className="lp-display mt-6 text-4xl leading-tight md:text-5xl">
+                <h2 className="lp-display mt-6 text-4xl md:text-5xl" style={{ lineHeight: 1.25 }}>
                   The spreadsheet was never{' '}
                   <span className="lp-display-em" style={{ color: 'color-mix(in oklab, var(--forest) 70%, transparent)' }}>
                     built for this.
