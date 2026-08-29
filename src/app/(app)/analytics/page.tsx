@@ -236,7 +236,7 @@ function AnalyticsInner() {
 
         <div className="grid lg:grid-cols-2 gap-5 items-start">
           <Card>
-            {cats.isLoading ? (
+            {!cats.data ? (
               <ListSkeleton rows={5} />
             ) : cats.data?.items.length ? (
               <>
@@ -404,7 +404,7 @@ function AnalyticsInner() {
       <div>
         <SectionHead label="Who it was with" />
         <Card>
-          {ppl.isLoading ? (
+          {!ppl.data ? (
             <ListSkeleton rows={5} />
           ) : ppl.data?.people.length ? (
             <>

@@ -190,7 +190,7 @@ function PeopleHub() {
       </div>
 
       <div className="card overflow-hidden">
-        {people.isLoading ? (
+        {!people.data ? (
           <div className="p-4">
             <ListSkeleton rows={6} />
           </div>

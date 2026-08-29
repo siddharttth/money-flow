@@ -184,6 +184,23 @@
 @layer base {
   * { box-sizing: border-box; }
 
+  /*
+   * TOUCH
+   * -----
+   * `manipulation` drops the double-tap-to-zoom gesture, and with it the
+   * ~300ms wait some browsers keep before dispatching a click in case a second
+   * tap is coming. That delay is most of what makes a tap feel like it did not
+   * register.
+   *
+   * The grey flash iOS paints on tap goes with it, because every pressable
+   * thing below has its own :active state — feedback we control, on the frame
+   * of the touch.
+   */
+  button, a, [role='button'], [role='tab'], label, input, select, textarea, summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* One focus ring, in the theme's accent. The browser default is a blue that
      belongs to no palette here, and it lands on every clustered ledger row. */
   :focus-visible {
@@ -331,16 +348,23 @@ h1, h2, h3 {
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .btn-primary { background: var(--brass); color: var(--on-brass); }
-  .btn-primary:hover:not(:disabled) {
+  @media (hover: hover) { .btn-primary:hover:not(:disabled) {
     background: var(--brass-bright);
     box-shadow: 0 14px 30px -12px rgba(64, 86, 244, 0.5);
-  }
+  } }
+  .btn-primary:active:not(:disabled) { background: var(--brass-bright); }
 
   .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-  .btn-ghost:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
+  @media (hover: hover) {
+    .btn-ghost:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
+  }
+  .btn-ghost:active:not(:disabled) { background: var(--surface-2); border-color: var(--brass); }
 
   .btn-danger { background: transparent; color: var(--rule-red); border-color: var(--border-strong); }
-  .btn-danger:hover:not(:disabled) { background: var(--rule-red-soft); border-color: var(--rule-red); }
+  @media (hover: hover) {
+    .btn-danger:hover:not(:disabled) { background: var(--rule-red-soft); border-color: var(--rule-red); }
+  }
+  .btn-danger:active:not(:disabled) { background: var(--rule-red-soft); border-color: var(--rule-red); }
 
   .chip {
     display: inline-flex;
@@ -359,7 +383,8 @@ h1, h2, h3 {
     min-height: 38px;
     font-family: inherit;
   }
-  .chip:hover { border-color: var(--brass); }
+  @media (hover: hover) { .chip:hover { border-color: var(--brass); } }
+  .chip:active { border-color: var(--brass); transform: scale(0.97); }
   .chip[data-selected='true'] {
     background: var(--brass);
     border-color: var(--brass);
@@ -383,7 +408,10 @@ h1, h2, h3 {
     transition: background 150ms ease-out;
     cursor: pointer;
   }
-  .row:hover { background: var(--surface-2); }
+  @media (hover: hover) { .row:hover { background: var(--surface-2); } }
+  /* Instant acknowledgement: a row that leads somewhere reacts on touchdown,
+     not when the next screen has finished loading. */
+  .row:active { background: var(--surface-2); }
 
   /* A clickable entity chip — category or person — that opens its inspector. */
   .tag {
@@ -404,7 +432,8 @@ h1, h2, h3 {
     transition: color 150ms ease-out, border-color 150ms ease-out, background 150ms ease-out;
     max-width: 12rem;
   }
-  .tag:hover { color: var(--text); border-color: var(--border-strong); }
+  @media (hover: hover) { .tag:hover { color: var(--text); border-color: var(--border-strong); } }
+  .tag:active { color: var(--text); border-color: var(--border-strong); }
 
   /*
    * Grouping without boxing. A strip of related figures shares one surface and
@@ -449,6 +478,23 @@ h1, h2, h3 {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+
+  /*
+   * Row actions that recede until pointed at.
+   *
+   * This has to be one rule, not a width-scoped `opacity-0` plus a separate
+   * hover override: Tailwind wraps `group-hover` in `@media (hover: hover)` but
+   * not the `opacity-0`, so on a touch screen 640px or wider — an iPad, a phone
+   * in landscape — the actions stayed at opacity 0 while remaining fully
+   * clickable. An invisible Delete button, exactly where a thumb rests.
+   */
+  .reveal { opacity: 1; transition: opacity 150ms ease-out; }
+  @media (hover: hover) and (min-width: 640px) {
+    .reveal { opacity: 0; }
+    .group:hover .reveal,
+    .group:focus-within .reveal,
+    .reveal:focus-within { opacity: 1; }
   }
 
   /* A quiet section rule, for headings that do not need a card around them. */

@@ -152,7 +152,15 @@ export default function DashboardPage() {
         ]}
       />
 
-      {/* 3 — the two dimensions of the same money. */}
+      {/*
+        3 — the two dimensions of the same money.
+
+        Skeletons key off `!data`, not `isLoading`. With SWR's keepPreviousData
+        the previous month's figures stay on screen while the next month
+        loads, but `isLoading` still reports true for the new key — so these
+        lists blanked to skeletons and back on every month step while the
+        headline figure above them held steady.
+      */}
       <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-5 items-start">
         <Card>
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -170,7 +178,7 @@ export default function DashboardPage() {
           </div>
 
           {dim === 'category' ? (
-            cats.isLoading ? (
+            !cats.data ? (
               <ListSkeleton rows={5} />
             ) : cats.data?.items.length ? (
               <div className="grid sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
@@ -202,7 +210,7 @@ export default function DashboardPage() {
                 }
               />
             )
-          ) : ppl.isLoading ? (
+          ) : !ppl.data ? (
             <ListSkeleton rows={5} />
           ) : ppl.data?.people.length ? (
             <>
@@ -300,7 +308,7 @@ export default function DashboardPage() {
           }
         />
         <Card className="!p-0 overflow-hidden">
-          {recent.isLoading ? (
+          {!recent.data ? (
             <div className="p-4">
               <ListSkeleton rows={5} />
             </div>

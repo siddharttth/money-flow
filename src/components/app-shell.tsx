@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { api } from '@/lib/client';
@@ -292,14 +292,32 @@ function MobileTab({
   active: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      className="flex flex-col items-center justify-center gap-1 h-14 text-[10px] font-semibold tracking-wide"
-      style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}
+    <Link href={href} aria-current={active ? 'page' : undefined} className="block">
+      <TabBody short={short} icon={icon} active={active} />
+    </Link>
+  );
+}
+
+/**
+ * The tab's own appearance, inside the Link so it can read the navigation's
+ * pending state.
+ *
+ * A route change waits on the server, and until it lands nothing on screen had
+ * changed — the tap looked ignored, so people tapped again. This colours the
+ * tab the moment the navigation starts, which is the frame the thumb lifts.
+ */
+function TabBody({ short, icon, active }: { short: string; icon: NavIconKey; active: boolean }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      className="flex flex-col items-center justify-center gap-1 h-14 text-[10px] font-semibold tracking-wide transition-colors"
+      style={{
+        color: active || pending ? 'var(--accent)' : 'var(--text-muted)',
+        transitionDuration: '120ms',
+      }}
     >
       <NavIcon name={icon} size={20} />
       {short}
-    </Link>
+    </span>
   );
 }

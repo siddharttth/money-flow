@@ -150,7 +150,7 @@ export default function SettingsPage() {
           }
         />
         <div className="card overflow-hidden">
-          {cats.isLoading ? (
+          {!cats.data ? (
             <div className="p-4">
               <ListSkeleton rows={6} />
             </div>

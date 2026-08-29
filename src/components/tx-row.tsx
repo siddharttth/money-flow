@@ -143,7 +143,7 @@ export function TransactionRow({
           )}
 
           {!clustered && onDelete && (
-            <span className="ml-auto flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity duration-150">
+            <span className="reveal ml-auto flex items-center gap-1">
               {tx.kind === 'expense' && (
                 <button
                   className="tag"
