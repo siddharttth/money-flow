@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     // Optional gate so a personal deployment isn't open to the world.
     const code = process.env.SIGNUP_CODE;
     if (code && input.signupCode !== code) {
-      throw new ApiError(403, 'Invalid signup code');
+      throw new ApiError(403, 'Invalid invite code');
     }
 
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);

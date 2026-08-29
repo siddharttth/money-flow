@@ -36,18 +36,22 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <div className="min-h-dvh app-grid flex items-center justify-center px-4 py-10 relative overflow-hidden">
-      {/* The same soft blue glow the landing page uses. */}
+    <div className="auth min-h-dvh app-grid flex items-center justify-center px-4 py-10 relative overflow-hidden">
+      {/* A warm gold wash rather than a glow — on cream, a blurred disc reads
+          as a smudge, but a wide radial just lifts the centre of the page. */}
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[min(560px,90vw)] h-[360px] rounded-full blur-[100px] pointer-events-none"
-        style={{ background: 'var(--brass-soft)' }}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(60% 45% at 50% 32%, color-mix(in oklab, var(--brass-soft) 100%, transparent), transparent 70%)',
+        }}
         aria-hidden
       />
 
       <div className="w-full max-w-sm relative z-10">
         <div className="text-center mb-8">
           <Link href="/" aria-label="Money Flow home" className="inline-block mb-4">
-            <Logo height={30} onDark />
+            <Logo height={30} />
           </Link>
           <h1 className="text-xl font-bold mb-1.5">
             {isRegister ? 'Start your ledger' : 'Welcome back'}
@@ -112,7 +116,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           {isRegister && (
             <div>
               <label className="label" htmlFor="code">
-                Signup code
+                Invite code
               </label>
               <input
                 id="code"
@@ -120,7 +124,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
                 value={signupCode}
                 onChange={(e) => setSignupCode(e.target.value)}
                 autoComplete="off"
-                placeholder="Only if this deployment requires one"
+                placeholder="Invite only — ask Sid for a code"
               />
             </div>
           )}

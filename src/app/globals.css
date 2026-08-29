@@ -329,6 +329,59 @@ h1, h2, h3 {
   }
 }
 
+/*
+ * Sign-in and sign-up wear the landing page's palette, not the app's.
+ * They are the first surface a visitor sees after the marketing page, so the
+ * cream paper and forest green carry straight through instead of dropping to
+ * the dark product chrome.
+ *
+ * These re-point the same tokens the shared .card/.input/.btn components read,
+ * so no auth-only component styles are needed. The selector is :root-prefixed
+ * on purpose: the dark default is :root:not([data-theme='light']), specificity
+ * (0,2,0), which a bare .auth would lose to.
+ */
+:root .auth {
+  --bg: oklch(0.962 0.018 96);
+  --surface: oklch(0.982 0.012 96);
+  --surface-2: oklch(0.945 0.019 96);
+  --border: oklch(0.88 0.018 110);
+  --border-strong: oklch(0.79 0.028 120);
+  --text: oklch(0.24 0.05 152);
+  --text-muted: oklch(0.45 0.03 140);
+
+  --brass: oklch(0.3 0.065 152);
+  --brass-bright: oklch(0.24 0.055 152);
+  --on-brass: oklch(0.93 0.03 96);
+  --brass-soft: color-mix(in oklab, oklch(0.72 0.1 88) 12%, transparent);
+
+  --danger: oklch(0.5 0.16 25);
+  --accent: oklch(0.3 0.065 152);
+  --accent-soft: color-mix(in oklab, oklch(0.3 0.065 152) 8%, transparent);
+
+  --shadow: 0 1px 2px color-mix(in oklab, oklch(0.24 0.05 152) 6%, transparent),
+            0 18px 40px -28px color-mix(in oklab, oklch(0.24 0.05 152) 40%, transparent);
+
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
+}
+
+/* The graph paper is drawn for the dark app; on cream it needs the light ink. */
+/* The auth screen fills the viewport, but overscroll and any short-page
+   gap would still show the dark app body behind it. */
+body:has(.auth) { background: oklch(0.962 0.018 96); }
+
+:root .auth.app-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--text) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--text) 5%, transparent) 1px, transparent 1px);
+}
+
+/* The primary button's hover shadow is a hard-coded indigo in the base rule. */
+:root .auth .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 14px 30px -14px color-mix(in oklab, var(--brass) 55%, transparent);
+}
+
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
