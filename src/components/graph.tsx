@@ -211,31 +211,70 @@ export function DayBars({
   monthDays: number;
   height?: number;
 }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   const byDay = new Map(data.map((d) => [Number(d.date.slice(8, 10)), d.totalMinor]));
   const max = niceMax(Math.max(1, ...data.map((d) => d.totalMinor)));
   const peak = Math.max(0, ...data.map((d) => d.totalMinor));
+  const peakDay = [...byDay.entries()].find(([, minor]) => minor === peak && peak > 0)?.[0] ?? null;
+
+  const monthPrefix = data[0]?.date.slice(0, 8) ?? '';
+  const shown = hover ?? peakDay;
+  const shownMinor = shown === null ? 0 : (byDay.get(shown) ?? 0);
 
   return (
     <div>
-      <div className="flex items-end gap-[2px]" style={{ height }}>
+      {/*
+        A fixed-height readout above the bars. It shows the heaviest day until
+        a bar is pointed at, so the row carries something either way and the
+        chart never shifts as the pointer moves across it.
+      */}
+      <div className="flex items-baseline justify-between gap-3 mb-2 h-[1.15rem]">
+        <span className="micro truncate">
+          {shown === null ? '' : hover === null ? `Heaviest · ${dayLabel(`${monthPrefix}${String(shown).padStart(2, '0')}`)}` : dayLabel(`${monthPrefix}${String(shown).padStart(2, '0')}`)}
+        </span>
+        {shown !== null && (
+          /* data-zero is the app's convention: a genuine zero recedes rather
+             than competing with the figures around it. */
+          <span className="num text-[12px] font-semibold shrink-0" data-zero={shownMinor === 0}>
+            {formatINR(shownMinor)}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-end gap-[2px]" style={{ height }} onMouseLeave={() => setHover(null)}>
         {Array.from({ length: monthDays }, (_, i) => {
           const day = i + 1;
           const minor = byDay.get(day) ?? 0;
           const isPeak = minor > 0 && minor === peak;
+          const isHovered = hover === day;
           return (
+            /* The whole column is the target, not the bar — at 31 days a bar
+               is two pixels wide and impossible to point at. */
             <div
               key={day}
-              className="flex-1 rounded-[1px] min-w-0"
-              title={`${day}: ${formatINR(minor)}`}
-              style={{
-                height: `${Math.max(minor > 0 ? 3 : 1, (minor / max) * 100)}%`,
-                background: minor === 0 ? 'var(--border)' : isPeak ? 'var(--hi)' : 'var(--brass)',
-                opacity: minor === 0 ? 1 : isPeak ? 1 : 0.75,
+              className="flex-1 h-full flex items-end min-w-0 cursor-default"
+              onMouseEnter={() => setHover(day)}
+              onPointerDown={(e) => {
+                if (e.pointerType !== 'mouse') setHover(day);
               }}
-            />
+              title={`${dayLabel(`${monthPrefix}${String(day).padStart(2, '0')}`)}: ${formatINR(minor)}`}
+            >
+              <div
+                className="w-full rounded-[1px]"
+                style={{
+                  height: `${Math.max(minor > 0 ? 3 : 1, (minor / max) * 100)}%`,
+                  background:
+                    minor === 0 ? 'var(--border)' : isHovered ? 'var(--text)' : isPeak ? 'var(--hi)' : 'var(--brass)',
+                  opacity: minor === 0 ? 1 : isHovered || isPeak ? 1 : 0.75,
+                  transition: 'background 120ms ease-out, opacity 120ms ease-out',
+                }}
+              />
+            </div>
           );
         })}
       </div>
+
       <div className="flex justify-between mt-1.5">
         <span className="micro">1</span>
         <span className="micro">{Math.round(monthDays / 2)}</span>
