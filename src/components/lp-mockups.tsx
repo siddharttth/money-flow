@@ -127,18 +127,26 @@ export function DashboardPanel() {
               ['This week', '₹5,438'],
               ['Daily pace', '₹1,085'],
             ].map(([label, value]) => (
+              /* See the receipt tiles below: flex column, figure pinned to the
+                 bottom, so a label that wraps cannot drop its figure a line. */
               <div
                 key={label}
-                className="rounded border px-3 py-4"
+                className="flex flex-col rounded border px-2.5 py-3.5"
                 style={{
                   borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)',
                   background: 'color-mix(in oklab, var(--onforest) 4%, transparent)',
                 }}
               >
-                <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+                <p
+                  className="lp-eyebrow text-[9px] leading-[1.35]"
+                  style={{ color: 'var(--onforest-muted)', letterSpacing: '0.16em' }}
+                >
                   {label}
                 </p>
-                <p className="lp-display mt-1 text-lg md:text-xl" style={{ color: 'var(--onforest)' }}>
+                <p
+                  className="lp-display mt-auto whitespace-nowrap pt-2 text-[15px] sm:text-lg md:text-xl"
+                  style={{ color: 'var(--onforest)' }}
+                >
                   {value}
                 </p>
               </div>
@@ -250,11 +258,28 @@ export function MechanismPanels() {
           ['Sankalp', '₹800'],
           ['August total', '₹800'],
         ].map(([label, value]) => (
-          <div key={label} className="rounded border px-3 py-4 text-center" style={{ borderColor: hair, background: wash }}>
-            <p className="lp-eyebrow text-[8px]" style={{ color: 'var(--onforest-muted)' }}>
+          /*
+           * A flex column with the figure pushed to the bottom. The grid makes
+           * the three tiles equal height, so mt-auto puts all three figures on
+           * one line no matter how many lines their label needed — on a phone
+           * "August total" wraps and "Sankalp" does not, which used to leave
+           * the three ₹800s at three different heights.
+           */
+          <div
+            key={label}
+            className="flex flex-col rounded border px-2.5 py-3.5 text-center"
+            style={{ borderColor: hair, background: wash }}
+          >
+            <p
+              className="lp-eyebrow text-[8px] leading-[1.35]"
+              style={{ color: 'var(--onforest-muted)', letterSpacing: '0.16em' }}
+            >
               {label}
             </p>
-            <p className="lp-display lp-tab mt-3 text-lg" style={{ color: 'var(--gold-soft)' }}>
+            <p
+              className="lp-display lp-tab mt-auto whitespace-nowrap pt-3 text-[15px] sm:text-lg"
+              style={{ color: 'var(--gold-soft)' }}
+            >
               {value}
             </p>
           </div>
@@ -383,16 +408,20 @@ export function LedgerPanel() {
           ['I owe', '₹13,950'],
           ['Net position', '−₹9,950'],
         ].map(([label, value], i) => (
+          /* Same rule as the receipt tiles: labels may wrap, figures line up. */
           <div
             key={label}
-            className="rounded border p-3"
+            className="flex flex-col rounded border p-2.5"
             style={{ borderColor: hair, background: 'color-mix(in oklab, var(--onforest) 4%, transparent)' }}
           >
-            <p className="lp-eyebrow text-[8px]" style={{ color: 'var(--onforest-muted)' }}>
+            <p
+              className="lp-eyebrow text-[8px] leading-[1.35]"
+              style={{ color: 'var(--onforest-muted)', letterSpacing: '0.16em' }}
+            >
               {label}
             </p>
             <p
-              className="lp-display lp-tab mt-1"
+              className="lp-display lp-tab mt-auto whitespace-nowrap pt-2 text-[13px] sm:text-base"
               style={{ color: i === 2 ? 'var(--gold-soft)' : 'var(--onforest)' }}
             >
               {value}
