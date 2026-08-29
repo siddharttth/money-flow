@@ -217,101 +217,146 @@ export function DashboardPanel() {
 
 /** The single-entry card, its three readings, and the add sheet. */
 export function MechanismPanels() {
+  const hair = 'color-mix(in oklab, var(--onforest) 10%, transparent)';
+  const wash = 'color-mix(in oklab, var(--onforest) 4%, transparent)';
+
   return (
-    <div className="space-y-3">
-      <div className="lp-panel-deep p-5">
-        <div className="flex items-start justify-between gap-4">
-          <span className="lp-num text-[30px] leading-none" style={{ color: 'var(--gold-500)' }}>
+    <div className="relative">
+      {/* The entry sits on the darkest green, so it reads as the subject. */}
+      <div className="rounded-lg border p-6" style={{ borderColor: hair, background: 'var(--forest-ink)' }}>
+        <div className="flex items-baseline justify-between">
+          <p className="lp-display lp-tab text-4xl" style={{ color: 'var(--gold-soft)' }}>
             ₹800
-          </span>
-          <span className="lp-mono text-[11px] mt-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.8 }}>
+          </p>
+          <p className="font-mono text-[11px]" style={{ color: 'var(--onforest-muted)' }}>
             23 Aug
-          </span>
+          </p>
         </div>
-        <div className="lp-rows mt-4">
-          {[
-            ['Category', 'Outside Food'],
-            ['With', 'Sankalp'],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between py-2.5">
-              <span className="text-[9.5px] tracking-[0.2em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-                {k}
-              </span>
-              <span className="text-[13px]" style={{ color: 'var(--ivory-100)' }}>
-                {v}
-              </span>
-            </div>
-          ))}
+        <div className="mt-4 space-y-2 text-[13px]">
+          <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: hair }}>
+            <span className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+              Category
+            </span>
+            <span style={{ color: 'var(--onforest)' }}>Outside Food</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+              With
+            </span>
+            <span style={{ color: 'var(--onforest)' }}>Sankalp</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="mt-3 grid grid-cols-3 gap-3">
         {[
           ['Outside Food', '₹800'],
           ['Sankalp', '₹800'],
           ['August total', '₹800'],
-        ].map(([k, v]) => (
-          <div key={k} className="lp-panel px-3 py-3.5 text-center">
-            <p className="text-[8.5px] tracking-[0.16em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-              {k}
+        ].map(([label, value]) => (
+          <div key={label} className="rounded border p-3 text-center" style={{ borderColor: hair, background: wash }}>
+            <p className="lp-eyebrow text-[8px]" style={{ color: 'var(--onforest-muted)' }}>
+              {label}
             </p>
-            <p className="lp-num text-[17px] mt-1.5" style={{ color: 'var(--gold-500)' }}>
-              {v}
+            <p className="lp-display lp-tab mt-1 text-lg" style={{ color: 'var(--gold-soft)' }}>
+              {value}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="lp-panel p-5">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[13px]" style={{ color: 'var(--ivory-100)' }}>
+      <div className="mt-3 rounded-lg border p-5" style={{ borderColor: hair, background: wash }}>
+        <div className="flex items-center justify-between">
+          <p className="text-[13px] font-medium" style={{ color: 'var(--onforest)' }}>
             Add transaction
-          </span>
-          <span style={{ color: 'var(--ivory-300)', opacity: 0.6 }}>×</span>
+          </p>
+          <span style={{ color: 'var(--onforest-muted)' }}>×</span>
         </div>
 
-        <div className="flex gap-2 mb-5">
-          <span className="lp-chip lp-chip-on">Expense</span>
-          <span className="lp-chip">I lent</span>
-          <span className="lp-chip">I borrowed</span>
+        <div className="mt-4 flex gap-2 text-[11px]">
+          {['Expense', 'I lent', 'I borrowed'].map((tab, i) => (
+            <span
+              key={tab}
+              className="rounded-full border px-3 py-1"
+              style={
+                i === 0
+                  ? {
+                      borderColor: 'color-mix(in oklab, var(--gold) 60%, transparent)',
+                      background: 'color-mix(in oklab, var(--gold) 15%, transparent)',
+                      color: 'var(--gold-soft)',
+                    }
+                  : { borderColor: 'color-mix(in oklab, var(--onforest) 15%, transparent)', color: 'var(--onforest-muted)' }
+              }
+            >
+              {tab}
+            </span>
+          ))}
         </div>
 
-        <p className="text-[9px] tracking-[0.2em] uppercase mb-1.5" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-          Amount
-        </p>
-        <p className="lp-num text-[26px] mb-5" style={{ color: 'var(--ivory-100)' }}>
-          ₹350
-          <span className="lp-caret" aria-hidden />
-        </p>
-
-        <p className="text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-          Category
-        </p>
-        <div className="flex flex-wrap gap-2 mb-5">
-          <span className="lp-chip lp-chip-on">Outside Food</span>
-          <span className="lp-chip">Transport</span>
-          <span className="lp-chip">Shopping</span>
-          <span className="lp-chip">Bills</span>
+        <div className="mt-4">
+          <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+            Amount
+          </p>
+          <p className="lp-display lp-tab mt-1 text-2xl" style={{ color: 'var(--onforest)' }}>
+            ₹350
+            <span className="lp-caret" aria-hidden />
+          </p>
         </div>
 
-        <p className="text-[9px] tracking-[0.2em] uppercase mb-2" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
-          With
-        </p>
-        <div className="flex flex-wrap gap-2 mb-6">
-          <span className="lp-chip lp-chip-on">
-            <Initial name="Sankalp" size={15} /> Sankalp
-          </span>
-          <span className="lp-chip">
-            <Initial name="Me" size={15} /> Me
-          </span>
-          <span className="lp-chip">
-            <Initial name="Mummy" size={15} /> Mummy
-          </span>
+        <div className="mt-4">
+          <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+            Category
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+            {['Outside Food', 'Transport', 'Shopping', 'Bills'].map((c, i) => (
+              <span
+                key={c}
+                className="rounded-full border px-3 py-1"
+                style={
+                  i === 0
+                    ? {
+                        borderColor: 'color-mix(in oklab, var(--gold) 60%, transparent)',
+                        background: 'color-mix(in oklab, var(--gold) 15%, transparent)',
+                        color: 'var(--gold-soft)',
+                      }
+                    : { borderColor: 'color-mix(in oklab, var(--onforest) 15%, transparent)', color: 'var(--onforest-muted)' }
+                }
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
+            With
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+            {['Sankalp', 'Me', 'Mummy'].map((n, i) => (
+              <span
+                key={n}
+                className="flex items-center gap-2 rounded-full border px-3 py-1"
+                style={
+                  i === 0
+                    ? {
+                        borderColor: 'color-mix(in oklab, var(--gold) 60%, transparent)',
+                        background: 'color-mix(in oklab, var(--gold) 15%, transparent)',
+                        color: 'var(--gold-soft)',
+                      }
+                    : { borderColor: 'color-mix(in oklab, var(--onforest) 15%, transparent)', color: 'var(--onforest-muted)' }
+                }
+              >
+                <Initial name={n} size={16} />
+                {n}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div
-          className="text-[10px] tracking-[0.2em] uppercase text-center py-3.5 rounded-[2px]"
-          style={{ background: 'var(--gold-500)', color: '#23180a' }}
+          className="mt-5 rounded py-3 text-center text-[11px] uppercase tracking-[0.2em] font-semibold"
+          style={{ background: 'var(--gold)', color: 'var(--forest-deep)' }}
         >
           Save
         </div>

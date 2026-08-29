@@ -193,72 +193,92 @@ export default async function LandingPage() {
         </section>
 
         {/* --------------------------- The Mechanism ----------------------- */}
-        <section id="mechanism" className="lp-dark px-5 sm:px-10 py-20 sm:py-28">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 md:gap-20 items-start">
+        {/* bg-forest — lighter than the cards it holds, so they read as inset. */}
+        <section
+          id="mechanism"
+          className="py-24 md:py-36"
+          style={{ background: 'var(--forest)', color: 'var(--onforest)' }}
+        >
+          <div className="mx-auto grid max-w-6xl items-start gap-16 px-6 md:grid-cols-2">
             <Reveal>
-              <span className="lp-label lp-label-dark">
-                The mechanism
-              </span>
-              <h2 className="lp-display text-[32px] sm:text-[46px] mt-6 mb-8">
-                Two dimensions.
-                <br />
-                <span className="lp-display-em" style={{ color: 'var(--gold-500)' }}>
-                  One transaction.
-                </span>
-              </h2>
-              <p className="text-[15px] sm:text-[16px] leading-relaxed" style={{ color: 'var(--ivory-300)' }}>
-                Dinner with a friend costs ₹800 once. The category records what the money became. The person
-                records who it was for. Two separate questions about the same entry — answered without ever
-                counting it twice.
-              </p>
-              <p
-                className="lp-display-em text-[17px] sm:text-[19px] mt-9 pl-5 border-l"
-                style={{ color: 'var(--gold-500)', borderColor: 'var(--gold-600)' }}
-              >
-                Not ₹1,600. Not ₹2,400. The same ₹800, read three ways.
-              </p>
+              <div className="md:sticky md:top-32">
+                {/* Plain eyebrow here — no flanking rules on this one. */}
+                <p className="lp-eyebrow" style={{ color: 'var(--gold)' }}>
+                  The mechanism
+                </p>
+                <h2 className="lp-display mt-6 text-4xl md:text-5xl" style={{ lineHeight: 1.25 }}>
+                  Two dimensions.
+                  <br />
+                  <span className="lp-display-em" style={{ color: 'var(--onforest-muted)' }}>
+                    One transaction.
+                  </span>
+                </h2>
+                <p
+                  className="mt-8 max-w-md text-[15px] leading-relaxed"
+                  style={{ color: 'var(--onforest-muted)' }}
+                >
+                  Dinner with a friend costs ₹800 once. The category records what the money became. The
+                  person records who it was for. Two separate questions about the same entry — answered
+                  without ever counting it twice.
+                </p>
+                <p
+                  className="lp-display-em mt-8 border-l-2 pl-5 text-lg"
+                  style={{
+                    borderColor: 'color-mix(in oklab, var(--gold) 60%, transparent)',
+                    color: 'var(--gold-soft)',
+                  }}
+                >
+                  Not ₹1,600. Not ₹2,400. The same ₹800, read three ways.
+                </p>
+              </div>
             </Reveal>
 
-            <Reveal delay={110}>
+            <Reveal delay={150}>
               <MechanismPanels />
             </Reveal>
           </div>
         </section>
 
         {/* ----------------------------- The Ledger ------------------------ */}
-        <section id="ledger" className="lp-paper px-5 sm:px-10 py-20 sm:py-28">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 md:gap-20 items-start">
+        {/* Plain paper — the rules stay in the hero. */}
+        <section id="ledger" className="mx-auto max-w-6xl px-6 py-24 md:py-36">
+          <div className="grid items-start gap-16 md:grid-cols-2">
             <Reveal>
-              <span className="lp-label">
-                The ledger
-              </span>
-              <h2 className="lp-display text-[32px] sm:text-[46px] mt-6 mb-8">
-                Lending isn&apos;t{' '}
-                <span className="lp-display-em" style={{ color: 'var(--green-600)' }}>
-                  spending.
-                </span>
-              </h2>
-              <p className="text-[15px] sm:text-[16px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-                Money lent comes back. Counted as an expense, it would quietly inflate every figure you rely
-                on. So it is kept apart — what you gave, what you received, and the standing balance with each
-                person, never mixed into what you actually spent.
-              </p>
-              <div className="lp-rows mt-9">
-                {LEDGER_POINTS.map((t) => (
-                  <div key={t} className="flex gap-5 py-5">
-                    <span className="pt-0.5" style={{ color: 'var(--gold-600)' }}>
-                      ·
-                    </span>
-                    <span className="text-[15px]" style={{ color: 'var(--ink-soft)' }}>
-                      {t}
-                    </span>
-                  </div>
-                ))}
+              <div className="md:sticky md:top-32">
+                <span className="lp-label">The ledger</span>
+                <h2 className="lp-display mt-6 text-4xl md:text-5xl" style={{ lineHeight: 1.25 }}>
+                  Lending isn&rsquo;t{' '}
+                  <span className="lp-display-em" style={{ color: 'color-mix(in oklab, var(--forest) 70%, transparent)' }}>
+                    spending.
+                  </span>
+                </h2>
+                <p className="mt-8 max-w-md text-[15px] leading-relaxed" style={{ color: 'var(--muted-fg)' }}>
+                  Money lent comes back. Counted as an expense, it would quietly inflate every figure you
+                  rely on. So it is kept apart — what you gave, what you received, and the standing balance
+                  with each person, never mixed into what you actually spent.
+                </p>
+                <ul className="mt-8 text-[14px]">
+                  {LEDGER_POINTS.map((line) => (
+                    <li
+                      key={line}
+                      className="flex gap-4 border-t py-4 last:border-b"
+                      style={{ borderColor: 'var(--border-lp)', color: 'var(--muted-fg)' }}
+                    >
+                      <span className="font-mono text-[11px]" style={{ color: 'var(--gold)' }}>
+                        ·
+                      </span>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Reveal>
 
-            <Reveal delay={110}>
-              <LedgerPanel />
+            <Reveal delay={150}>
+              {/* The panel is nested on forest, so it lifts off the paper. */}
+              <div className="rounded-xl p-4 md:p-6" style={{ background: 'var(--forest)' }}>
+                <LedgerPanel />
+              </div>
             </Reveal>
           </div>
         </section>
