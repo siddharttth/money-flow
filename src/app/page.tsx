@@ -206,7 +206,7 @@ export default async function LandingPage() {
                 <p className="lp-eyebrow" style={{ color: 'var(--gold)' }}>
                   The mechanism
                 </p>
-                <h2 className="lp-display mt-6 text-4xl md:text-5xl" style={{ lineHeight: 1.25 }}>
+                <h2 className="lp-display mt-6 text-[38px] md:text-[50px]" style={{ lineHeight: 1.25 }}>
                   Two dimensions.
                   <br />
                   <span className="lp-display-em" style={{ color: 'var(--onforest-muted)' }}>
@@ -214,7 +214,7 @@ export default async function LandingPage() {
                   </span>
                 </h2>
                 <p
-                  className="mt-8 max-w-md text-[15px] leading-relaxed"
+                  className="mt-8 max-w-md text-[16px] leading-relaxed"
                   style={{ color: 'var(--onforest-muted)' }}
                 >
                   Dinner with a friend costs ₹800 once. The category records what the money became. The
@@ -222,7 +222,7 @@ export default async function LandingPage() {
                   without ever counting it twice.
                 </p>
                 <p
-                  className="lp-display-em mt-8 border-l-2 pl-5 text-lg"
+                  className="lp-display-em mt-8 border-l-2 pl-5 text-[19px]"
                   style={{
                     borderColor: 'color-mix(in oklab, var(--gold) 60%, transparent)',
                     color: 'var(--gold-soft)',
