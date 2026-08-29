@@ -565,6 +565,10 @@ h1, h2, h3 {
   .lp-reveal { opacity: 1; transform: none; transition: none; }
 }
 
+/* Rows and rail items brighten on hover, as in the reference. */
+.lp-hoverable { transition: color 200ms var(--ease-lux), background 200ms var(--ease-lux); }
+.lp-hoverable:hover { color: var(--onforest) !important; }
+
 /* Caret in the mocked amount field. */
 @keyframes lp-blink {
   0%, 100% { opacity: 1; }

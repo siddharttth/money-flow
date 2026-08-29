@@ -1,16 +1,16 @@
-import { Icon, type IconKey } from './icons';
+import { CountUp } from './lp-countup';
 
 /**
  * Product panels for the landing page — flat, hairline-bordered surfaces
  * rather than device frames. Every figure is a real value from the app.
  */
 
-const CATEGORIES: [string, string, IconKey, string, number][] = [
-  ['Investment', '10,000', 'invest', 'var(--gold-500)', 100],
-  ['Shopping', '4,843', 'shop', '#9ec2ad', 48],
-  ['Outside Food', '2,921', 'food', '#c98a5e', 29],
-  ['Misc', '2,140', 'misc', '#8aa79a', 21],
-  ['Ciggs / Alc', '1,931', 'smoke', '#b5786a', 19],
+const CATEGORIES: [string, number][] = [
+  ['Investment', 10000],
+  ['Shopping', 4843],
+  ['Outside Food', 2921],
+  ['Misc', 2140],
+  ['Ciggs / Alc', 1931],
 ];
 
 const PEOPLE: [string, string][] = [
@@ -54,102 +54,129 @@ function Initial({ name, size = 22 }: { name: string; size?: number }) {
 export function Ticker() {
   const run = [...TICKER, ...TICKER];
   return (
-    <section className="py-16 sm:py-20" style={{ background: 'var(--forest)' }}>
+    <div
+      className="lp-ticker border-y py-3"
+      style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+    >
+      {/* Duplicated so the -50% loop is seamless. */}
       <div
-        className="lp-ticker border-y py-3"
-        style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+        className="lp-ticker-track w-max gap-10 font-mono text-[11px] uppercase tracking-[0.25em]"
+        style={{ color: 'var(--onforest-muted)' }}
       >
-        {/* Duplicated so the -50% loop is seamless. */}
-        <div className="lp-ticker-track w-max gap-10 font-mono text-[11px] uppercase tracking-[0.25em]" style={{ color: 'var(--onforest-muted)' }}>
-          {run.map(([name, amount], i) => (
-            <span key={i} className="flex items-center gap-10 shrink-0">
-              <span>
-                {name}{' '}
-                <span className="lp-mono" style={{ color: 'var(--gold-soft)' }}>
-                  ₹{amount}
-                </span>
+        {run.map(([name, amount], i) => (
+          <span key={i} className="flex shrink-0 items-center gap-10">
+            <span>
+              {name}{' '}
+              <span className="lp-mono" style={{ color: 'var(--gold-soft)' }}>
+                ₹{amount}
               </span>
-              <span className="opacity-40">·</span>
             </span>
-          ))}
-        </div>
+            <span className="opacity-40">·</span>
+          </span>
+        ))}
       </div>
-    </section>
+    </div>
   );
 }
 
 export function DashboardPanel() {
-  return (
-    <div className="lp-panel overflow-hidden">
-      <div className="grid grid-cols-1 sm:grid-cols-[168px_1fr]">
-        <div className="hidden sm:flex flex-col gap-0.5 p-5 border-r" style={{ borderColor: 'rgba(243,239,228,0.09)' }}>
-          <span className="lp-display text-[15px] mb-5">
-            Money <span className="lp-display-em" style={{ color: 'var(--gold-500)' }}>Flow</span>
-          </span>
-          {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((n, i) => (
-            <span
-              key={n}
-              className="text-[12px] px-3 py-2 rounded-[3px]"
-              style={{
-                color: i === 0 ? 'var(--ivory-100)' : 'var(--ivory-300)',
-                background: i === 0 ? 'rgba(243,239,228,0.07)' : 'transparent',
-                opacity: i === 0 ? 1 : 0.62,
-              }}
-            >
-              {n}
-            </span>
-          ))}
-        </div>
+  const max = Math.max(...CATEGORIES.map((c) => c[1]));
 
-        <div className="p-5 sm:p-7">
-          <p className="text-[10px] tracking-[0.2em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
+  return (
+    <div
+      className="overflow-hidden rounded-lg border"
+      style={{
+        borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)',
+        background: 'var(--forest-ink)',
+        boxShadow: '0 60px 120px -40px color-mix(in oklab, var(--forest-ink) 70%, transparent)',
+      }}
+    >
+      <div className="grid md:grid-cols-[180px_1fr]">
+        <aside
+          className="hidden border-r p-5 md:block"
+          style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+        >
+          <span className="lp-display text-[17px]" style={{ color: 'var(--onforest)' }}>
+            Money{' '}
+            <span className="lp-display-em" style={{ color: 'var(--gold-soft)' }}>
+              Flow
+            </span>
+          </span>
+          <nav className="mt-8 space-y-1 text-[13px]">
+            {['Dashboard', 'Transactions', 'People', 'Analytics', 'Settings'].map((item, i) => (
+              <div
+                key={item}
+                className={`rounded px-3 py-2 ${i === 0 ? '' : 'lp-hoverable'}`}
+                style={
+                  i === 0
+                    ? { background: 'color-mix(in oklab, var(--onforest) 10%, transparent)', color: 'var(--onforest)' }
+                    : { color: 'var(--onforest-muted)' }
+                }
+              >
+                {item}
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="p-6 md:p-8">
+          <p className="lp-eyebrow" style={{ color: 'var(--onforest-muted)' }}>
             Total spending
           </p>
-          <p className="lp-num text-[38px] sm:text-[46px] leading-none mt-2" style={{ color: 'var(--gold-500)' }}>
-            ₹24,962
+          <p className="lp-display mt-2 text-5xl" style={{ color: 'var(--gold-soft)' }}>
+            <CountUp to={24962} />
           </p>
-          <p className="text-[12px] mt-2.5" style={{ color: 'var(--ivory-300)', opacity: 0.75 }}>
+          <p className="mt-1 text-[13px]" style={{ color: 'var(--onforest-muted)' }}>
             25 transactions · August 2026
           </p>
 
-          <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="mt-6 grid grid-cols-3 gap-3">
             {[
-              ['Today', '2,300'],
-              ['This week', '5,438'],
-              ['Daily pace', '1,085'],
+              ['Today', '₹2,300'],
+              ['This week', '₹5,438'],
+              ['Daily pace', '₹1,085'],
             ].map(([label, value]) => (
-              <div key={label} className="lp-panel-deep px-3.5 py-3">
-                <p className="text-[9px] tracking-[0.18em] uppercase" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
+              <div
+                key={label}
+                className="rounded border p-3"
+                style={{
+                  borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)',
+                  background: 'color-mix(in oklab, var(--onforest) 4%, transparent)',
+                }}
+              >
+                <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
                   {label}
                 </p>
-                <p className="lp-num text-[19px] mt-1.5" style={{ color: 'var(--ivory-100)' }}>
-                  ₹{value}
+                <p className="lp-display mt-1 text-lg md:text-xl" style={{ color: 'var(--onforest)' }}>
+                  {value}
                 </p>
               </div>
             ))}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-7 mt-7">
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
             <div>
-              <p className="text-[9.5px] tracking-[0.2em] uppercase mb-3.5" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
+              <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
                 Where it went
               </p>
-              <div className="space-y-3">
-                {CATEGORIES.map(([name, amount, icon, color, width]) => (
+              <div className="mt-3 space-y-3">
+                {CATEGORIES.map(([name, amt], i) => (
                   <div key={name}>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span style={{ color }} className="shrink-0 flex opacity-80">
-                        <Icon name={icon} size={12} />
-                      </span>
-                      <span className="text-[12px] flex-1 truncate" style={{ color: 'var(--ivory-100)' }}>
-                        {name}
-                      </span>
-                      <span className="lp-mono text-[11.5px]" style={{ color: 'var(--ivory-100)' }}>
-                        ₹{amount}
+                    <div className="flex justify-between text-[13px]">
+                      <span style={{ color: 'var(--onforest)' }}>{name}</span>
+                      <span className="lp-mono" style={{ color: 'var(--onforest-muted)' }}>
+                        ₹{amt.toLocaleString('en-IN')}
                       </span>
                     </div>
-                    <div className="h-[3px] rounded-full" style={{ background: 'rgba(243,239,228,0.08)' }}>
-                      <div className="h-full rounded-full" style={{ width: `${width}%`, background: color }} />
+                    {/* One gold, fading down the list — not a colour per category. */}
+                    <div
+                      className="mt-1 h-1 rounded-full"
+                      style={{ background: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${(amt / max) * 100}%`, background: 'var(--gold)', opacity: 1 - i * 0.14 }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -157,17 +184,29 @@ export function DashboardPanel() {
             </div>
 
             <div>
-              <p className="text-[9.5px] tracking-[0.2em] uppercase mb-3.5" style={{ color: 'var(--ivory-300)', opacity: 0.7 }}>
+              <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
                 Who it was with
               </p>
-              <div className="lp-rows">
+              <div className="mt-3 space-y-1">
                 {PEOPLE.map(([name, amount]) => (
-                  <div key={name} className="flex items-center gap-3 py-2.5">
-                    <Initial name={name} />
-                    <span className="text-[12px] flex-1 truncate" style={{ color: 'var(--ivory-100)' }}>
+                  <div
+                    key={name}
+                    className="flex items-center justify-between border-b py-2 text-[13px] last:border-0"
+                    style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
+                  >
+                    <span className="flex items-center gap-3" style={{ color: 'var(--onforest)' }}>
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-full border font-mono text-[10px]"
+                        style={{
+                          borderColor: 'color-mix(in oklab, var(--onforest) 20%, transparent)',
+                          color: 'var(--gold-soft)',
+                        }}
+                      >
+                        {name[0]}
+                      </span>
                       {name}
                     </span>
-                    <span className="lp-mono text-[11.5px]" style={{ color: 'var(--ivory-100)' }}>
+                    <span className="lp-mono" style={{ color: 'var(--onforest-muted)' }}>
                       ₹{amount}
                     </span>
                   </div>

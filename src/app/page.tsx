@@ -126,13 +126,11 @@ export default async function LandingPage() {
           </Reveal>
         </section>
 
-        {/* Real figures, running past. */}
-        <Ticker />
-
-        {/* --------------------------- The product ------------------------- */}
-        <section className="px-5 sm:px-10 pb-16 sm:pb-24" style={{ background: 'var(--forest)' }}>
+        {/* Real figures, then the product — one forest band, as in the reference. */}
+        <section className="py-20 md:py-28" style={{ background: 'var(--forest)', color: 'var(--onforest)' }}>
+          <Ticker />
           <Reveal>
-            <div className="max-w-6xl mx-auto">
+            <div className="mx-auto mt-16 max-w-6xl px-6 md:mt-20">
               <DashboardPanel />
             </div>
           </Reveal>
