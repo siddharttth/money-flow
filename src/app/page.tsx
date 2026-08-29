@@ -137,47 +137,56 @@ export default async function LandingPage() {
         </section>
 
         {/* ---------------------------- The Movement ----------------------- */}
-        <section id="movement" className="lp-paper px-5 sm:px-10 py-20 sm:py-28">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 md:gap-20 items-start">
+        {/* No ruled paper here — the rules belong to the hero alone. */}
+        <section id="movement" className="mx-auto max-w-6xl px-6 py-24 md:py-36">
+          <div className="grid gap-16 md:grid-cols-2">
             <Reveal>
-              <span className="lp-label lp-label-start mb-8" style={{ color: 'var(--ink-soft)' }}>
-                The complication
-              </span>
-              <h2 className="lp-display text-[32px] sm:text-[44px] mt-6 mb-9">
-                The spreadsheet was never{' '}
-                <span className="lp-display-em" style={{ color: 'var(--green-600)' }}>
-                  built for this.
-                </span>
-              </h2>
-              <div className="lp-rows">
-                {PROBLEMS.map((t, i) => (
-                  <div key={t} className="flex gap-5 py-5">
-                    <span className="lp-mono text-[11px] pt-0.5" style={{ color: 'var(--ink-soft)', opacity: 0.55 }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="text-[15px]" style={{ color: 'var(--ink-soft)' }}>
-                      {t}
-                    </span>
-                  </div>
-                ))}
+              <div>
+                <span className="lp-label">The complication</span>
+                <h2 className="lp-display mt-6 text-4xl leading-tight md:text-5xl">
+                  The spreadsheet was never{' '}
+                  <span className="lp-display-em" style={{ color: 'color-mix(in oklab, var(--forest) 70%, transparent)' }}>
+                    built for this.
+                  </span>
+                </h2>
+                <ul className="mt-10 text-[14px]">
+                  {PROBLEMS.map((line, i) => (
+                    <li
+                      key={line}
+                      className="flex gap-4 border-t py-4 last:border-b"
+                      style={{ borderColor: 'var(--border-lp)', color: 'var(--muted-fg)' }}
+                    >
+                      <span
+                        className="font-mono text-[11px]"
+                        style={{ color: 'color-mix(in oklab, var(--foreground) 40%, transparent)' }}
+                      >
+                        0{i + 1}
+                      </span>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Reveal>
 
-            <Reveal delay={110} className="md:pt-32">
-              <span className="lp-label lp-label-start mb-8" style={{ color: 'var(--ink-soft)' }}>
-                A single movement
-              </span>
-              <div className="lp-rows mt-6">
-                {ANSWERS.map((t) => (
-                  <div key={t} className="flex gap-5 py-5">
-                    <span className="pt-0.5" style={{ color: 'var(--gold-600)' }}>
-                      ·
-                    </span>
-                    <span className="text-[15px]" style={{ color: 'var(--ink)' }}>
-                      {t}
-                    </span>
-                  </div>
-                ))}
+            {/* Offset down, so the two columns read as a sequence not a pair. */}
+            <Reveal delay={150}>
+              <div className="md:pt-24">
+                <span className="lp-label">A single movement</span>
+                <ul className="mt-10 text-[14px]">
+                  {ANSWERS.map((line) => (
+                    <li
+                      key={line}
+                      className="flex gap-4 border-t py-4 last:border-b"
+                      style={{ borderColor: 'var(--border-lp)' }}
+                    >
+                      <span className="font-mono text-[11px]" style={{ color: 'var(--gold)' }}>
+                        ·
+                      </span>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Reveal>
           </div>
@@ -187,7 +196,7 @@ export default async function LandingPage() {
         <section id="mechanism" className="lp-dark px-5 sm:px-10 py-20 sm:py-28">
           <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 md:gap-20 items-start">
             <Reveal>
-              <span className="lp-label lp-label-start mb-8" style={{ color: 'var(--gold-500)' }}>
+              <span className="lp-label lp-label-dark">
                 The mechanism
               </span>
               <h2 className="lp-display text-[32px] sm:text-[46px] mt-6 mb-8">
@@ -220,7 +229,7 @@ export default async function LandingPage() {
         <section id="ledger" className="lp-paper px-5 sm:px-10 py-20 sm:py-28">
           <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 md:gap-20 items-start">
             <Reveal>
-              <span className="lp-label lp-label-start mb-8" style={{ color: 'var(--ink-soft)' }}>
+              <span className="lp-label">
                 The ledger
               </span>
               <h2 className="lp-display text-[32px] sm:text-[46px] mt-6 mb-8">

@@ -397,6 +397,7 @@ h1, h2, h3 {
   --onforest: oklch(0.93 0.03 96);
   --onforest-muted: oklch(0.72 0.035 120);
   --border-lp: oklch(0.87 0.02 110);
+  --border-strong: oklch(0.4 0.05 152);
   --rule: color-mix(in oklab, var(--foreground) 8%, transparent);
   --radius-lp: 0.25rem;
 
@@ -459,21 +460,24 @@ h1, h2, h3 {
 .lp-label {
   display: inline-flex;
   align-items: center;
-  gap: 1.1rem;
+  gap: 1rem;
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.32em;
   text-transform: uppercase;
+  color: var(--muted-fg);
 }
 .lp-label::before,
 .lp-label::after {
   content: '';
-  width: clamp(1.5rem, 5vw, 3rem);
+  width: 40px;
   height: 1px;
-  background: currentColor;
-  opacity: 0.35;
+  background: color-mix(in oklab, var(--border-strong) 40%, transparent);
 }
-.lp-label-start::before { display: none; }
+/* On the dark bands the rules and the text go gold. */
+.lp-label-dark { color: var(--gold); }
+.lp-label-dark::before,
+.lp-label-dark::after { background: color-mix(in oklab, var(--gold) 50%, transparent); }
 
 /* Eyebrow treatment without the flanking rules — used for captions. */
 .lp-eyebrow {
