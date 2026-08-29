@@ -104,9 +104,9 @@ function TxRow({ tx, onCategory }: { tx: Transaction; onCategory?: (id: string) 
               tx.category.name
             )
           ) : tx.kind === 'lent' ? (
-            'I gave'
+            'I lent'
           ) : (
-            'I got'
+            'I borrowed'
           )}
         </p>
         <p className="muted text-xs truncate">
@@ -227,7 +227,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
                     {e.direction === 'out' ? '↑' : '↓'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{e.direction === 'out' ? 'I gave' : 'I got'}</p>
+                    <p className="text-sm font-medium">{e.direction === 'out' ? 'I lent' : 'I borrowed'}</p>
                     <p className="muted text-xs truncate">
                       {dayLabel(e.entryDate)}
                       {e.note ? ` · ${e.note}` : ''}

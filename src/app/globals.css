@@ -284,7 +284,11 @@ h1, h2, h3 {
     outline: none;
     transition: border-color 150ms ease-out, background 150ms ease-out;
   }
-  .input:focus { border-bottom-color: var(--brass); background: var(--brass-soft); }
+  /* Focus moves the rule, not the fill. Tinting the whole box with the accent
+     turned the big amount field into a solid olive block under the gold
+     theme — a field you are typing into should not be the loudest thing on
+     the sheet. */
+  .input:focus { border-bottom-color: var(--brass); }
   .input::placeholder { color: var(--text-muted); opacity: 0.65; }
 
   .label {

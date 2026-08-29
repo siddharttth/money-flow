@@ -67,9 +67,13 @@ function PeopleHub() {
 
   const [month, setMonth] = useState(currentMonth());
   const [filter, setFilter] = useState<Filter>('all');
-  const [ledgerFor, setLedgerFor] = useState<null | { direction: 'out' | 'in'; personId?: string }>(
-    params.get('settle') ? { direction: 'in', personId: params.get('settle')! } : null,
-  );
+  const [ledgerFor, setLedgerFor] = useState<null | {
+    direction: 'out' | 'in';
+    personId?: string;
+    /** Settling carries the outstanding balance in, and different wording. */
+    settleMinor?: number;
+    name?: string;
+  }>(params.get('settle') ? { direction: 'in', personId: params.get('settle')!, settleMinor: 0 } : null);
   const [addingPerson, setAddingPerson] = useState(false);
 
   const people = useSWR<{ items: Person[] }>('/api/people');
@@ -158,13 +162,13 @@ function PeopleHub() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 w-full lg:w-52">
-            {/* Short enough to stay on one line at 390px — a two-line label
-                made the pair different heights. */}
+            {/* The same two words the Add sheet uses. One vocabulary for one
+                concept, everywhere it appears. */}
             <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'out' })}>
-              Lend out
+              I lent
             </button>
             <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'in' })}>
-              Borrow
+              I borrowed
             </button>
           </div>
         </div>
@@ -284,7 +288,12 @@ function PeopleHub() {
                           className="tag"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLedgerFor({ direction: balanceMinor > 0 ? 'in' : 'out', personId: person.id });
+                            setLedgerFor({
+                              direction: balanceMinor > 0 ? 'in' : 'out',
+                              personId: person.id,
+                              settleMinor: Math.abs(balanceMinor),
+                              name: person.name,
+                            });
                           }}
                         >
                           Settle
@@ -305,7 +314,12 @@ function PeopleHub() {
                         className="tag"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLedgerFor({ direction: balanceMinor > 0 ? 'in' : 'out', personId: person.id });
+                          setLedgerFor({
+                            direction: balanceMinor > 0 ? 'in' : 'out',
+                            personId: person.id,
+                            settleMinor: Math.abs(balanceMinor),
+                            name: person.name,
+                          });
                         }}
                       >
                         Settle {formatINR(Math.abs(balanceMinor))}
@@ -328,17 +342,27 @@ function PeopleHub() {
       <Modal
         open={!!ledgerFor}
         onClose={() => setLedgerFor(null)}
-        title={ledgerFor?.direction === 'in' ? 'Money I got' : 'Money I gave'}
+        title={
+          ledgerFor?.settleMinor !== undefined
+            ? `Settle up${ledgerFor.name ? ` with ${ledgerFor.name}` : ''}`
+            : ledgerFor?.direction === 'in'
+              ? 'I borrowed'
+              : 'I lent'
+        }
       >
         {ledgerFor && (
           <LedgerForm
             key={`${ledgerFor.direction}-${ledgerFor.personId ?? 'any'}`}
             defaultDirection={ledgerFor.direction}
             lockedPersonId={ledgerFor.personId}
+            /* Settling means paying the balance off, so the balance is the
+               amount — pre-filled, and still editable for a part payment. */
+            defaultAmount={ledgerFor.settleMinor ? ledgerFor.settleMinor / 100 : undefined}
+            intent={ledgerFor.settleMinor !== undefined ? 'settle' : 'record'}
             onSaved={() => {
               setLedgerFor(null);
               refresh();
-              toast('Ledger updated');
+              toast(ledgerFor.settleMinor !== undefined ? 'Settled up' : 'Ledger updated');
             }}
           />
         )}
