@@ -20,14 +20,14 @@ import type { Expense } from '@/lib/types';
 const NAV: { href: string; label: string; short: string; icon: NavIconKey }[] = [
   { href: '/dashboard', label: 'Dashboard', short: 'Home', icon: 'dashboard' },
   { href: '/expenses', label: 'Transactions', short: 'Ledger', icon: 'ledger' },
+  { href: '/investments', label: 'Investments', short: 'Invest', icon: 'invest' },
   { href: '/people', label: 'People', short: 'People', icon: 'people' },
   { href: '/analytics', label: 'Analytics', short: 'Insights', icon: 'analytics' },
   { href: '/settings', label: 'Settings', short: 'Settings', icon: 'settings' },
 ];
 
-/** The two that flank the + on a phone, in thumb order. */
-const MOBILE_LEFT = ['/dashboard', '/expenses'];
-const MOBILE_RIGHT = ['/people', '/analytics'];
+/** Everything except Settings, which lives in the header. */
+const MOBILE_TABS = ['/dashboard', '/expenses', '/investments', '/people', '/analytics'];
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -205,40 +205,38 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             </main>
           </div>
 
-          {/* Mobile bottom nav, + as the centre action. */}
+          {/*
+            Mobile bottom nav. The + used to sit in the middle of it, which cost
+            a whole slot — with Investments there are five screens to reach and
+            no room left. It floats above the bar now, where it is still the
+            largest target on screen and no longer competing for a tab.
+          */}
           <nav
             className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t safe-bottom"
             style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
           >
             <div className="grid grid-cols-5 items-center max-w-lg mx-auto">
-              {MOBILE_LEFT.map((href) => {
-                const item = NAV.find((n) => n.href === href)!;
-                return <MobileTab key={href} {...item} active={isActive(href)} />;
-              })}
-
-              <div className="flex justify-center">
-                <button
-                  onClick={() => openAdd()}
-                  aria-label="Add transaction"
-                  className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-                  style={{
-                    background: 'var(--brass)',
-                    color: 'var(--on-brass)',
-                    border: '3px solid var(--bg)',
-                    boxShadow: '0 10px 24px -10px color-mix(in oklab, var(--brass) 70%, transparent)',
-                    transitionDuration: '80ms',
-                  }}
-                >
-                  <NavIcon name="plus" size={24} />
-                </button>
-              </div>
-
-              {MOBILE_RIGHT.map((href) => {
+              {MOBILE_TABS.map((href) => {
                 const item = NAV.find((n) => n.href === href)!;
                 return <MobileTab key={href} {...item} active={isActive(href)} />;
               })}
             </div>
           </nav>
+
+          <button
+            onClick={() => openAdd()}
+            aria-label="Add transaction"
+            className="lg:hidden fixed right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{
+              bottom: 'calc(env(safe-area-inset-bottom) + 4.5rem)',
+              background: 'var(--brass)',
+              color: 'var(--on-brass)',
+              boxShadow: '0 12px 28px -10px color-mix(in oklab, var(--brass) 75%, transparent)',
+              transitionDuration: '80ms',
+            }}
+          >
+            <NavIcon name="plus" size={24} />
+          </button>
         </div>
 
         <Modal

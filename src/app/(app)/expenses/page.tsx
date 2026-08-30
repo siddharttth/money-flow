@@ -89,22 +89,23 @@ function Transactions() {
     }));
   }, [data]);
 
-  /** Spending, lending and borrowing never mix into one figure. */
+  /**
+   * Four figures that never mix. Spending, lending, borrowing — and investing,
+   * which looks like an expense in this list because it is one row in the same
+   * table, but is not money spent. See the note at the top of analytics.ts.
+   */
   const totals = useMemo(() => {
     const items = data?.items ?? [];
-    const of = (kind: TxKind) =>
-      items.filter((t) => t.kind === kind).reduce((sum, t) => sum + t.amountMinor, 0);
-    const spends = items.filter((t) => t.kind === 'expense');
-    const biggest = spends.reduce<Transaction | null>(
-      (best, t) => (!best || t.amountMinor > best.amountMinor ? t : best),
-      null,
-    );
+    const sum = (rows: Transaction[]) => rows.reduce((s, t) => s + t.amountMinor, 0);
+    const of = (kind: TxKind) => sum(items.filter((t) => t.kind === kind));
+    const expenseRows = items.filter((t) => t.kind === 'expense');
+    const invested = expenseRows.filter((t) => t.category?.kind === 'investment');
     return {
-      spent: of('expense'),
+      spent: sum(expenseRows.filter((t) => t.category?.kind !== 'investment')),
+      invested: sum(invested),
       lent: of('lent'),
       borrowed: of('borrowed'),
       count: items.length,
-      biggest,
     };
   }, [data]);
 
@@ -170,15 +171,14 @@ function Transactions() {
         cols={4}
         items={[
           { label: 'Spent', minor: totals.spent, sub: `${totals.count} shown` },
+          {
+            label: 'Invested',
+            minor: totals.invested,
+            tone: totals.invested ? 'var(--credit)' : undefined,
+            sub: totals.invested ? 'not spending' : undefined,
+          },
           { label: 'Lent out', minor: totals.lent, tone: totals.lent ? 'var(--rule-red)' : undefined },
           { label: 'Borrowed', minor: totals.borrowed, tone: totals.borrowed ? 'var(--credit)' : undefined },
-          {
-            label: 'Biggest entry',
-            minor: totals.biggest?.amountMinor ?? 0,
-            sub: totals.biggest
-              ? totals.biggest.note || totals.biggest.category?.name || undefined
-              : undefined,
-          },
         ]}
       />
 
@@ -241,7 +241,9 @@ function Transactions() {
          */
         <div className="card overflow-clip">
           {groups.map(({ date, items, clusters }, groupIndex) => {
-            const spent = items.filter((i) => i.kind === 'expense').reduce((s, i) => s + i.amountMinor, 0);
+            const spent = items
+              .filter((i) => i.kind === 'expense' && i.category?.kind !== 'investment')
+              .reduce((s, i) => s + i.amountMinor, 0);
             return (
               <section key={date}>
                 <h2

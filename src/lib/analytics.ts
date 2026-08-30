@@ -18,6 +18,17 @@ import { daysBetween, monthRange, shiftMonth, todayISO, weekRange } from './date
  * the grand total and must never be summed into it. Responses that carry a
  * person breakdown always ship `grandTotal` alongside so the UI has the real
  * number to display.
+ *
+ * THE SECOND RULE: INVESTING IS NOT SPENDING
+ * ------------------------------------------
+ * ₹10,000 into a SIP left the current account but did not leave your net
+ * worth — it moved from one pocket to another, the same way a loan does.
+ * Counting it as spending makes every month look ruinous and makes the
+ * daily pace, the projection and the month-over-month comparison meaningless.
+ *
+ * So every query here excludes categories marked `kind = 'investment'` by
+ * default. `include` opts back in: 'investment' for the investments screen,
+ * 'all' for anything that genuinely means "money that moved".
  */
 
 export type Filters = {
@@ -26,7 +37,24 @@ export type Filters = {
   end?: string;
   categoryIds?: string[];
   personIds?: string[];
+  /** Defaults to 'spending' — investment categories are left out. */
+  include?: 'spending' | 'investment' | 'all';
 };
+
+/**
+ * Written as a subquery rather than a join so it can drop into any of these
+ * queries without changing their row shape — a join to `categories` would
+ * multiply nothing here, but it would force every caller to group by more
+ * columns than it means to.
+ */
+export function kindPredicate(include: Filters['include']) {
+  if (include === 'all') return undefined;
+  const test = include === 'investment' ? sql`=` : sql`<>`;
+  return sql`EXISTS (
+    SELECT 1 FROM ${categories} c
+    WHERE c.id = ${expenses.categoryId} AND c.kind ${test} 'investment'
+  )`;
+}
 
 /** Base predicate: this user, not soft-deleted, inside the date window. */
 function baseWhere(f: Filters) {
@@ -34,6 +62,8 @@ function baseWhere(f: Filters) {
   if (f.start) clauses.push(gte(expenses.expenseDate, f.start));
   if (f.end) clauses.push(lte(expenses.expenseDate, f.end));
   if (f.categoryIds?.length) clauses.push(inArray(expenses.categoryId, f.categoryIds));
+  const kind = kindPredicate(f.include);
+  if (kind) clauses.push(kind);
   return and(...clauses);
 }
 
@@ -249,7 +279,14 @@ export async function getMonthlyTotals(userId: string, months: number) {
       count: sql<string>`COUNT(*)`,
     })
     .from(expenses)
-    .where(and(eq(expenses.userId, userId), isNull(expenses.deletedAt), gte(expenses.expenseDate, start)))
+    .where(
+      and(
+        eq(expenses.userId, userId),
+        isNull(expenses.deletedAt),
+        gte(expenses.expenseDate, start),
+        kindPredicate('spending'),
+      ),
+    )
     .groupBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM')`);
 

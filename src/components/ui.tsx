@@ -105,17 +105,22 @@ export function HeroFigure({
  */
 export function Delta({ pct, invert = false }: { pct: number | null | undefined; invert?: boolean }) {
   if (pct == null || !Number.isFinite(pct)) return null;
+
+  // A change too small to round to a tenth of a percent is not a change, and
+  // an arrow on it points somewhere the figure did not go.
+  const flat = Math.abs(pct) < 0.05;
   const up = pct > 0;
   const bad = invert ? !up : up;
+
   return (
     <span
       className="num inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
       style={{
-        color: Math.abs(pct) < 0.05 ? 'var(--text-muted)' : bad ? 'var(--rule-red)' : 'var(--credit)',
-        background: Math.abs(pct) < 0.05 ? 'var(--surface-2)' : bad ? 'var(--rule-red-soft)' : 'var(--credit-soft)',
+        color: flat ? 'var(--text-muted)' : bad ? 'var(--rule-red)' : 'var(--credit)',
+        background: flat ? 'var(--surface-2)' : bad ? 'var(--rule-red-soft)' : 'var(--credit-soft)',
       }}
     >
-      {up ? '\u2191' : '\u2193'} {Math.abs(pct).toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%
+      {flat ? 'no change' : `${up ? '\u2191' : '\u2193'} ${Math.abs(pct).toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`}
     </span>
   );
 }

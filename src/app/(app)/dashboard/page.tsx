@@ -7,6 +7,7 @@ import { currentMonth, dayLabel, monthLabel, monthRange } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { CategoryStat, PersonStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
+import type { InvestmentSummary } from '@/lib/investments';
 import type { Transaction } from '@/lib/transactions';
 import {
   Card,
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const peers = useSWR<{ owedToMeMinor: number; owedByMeMinor: number; netMinor: number }>('/api/ledger');
   const daily = useSWR<{ items: { date: string; totalMinor: number }[] }>(`/api/analytics/daily?month=${month}`);
   const recent = useSWR<{ items: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&limit=6`);
+  const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
 
   const s = summary.data;
   const f = flow.data;
@@ -112,6 +114,23 @@ export default function DashboardPage() {
                   {f.pace.monthDays}
                 </p>
               </div>
+            )}
+
+            {/* Investing is not spending, so it is not in the figure above —
+                which makes saying where it went the more important, not less. */}
+            {(invest.data?.monthMinor ?? 0) > 0 && (
+              <Link
+                href="/investments"
+                className="row mt-4 -mx-2 px-2 py-2 rounded-lg flex items-baseline justify-between gap-3"
+              >
+                <span className="label mb-0">Invested, separately</span>
+                <span className="flex items-baseline gap-1.5">
+                  <Money minor={invest.data!.monthMinor} className="text-base font-semibold" />
+                  <span className="micro" style={{ color: 'var(--accent)' }}>
+                    →
+                  </span>
+                </span>
+              </Link>
             )}
           </div>
 

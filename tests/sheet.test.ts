@@ -114,7 +114,10 @@ const exp = (date: string, amount: number, category: string, people: string[] = 
 });
 
 describe('month grid', () => {
-  const categories = ['Bills / Recharge', 'Ciggs / Alc', 'Outside Food', 'Misc'];
+  const categories = ['Bills / Recharge', 'Ciggs / Alc', 'Outside Food', 'Misc'].map((name) => ({
+    name,
+    kind: 'expense',
+  }));
 
   it('names the tab the way the original sheet did', () => {
     expect(monthTabName('2026-08')).toBe('AUG-26');
@@ -125,7 +128,7 @@ describe('month grid', () => {
     const sheet = buildMonthSheet('2026-08', categories, [exp('2026-08-03', 112, 'Ciggs / Alc')]);
     // header + 31 days + TOTAL
     expect(sheet.rows).toHaveLength(33);
-    expect(sheet.rows[0]).toEqual(['DATE', ...categories, 'TOTAL']);
+    expect(sheet.rows[0]).toEqual(['DATE', ...categories.map((c) => c.name), 'TOTAL']);
     expect(sheet.rows[1][0]).toBe('1-Aug-2026');
     expect(sheet.rows[31][0]).toBe('31-Aug-2026');
   });
@@ -187,6 +190,41 @@ describe('month grid', () => {
   it('handles a 30-day month and a leap February', () => {
     expect(buildMonthSheet('2026-09', categories, []).rows).toHaveLength(32);
     expect(buildMonthSheet('2024-02', categories, []).rows).toHaveLength(31);
+  });
+});
+
+describe('month grid, with investments', () => {
+  const mixed = [
+    { name: 'Outside Food', kind: 'expense' },
+    { name: 'Misc', kind: 'expense' },
+    { name: 'Investment', kind: 'investment' },
+  ];
+
+  it('puts investment columns past TOTAL, under their own INVESTED total', () => {
+    const sheet = buildMonthSheet('2026-08', mixed, [
+      exp('2026-08-05', 25013, 'Outside Food'),
+      exp('2026-08-07', 10000, 'Investment'),
+    ]);
+
+    expect(sheet.rows[0]).toEqual(['DATE', 'Outside Food', 'Misc', 'TOTAL', 'Investment', 'INVESTED']);
+
+    const total = sheet.rows.at(-1)!;
+    expect(total).toEqual(['TOTAL', 25013, null, 25013, 10000, 10000]);
+  });
+
+  it('keeps the SIP out of its own day total', () => {
+    const sheet = buildMonthSheet('2026-08', mixed, [
+      exp('2026-08-07', 640, 'Outside Food'),
+      exp('2026-08-07', 10000, 'Investment'),
+    ]);
+    const day7 = sheet.rows[7];
+    expect(day7[3]).toBe(640); // TOTAL
+    expect(day7[5]).toBe(10000); // INVESTED
+  });
+
+  it('omits the investment columns entirely when nothing is marked as one', () => {
+    const sheet = buildMonthSheet('2026-08', [{ name: 'Misc', kind: 'expense' }], [exp('2026-08-01', 10, 'Misc')]);
+    expect(sheet.rows[0]).toEqual(['DATE', 'Misc', 'TOTAL']);
   });
 });
 

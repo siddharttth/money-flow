@@ -14,15 +14,22 @@ import { monthRange } from './dates';
  * TRANSACTIONS for the flat list with notes and people intact. That last one
  * matters — the grid collapses several entries in a day into one figure, so
  * without it an export could not be re-imported without loss.
+ *
+ * Investment categories sit to the RIGHT of the TOTAL column, under their own
+ * INVESTED total. The old sheet folded them into the month total, which is
+ * what made every month look worse than it was — a SIP left the account but
+ * not your net worth. Both figures are printed; neither is added to the other.
  */
 
 export type ExportExpense = {
   expenseDate: string;
   amount: number;
-  category: { name: string };
+  category: { name: string; kind?: string };
   people: { name: string }[];
   note: string | null;
 };
+
+export type ExportCategory = { name: string; kind: string };
 
 export type ExportLedgerEntry = {
   entryDate: string;
@@ -63,9 +70,16 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * in the same places, including ones that saw no spending that month — a
  * column that appears and disappears between tabs makes them incomparable.
  */
-export function buildMonthSheet(month: string, categories: string[], expenses: ExportExpense[]): SheetSpec {
+export function buildMonthSheet(
+  month: string,
+  categories: ExportCategory[],
+  expenses: ExportExpense[],
+): SheetSpec {
   const { start, end } = monthRange(month);
   const days = Number(end.slice(8, 10));
+
+  const spendCols = categories.filter((c) => c.kind !== 'investment').map((c) => c.name);
+  const investCols = categories.filter((c) => c.kind === 'investment').map((c) => c.name);
 
   // day -> category -> amount
   const grid = new Map<number, Map<string, number>>();
@@ -77,24 +91,47 @@ export function buildMonthSheet(month: string, categories: string[], expenses: E
     grid.set(day, byCat);
   }
 
-  const rows: CellValue[][] = [['DATE', ...categories, 'TOTAL']];
+  const header: CellValue[] = ['DATE', ...spendCols, 'TOTAL'];
+  if (investCols.length) header.push(...investCols, 'INVESTED');
+  const rows: CellValue[][] = [header];
 
-  const columnTotals = new Array(categories.length).fill(0);
-  let grandTotal = 0;
+  const spendTotals = new Array(spendCols.length).fill(0);
+  const investTotals = new Array(investCols.length).fill(0);
+  let grandSpent = 0;
+  let grandInvested = 0;
+
+  const fill = (names: string[], totals: number[], byCat: Map<string, number> | undefined) =>
+    names.map((name, i) => {
+      const amount = byCat?.get(name) ?? 0;
+      totals[i] = round2(totals[i] + amount);
+      return amount > 0 ? amount : null;
+    });
 
   for (let day = 1; day <= days; day++) {
     const byCat = grid.get(day);
-    const cells = categories.map((name, i) => {
-      const amount = byCat?.get(name) ?? 0;
-      columnTotals[i] = round2(columnTotals[i] + amount);
-      return amount > 0 ? amount : null;
-    });
-    const dayTotal = round2(cells.reduce<number>((s, v) => s + (v ?? 0), 0));
-    grandTotal = round2(grandTotal + dayTotal);
-    rows.push([sheetDate(`${start.slice(0, 8)}${String(day).padStart(2, '0')}`), ...cells, dayTotal || null]);
+    const spent = fill(spendCols, spendTotals, byCat);
+    const dayTotal = round2(spent.reduce<number>((s, v) => s + (v ?? 0), 0));
+    grandSpent = round2(grandSpent + dayTotal);
+
+    const row: CellValue[] = [
+      sheetDate(`${start.slice(0, 8)}${String(day).padStart(2, '0')}`),
+      ...spent,
+      dayTotal || null,
+    ];
+
+    if (investCols.length) {
+      const put = fill(investCols, investTotals, byCat);
+      const dayInvested = round2(put.reduce<number>((s, v) => s + (v ?? 0), 0));
+      grandInvested = round2(grandInvested + dayInvested);
+      row.push(...put, dayInvested || null);
+    }
+
+    rows.push(row);
   }
 
-  rows.push(['TOTAL', ...columnTotals.map((t) => t || null), grandTotal || null]);
+  const totalRow: CellValue[] = ['TOTAL', ...spendTotals.map((t) => t || null), grandSpent || null];
+  if (investCols.length) totalRow.push(...investTotals.map((t) => t || null), grandInvested || null);
+  rows.push(totalRow);
 
   return {
     name: monthTabName(month),
@@ -102,7 +139,7 @@ export function buildMonthSheet(month: string, categories: string[], expenses: E
     headerRows: [0],
     totalRows: [rows.length - 1],
     freezeRow: 1,
-    widths: [14, ...categories.map(() => 15), 12],
+    widths: [14, ...header.slice(1).map(() => 15)],
   };
 }
 
@@ -180,7 +217,7 @@ export function monthsPresent(expenses: ExportExpense[]): string[] {
 
 export function buildWorkbook(
   expenses: ExportExpense[],
-  categories: string[],
+  categories: ExportCategory[],
   balances: ExportPeerBalance[],
   ledger: ExportLedgerEntry[],
 ): SheetSpec[] {

@@ -20,7 +20,9 @@ export type Transaction = {
   amountMinor: number;
   date: string;
   note: string | null;
-  category: { id: string; name: string; icon: string; color: string } | null;
+  /** `kind` rides along so a list can separate spending from investing
+   *  without a second query — see the note at the top of analytics.ts. */
+  category: { id: string; name: string; icon: string; color: string; kind: string } | null;
   people: { id: string; name: string; color: string }[];
 };
 
@@ -99,7 +101,7 @@ async function fetchExpenses(p: FeedParams, take: number): Promise<Transaction[]
     amountMinor: r.e.amountMinor,
     date: r.e.expenseDate,
     note: r.e.note,
-    category: { id: r.c.id, name: r.c.name, icon: r.c.icon, color: r.c.color },
+    category: { id: r.c.id, name: r.c.name, icon: r.c.icon, color: r.c.color, kind: r.c.kind },
     people: byExpense.get(r.e.id) ?? [],
   }));
 }

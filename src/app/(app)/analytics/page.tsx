@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { qs } from '@/lib/client';
@@ -8,6 +9,7 @@ import { currentMonth, dayLabel, monthLabel, monthRange } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { CategoryStat, Expense, ExpenseList, Person, PersonStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
+import type { InvestmentSummary } from '@/lib/investments';
 import {
   Card,
   Delta,
@@ -70,6 +72,7 @@ function AnalyticsInner() {
     `/api/analytics/daily${qs({ month, personIds })}`,
   );
   const trends = useSWR<{ items: { month: string; totalMinor: number }[] }>('/api/analytics/trends?months=12');
+  const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
 
   const s = summary.data;
   const f = flow.data;
@@ -440,6 +443,39 @@ function AnalyticsInner() {
       </div>
 
       {/* ---------- Money that is not spending ---------- */}
+      {(invest.data?.monthMinor ?? 0) > 0 && (
+        <div>
+          <SectionHead
+            label="Investing, separately"
+            action={
+              <Link href="/investments" className="micro" style={{ color: 'var(--accent)' }}>
+                Open
+              </Link>
+            }
+          />
+          <StatStrip
+            cols={3}
+            items={[
+              { label: `Put in during ${monthLabel(month).split(' ')[0]}`, minor: invest.data!.monthMinor, tone: 'var(--credit)' },
+              { label: 'Lifetime', minor: invest.data!.lifetimeMinor },
+              {
+                label: 'Share of outgoings',
+                value: `${Math.round(
+                  (invest.data!.monthMinor / Math.max(1, invest.data!.monthMinor + invest.data!.monthSpendingMinor)) *
+                    100,
+                )}%`,
+                sub: 'of everything that left',
+              },
+            ]}
+          />
+          <p className="muted text-[12px] mt-3 leading-relaxed max-w-2xl">
+            Excluded from every figure above. Money into an investment left the current account but not your net
+            worth, so counting it as spending would make the pace, the projection and the month-over-month comparison
+            all wrong.
+          </p>
+        </div>
+      )}
+
       {f && f.ledger.entryCount > 0 && (
         <div>
           <SectionHead label="Lending, separately" />

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { clusterTransactions } from '@/lib/cluster';
 import type { Transaction } from '@/lib/transactions';
 
-const cat = (id: string) => ({ id, name: id, icon: 'cash', color: '#000' });
+const cat = (id: string) => ({ id, name: id, icon: 'cash', color: '#000', kind: 'expense' });
 const person = (id: string) => ({ id, name: id, color: '#000' });
 
 let n = 0;

@@ -3,7 +3,7 @@ import { categories, people, expenses, expensePeople } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { ApiError, ok, parseBody, withAuth } from '@/lib/api';
 import { importCommitSchema } from '@/lib/validation';
-import { pickColor, slugify } from '@/lib/defaults';
+import { DEFAULT_CATEGORIES, pickColor, slugify } from '@/lib/defaults';
 import { getSelfPersonId } from '@/lib/expenses';
 import { toMinor } from '@/lib/money';
 import { randomUUID } from 'crypto';
@@ -34,13 +34,20 @@ export const POST = withAuth(async (req, session) => {
       const hit = catByName.get(key);
       if (hit) return hit;
       if (!input.createMissing) throw new ApiError(422, `Unknown category "${name}"`);
+      /*
+       * An INVESTMENT column in the old sheet has to arrive as an investment
+       * category, or its whole history lands in the spending total on the way
+       * in — which is exactly what this app exists to stop.
+       */
+      const seeded = DEFAULT_CATEGORIES.find((d) => d.name.toLowerCase() === key);
       const [row] = await tx
         .insert(categories)
         .values({
           userId: session.userId,
           name,
           slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 6)}`,
-          color: pickColor(catByName.size),
+          color: seeded?.color ?? pickColor(catByName.size),
+          kind: seeded?.kind ?? 'expense',
           sortOrder: catByName.size,
         })
         .returning();

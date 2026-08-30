@@ -1,6 +1,7 @@
 import { and, eq, gte, lte, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { expenses, categories, ledgerEntries } from '@/db/schema';
+import { kindPredicate } from './analytics';
 import { sumToMinor } from './money';
 import { daysBetween, monthRange, shiftMonth, todayISO } from './dates';
 
@@ -20,6 +21,10 @@ import { daysBetween, monthRange, shiftMonth, todayISO } from './dates';
  * absent here: person totals can exceed the grand total by design, so mixing
  * them into flow arithmetic would be exactly the double-count the schema
  * exists to prevent.
+ *
+ * Investment categories are excluded throughout, for the same reason lending
+ * is: money into a SIP left the account but not your net worth. See the note
+ * at the top of analytics.ts.
  */
 
 /** Anything at or below this is a "small ticket" — the thousand-cuts bucket. */
@@ -106,13 +111,14 @@ export type Flow = {
   repeats: { label: string; categoryName: string; count: number; totalMinor: number }[];
 };
 
-/** Live, undeleted expenses for one user inside a date window. */
+/** Live, undeleted, non-investment expenses for one user inside a date window. */
 function inWindow(userId: string, start: string, end: string) {
   return and(
     eq(expenses.userId, userId),
     isNull(expenses.deletedAt),
     gte(expenses.expenseDate, start),
     lte(expenses.expenseDate, end),
+    kindPredicate('spending'),
   );
 }
 

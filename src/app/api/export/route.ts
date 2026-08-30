@@ -29,7 +29,7 @@ export const GET = withAuth(async (req, session) => {
 
   const [catRows, balances, ledger] = await Promise.all([
     db
-      .select({ name: categories.name })
+      .select({ name: categories.name, kind: categories.kind })
       .from(categories)
       .where(eq(categories.userId, session.userId))
       .orderBy(asc(categories.sortOrder), asc(categories.name)),
@@ -42,7 +42,9 @@ export const GET = withAuth(async (req, session) => {
    * disabled or renamed category still has history, and a grid that silently
    * dropped its column would not add up to its own TOTAL.
    */
-  const names = [...new Set([...catRows.map((c) => c.name), ...all.map((e) => e.category.name)])];
+  const byName = new Map(catRows.map((c) => [c.name, c.kind]));
+  for (const e of all) if (!byName.has(e.category.name)) byName.set(e.category.name, e.category.kind ?? 'expense');
+  const names = [...byName].map(([name, kind]) => ({ name, kind }));
 
   const sheets = buildWorkbook(
     all,
