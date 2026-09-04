@@ -157,7 +157,7 @@ export default function InvestmentsPage() {
         <SectionHead
           label="Funds"
           action={
-            <Link href="/settings" className="micro" style={{ color: 'var(--accent)' }}>
+            <Link href="/settings" className="micro micro-link" style={{ color: 'var(--accent)' }}>
               {funds.data?.items.length ? 'Manage' : 'Create one'}
             </Link>
           }

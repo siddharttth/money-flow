@@ -123,10 +123,19 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
                 }}
               />
             </div>
-            <p className="micro mt-2">
-              spent · invested · still due, against income
-              {plan.savingsRatePct != null && ` — saving ${Math.round(plan.savingsRatePct)}%`}
-            </p>
+            {/* A three-colour bar with a comma-separated caption underneath
+                asks the reader to match order to colour in their head. Swatches
+                do that job for them. */}
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-2.5">
+              <Key color="var(--brass)" label="Spent" />
+              <Key color="var(--credit)" label="Invested" />
+              <Key color="var(--border-strong)" label="Still due" />
+              {plan.savingsRatePct != null && (
+                <span className="micro ml-auto" style={{ color: 'var(--credit)' }}>
+                  Saving {Math.round(plan.savingsRatePct)}%
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -444,5 +453,15 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
         </button>
       )}
     </Card>
+  );
+}
+
+/** A colour swatch and its name — the legend for any stacked bar here. */
+function Key({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="micro inline-flex items-center gap-1.5">
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />
+      {label}
+    </span>
   );
 }

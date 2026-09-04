@@ -278,7 +278,13 @@ function AnalyticsInner() {
             )}
           </Card>
 
-          {/* ---------- Momentum ---------- */}
+          {/*
+            ---------- Momentum ----------
+            Hidden in a first month. With nothing to compare against, every
+            category is "NEW" and the card is a list of the same word seven
+            times pretending to be an insight.
+          */}
+          {f && f.momentum.some((m) => !m.isNew) && (
           <Card>
             <h3 className="text-[15px] font-semibold mb-1">Heating up, cooling down</h3>
             <p className="muted text-[12px] mb-4">
@@ -324,6 +330,7 @@ function AnalyticsInner() {
               <EmptyState title="Nothing to compare yet" hint="Momentum needs a month or two of history." />
             )}
           </Card>
+          )}
         </div>
       </div>
 
@@ -448,7 +455,7 @@ function AnalyticsInner() {
           <SectionHead
             label="Investing, separately"
             action={
-              <Link href="/investments" className="micro" style={{ color: 'var(--accent)' }}>
+              <Link href="/investments" className="micro micro-link" style={{ color: 'var(--accent)' }}>
                 Open
               </Link>
             }

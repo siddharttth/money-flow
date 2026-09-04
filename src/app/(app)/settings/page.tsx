@@ -13,6 +13,7 @@ import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
+import { IncomeSourceModal } from '@/components/income-source-modal';
 
 type CategoryRow = Category & {
   monthlyBudgetMinor: number | null;
@@ -73,7 +74,11 @@ export default function SettingsPage() {
    */
   useEffect(() => {
     const add = new URLSearchParams(window.location.search).get('add');
-    if (add === 'income' || add === 'investment' || add === 'expense') setCreating(add);
+    if (add === 'income' || add === 'investment' || add === 'expense') {
+      setCreating(add);
+      // Consume it, so a refresh or a back-tap does not reopen the sheet.
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
   function applyTheme(next: ThemeChoice) {
@@ -107,37 +112,6 @@ export default function SettingsPage() {
   return (
     <div className="space-y-7">
       <PageHeader eyebrow="Settings" title="Preferences" sub="Categories, budgets, appearance and data." />
-
-      {/* ---------- Appearance ---------- */}
-      <section>
-        <SectionHead label="Appearance" />
-        <Card>
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-            {THEMES.map((t) => (
-              <button
-                key={t.value}
-                onClick={() => applyTheme(t.value)}
-                aria-pressed={theme === t.value}
-                className="text-left rounded-lg p-2 transition-colors"
-                style={{
-                  border: `1px solid ${theme === t.value ? 'var(--accent)' : 'var(--border)'}`,
-                  background: theme === t.value ? 'var(--accent-soft)' : 'transparent',
-                  transitionDuration: '150ms',
-                }}
-              >
-                <ThemeSwatch kind={t.value} />
-                <span
-                  className="block text-[12.5px] font-semibold mt-2"
-                  style={{ color: theme === t.value ? 'var(--accent)' : 'var(--text)' }}
-                >
-                  {t.label}
-                </span>
-                <span className="muted text-[11px] block leading-snug mt-0.5">{t.hint}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-      </section>
 
       {/* ---------- Income ---------- */}
       <section>
@@ -388,6 +362,37 @@ export default function SettingsPage() {
         </Card>
       </section>
 
+      {/* ---------- Appearance ---------- */}
+      <section>
+        <SectionHead label="Appearance" />
+        <Card>
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            {THEMES.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => applyTheme(t.value)}
+                aria-pressed={theme === t.value}
+                className="text-left rounded-lg p-2 transition-colors"
+                style={{
+                  border: `1px solid ${theme === t.value ? 'var(--accent)' : 'var(--border)'}`,
+                  background: theme === t.value ? 'var(--accent-soft)' : 'transparent',
+                  transitionDuration: '150ms',
+                }}
+              >
+                <ThemeSwatch kind={t.value} />
+                <span
+                  className="block text-[12.5px] font-semibold mt-2"
+                  style={{ color: theme === t.value ? 'var(--accent)' : 'var(--text)' }}
+                >
+                  {t.label}
+                </span>
+                <span className="muted text-[11px] block leading-snug mt-0.5">{t.hint}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </section>
+
       {/* ---------- Session ---------- */}
       <section>
         <SectionHead label="Session" />
@@ -404,10 +409,20 @@ export default function SettingsPage() {
         </Card>
       </section>
 
+      <IncomeSourceModal
+        open={creating === 'income'}
+        onClose={() => setCreating(null)}
+        onDone={async (msg) => {
+          await refresh();
+          toast(msg);
+          setCreating(null);
+        }}
+      />
+
       <CategoryModal
-        open={!!creating || !!editing}
+        open={(!!creating && creating !== 'income') || !!editing}
         category={editing}
-        defaultKind={creating ?? 'expense'}
+        defaultKind={creating === 'investment' ? 'investment' : 'expense'}
         onClose={() => {
           setCreating(null);
           setEditing(null);
@@ -559,54 +574,6 @@ function CategoryModal({
         </div>
 
         <div>
-          <label className="label" htmlFor="cbudget">
-            Monthly budget <span className="normal-case font-normal">— optional</span>
-          </label>
-          <input
-            id="cbudget"
-            className="input num"
-            inputMode="decimal"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ''))}
-            placeholder="No limit"
-          />
-          <p className="muted text-xs mt-1.5">Sets the pacing bar on the category inspector.</p>
-        </div>
-
-        <div>
-          <label className="label">Icon</label>
-          <div className="flex flex-wrap gap-2">
-            {ICON_KEYS.map((k) => (
-              <button
-                key={k}
-                className="chip px-2.5"
-                data-selected={icon === k}
-                onClick={() => setIcon(k)}
-                aria-label={k}
-                style={icon === k ? undefined : { color }}
-              >
-                <Icon name={k} size={18} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Colour</label>
-          <div className="flex flex-wrap gap-2">
-            {PALETTE.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                aria-label={`Colour ${c}`}
-                className="w-8 h-8 rounded-full border-2"
-                style={{ background: c, borderColor: color === c ? 'var(--text)' : 'transparent' }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
           <span className="label">Type</span>
           <div className="flex flex-wrap gap-2">
             <button className="chip" data-selected={kind === 'expense'} onClick={() => setKind('expense')}>
@@ -670,6 +637,60 @@ function CategoryModal({
             </div>
           </div>
         )}
+
+        {/* A budget caps spending. On money arriving, or money being set
+            aside, there is nothing to cap — asking was just noise. */}
+        {kind === 'expense' && (
+          <div>
+            <label className="label" htmlFor="cbudget">
+              Monthly budget <span className="normal-case font-normal">— optional</span>
+            </label>
+            <input
+              id="cbudget"
+              className="input num"
+              inputMode="decimal"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value.replace(/[^0-9.]/g, ''))}
+              placeholder="No limit"
+            />
+            <p className="muted text-xs mt-1.5">
+              Draws a pacing bar against this category so you can see it filling up.
+            </p>
+          </div>
+        )}
+
+        <div>
+          <label className="label">Icon</label>
+          <div className="flex flex-wrap gap-2">
+            {ICON_KEYS.map((k) => (
+              <button
+                key={k}
+                className="chip px-2.5"
+                data-selected={icon === k}
+                onClick={() => setIcon(k)}
+                aria-label={k}
+                style={icon === k ? undefined : { color }}
+              >
+                <Icon name={k} size={18} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Colour</label>
+          <div className="flex flex-wrap gap-2">
+            {PALETTE.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                aria-label={`Colour ${c}`}
+                className="w-8 h-8 rounded-full border-2"
+                style={{ background: c, borderColor: color === c ? 'var(--text)' : 'transparent' }}
+              />
+            ))}
+          </div>
+        </div>
 
         {error && (
           <p className="text-sm" style={{ color: 'var(--danger)' }}>

@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 <span className="label mb-0">Invested, separately</span>
                 <span className="flex items-baseline gap-1.5">
                   <Money minor={invest.data!.monthMinor} className="text-base font-semibold" />
-                  <span className="micro" style={{ color: 'var(--accent)' }}>
+                  <span className="micro micro-link" style={{ color: 'var(--accent)' }}>
                     →
                   </span>
                 </span>
@@ -166,10 +166,13 @@ export default function DashboardPage() {
         items={[
           { label: 'Today', minor: s?.todayMinor ?? 0 },
           { label: 'This week', minor: s?.weekMinor ?? 0 },
+          /* Daily pace used to sit here, word for word the same figure the
+             hero card already prints under the projection. Four stats should
+             be four facts. */
           {
-            label: 'Daily pace',
-            minor: f?.pace.perDayMinor ?? 0,
-            sub: f ? `over ${f.pace.elapsedDays} days` : undefined,
+            label: 'Typical entry',
+            minor: f?.tickets.medianMinor ?? 0,
+            sub: f ? `${f.tickets.count} this month` : undefined,
           },
           {
             label: 'Net with people',
@@ -276,7 +279,7 @@ export default function DashboardPage() {
           <SectionHead
             label="Signals"
             action={
-              <Link href="/analytics" className="micro" style={{ color: 'var(--accent)' }}>
+              <Link href="/analytics" className="micro micro-link" style={{ color: 'var(--accent)' }}>
                 More
               </Link>
             }
@@ -340,7 +343,7 @@ export default function DashboardPage() {
         <SectionHead
           label="Recent activity"
           action={
-            <Link href="/expenses" className="micro" style={{ color: 'var(--accent)' }}>
+            <Link href="/expenses" className="micro micro-link" style={{ color: 'var(--accent)' }}>
               View all
             </Link>
           }

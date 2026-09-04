@@ -8,6 +8,7 @@ import type { Category, Expense, Person } from '@/lib/types';
 import { ChipRow } from './ui';
 import { formatINR } from '@/lib/money';
 import { Icon, resolveIcon } from '@/components/icons';
+import Link from 'next/link';
 
 /** Categories and people the user picked most recently, surfaced first so the
  *  common case is a single tap. Stored locally — no server round trip. */
@@ -93,12 +94,26 @@ export function ExpenseForm({
    * Income categories never belong in the expense list and vice versa. Before
    * this, "Salary" sat among the spending chips where one stray tap filed a
    * month's pay as an expense.
+   *
+   * Investment categories stay loggable here — a SIP is still something you
+   * type in — but they sit in their own row under their own heading, because
+   * putting them in with groceries is exactly the confusion the whole
+   * "investing is not spending" rule exists to prevent.
    */
-  const categories = useMemo(() => {
+  const { categories, investing } = useMemo(() => {
     const pool = (catData?.items ?? []).filter((c) =>
       isIncome ? c.kind === 'income' : c.kind !== 'income',
     );
-    return byRecency(pool, recents.categories);
+    return {
+      categories: byRecency(
+        pool.filter((c) => isIncome || c.kind !== 'investment'),
+        recents.categories,
+      ),
+      investing: isIncome ? [] : byRecency(
+        pool.filter((c) => c.kind === 'investment'),
+        recents.categories,
+      ),
+    };
   }, [catData, recents.categories, isIncome]);
 
   // Default a new expense to "Me" — spending on yourself is the common case,
@@ -171,6 +186,24 @@ export function ExpenseForm({
     });
   }
 
+  const categoryChip = (c: Category) => (
+    <button
+      key={c.id}
+      type="button"
+      className="chip"
+      data-selected={categoryId === c.id}
+      onClick={() => setCategoryId(c.id)}
+      style={categoryId === c.id ? { background: c.color, borderColor: c.color, color: '#fff' } : undefined}
+    >
+      {/* Carries its own colour when unselected, so the grid is scannable by
+          hue before it is readable by name. */}
+      <span className="inline-flex" style={{ color: categoryId === c.id ? 'inherit' : c.color }} aria-hidden>
+        <Icon name={resolveIcon(c.icon)} size={15} />
+      </span>
+      {c.name}
+    </button>
+  );
+
   return (
     <form
       onSubmit={(e) => {
@@ -211,41 +244,28 @@ export function ExpenseForm({
         <label className="label">{isIncome ? 'Source' : 'Category'}</label>
         {categories.length === 0 ? (
           isIncome ? (
-            <p className="muted text-[13px] leading-relaxed">
-              No income sources yet. Add one in Settings — a category with its type set to Income — and your pay
-              lands here.
-            </p>
+            /* A dead end here is what sent people hunting through Settings for
+               a field that did not exist. It is a link now. */
+            <div className="rounded-xl p-4 text-center" style={{ background: 'var(--surface-2)' }}>
+              <p className="muted text-[13px] leading-relaxed">Nowhere to file this yet.</p>
+              <Link href="/settings?add=income" className="btn btn-primary mt-3 inline-flex">
+                Add an income source
+              </Link>
+            </div>
           ) : (
             <p className="muted text-sm">Loading categories…</p>
           )
         ) : (
-          <ChipRow>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="chip"
-                data-selected={categoryId === c.id}
-                onClick={() => setCategoryId(c.id)}
-                style={
-                  categoryId === c.id
-                    ? { background: c.color, borderColor: c.color, color: '#fff' }
-                    : undefined
-                }
-              >
-                {/* Carries its own colour when unselected, so the grid is
-                    scannable by hue before it is readable by name. */}
-                <span
-                  className="inline-flex"
-                  style={{ color: categoryId === c.id ? 'inherit' : c.color }}
-                  aria-hidden
-                >
-                  <Icon name={resolveIcon(c.icon)} size={15} />
-                </span>
-                {c.name}
-              </button>
-            ))}
-          </ChipRow>
+          <ChipRow>{categories.map(categoryChip)}</ChipRow>
+        )}
+
+        {investing.length > 0 && (
+          <div className="mt-4">
+            <p className="muted text-[11px] uppercase tracking-[0.08em] mb-2">
+              Investing · kept, not spent
+            </p>
+            <ChipRow>{investing.map(categoryChip)}</ChipRow>
+          </div>
         )}
       </div>
 

@@ -428,6 +428,20 @@ h1, h2, h3 {
     color: var(--text-muted);
   }
 
+  /*
+   * A micro-label that is also a link. 10.5px of text draws a 16px-tall hit
+   * area, which on a phone is a tap you have to aim at — so it carries a
+   * finger-sized target and pulls the extra height back out of the layout.
+   */
+  .micro-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding-inline: 0.5rem;
+    margin-inline: -0.5rem;
+    margin-block: -0.75rem;
+  }
+
   /* Anything in a list that can be opened. 150ms ease-out everywhere. */
   .row {
     transition: background 150ms ease-out;
@@ -439,6 +453,23 @@ h1, h2, h3 {
   .row:active { background: var(--surface-2); }
 
   /* A clickable entity chip — category or person — that opens its inspector. */
+  /*
+   * A tag that does something needs a finger-sized target, but growing it to
+   * 44px would turn every static badge beside it into a lozenge. So the hit
+   * area grows and the box does not: an invisible ::after takes the tap.
+   */
+  button.tag,
+  a.tag {
+    position: relative;
+  }
+
+  button.tag::after,
+  a.tag::after {
+    content: '';
+    position: absolute;
+    inset: -7px -4px;
+  }
+
   .tag {
     display: inline-flex;
     align-items: center;

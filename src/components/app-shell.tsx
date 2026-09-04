@@ -44,6 +44,13 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | undefined>();
+
+  /* A sheet that survives a route change is a sheet floating over the wrong
+     screen. Anything inside it that navigates — "Add an income source", say —
+     should hand the user the page it promised, not the page behind glass. */
+  useEffect(() => {
+    setAddOpen(false);
+  }, [pathname]);
   // Toasts are owned by a provider above this, so the inspector can raise one
   // without importing the shell back.
   const toast = useToast();

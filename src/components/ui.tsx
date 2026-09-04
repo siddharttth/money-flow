@@ -216,7 +216,7 @@ export function Segmented<T extends string>({
           role="tab"
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
-          className="flex-1 px-3 sm:px-4 h-[34px] rounded-full text-xs font-semibold whitespace-nowrap transition-colors"
+          className="flex-1 px-3 sm:px-4 h-[38px] rounded-full text-xs font-semibold whitespace-nowrap transition-colors"
           style={{
             transitionDuration: '150ms',
             background: value === o.value ? 'var(--surface)' : 'transparent',
