@@ -87,7 +87,12 @@ export type MonthlyPlan = {
     savedMinor: number;
     /** The part of it already moved somewhere deliberate. */
     investedMinor: number;
-    /** The rest — still sitting in the account. */
+    /**
+     * The rest — still sitting in the account. Goes NEGATIVE when the month
+     * put more into investments than it produced: the difference came out of
+     * money that was already there, and saying so is the whole point of
+     * splitting the figure.
+     */
     inHandMinor: number;
     /** saved ÷ in, as a percentage. Null when there is nothing to divide by. */
     ratePct: number | null;
@@ -247,8 +252,12 @@ function buildTally(inMinor: number, spentMinor: number, investedMinor: number):
     outMinor: spentMinor,
     savedMinor,
     investedMinor,
-    // Investing more than you earned this month is possible — the money came
-    // from somewhere else — and must not draw a negative "in hand".
+    /*
+     * Deliberately allowed to go negative. A month that earned ₹33,133, spent
+     * ₹25,366 and invested ₹12,000 saved ₹7,767 by the usual definition, but
+     * the account is ₹4,233 lighter than it started — that ₹4,233 came out of
+     * what was already there. Clamping it to zero hides a drawdown.
+     */
     inHandMinor: savedMinor - investedMinor,
     ratePct: inMinor > 0 ? (savedMinor / inMinor) * 100 : null,
   };

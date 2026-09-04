@@ -502,13 +502,28 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
   if (!t.known) return null;
 
   const short = plan.isCurrentMonth;
+  /** Spending alone outran the money coming in. */
   const overspent = t.savedMinor < 0;
+  /** Spending did not, but spending plus investing did — the balance fell. */
+  const dipped = t.inHandMinor < 0;
 
-  // Shares of what came in. The bar is a picture of the same subtraction.
-  const pct = (v: number) => (t.inMinor > 0 ? Math.max(0, Math.min(100, (v / t.inMinor) * 100)) : 0);
+  /*
+   * The bar is scaled to whichever is larger: what came in, or what went out.
+   *
+   * Scaling to income alone was wrong the moment a month invested more than it
+   * produced — the segments summed past 100%, flex silently squashed them to
+   * fit, and the picture quietly rescaled itself into a lie. Against the larger
+   * of the two, a month that spent everything fills the bar exactly, and a
+   * month that dipped into savings runs past the income mark drawn below.
+   */
+  const outTotal = t.outMinor + t.investedMinor;
+  const scale = Math.max(t.inMinor, outTotal, 1);
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / scale) * 100));
   const spentPct = pct(t.outMinor);
   const investedPct = pct(t.investedMinor);
   const inHandPct = Math.max(0, 100 - spentPct - investedPct);
+  /** Where the money coming in ran out, when the month went past it. */
+  const incomeMarkPct = dipped ? pct(t.inMinor) : null;
 
   return (
     <Card className="!p-5 sm:!p-6">
@@ -546,20 +561,45 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
         there — all three stay distinct in Paper and Ink alike.
       */}
       <div className="mt-5">
-        <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-          <span style={{ width: `${spentPct}%`, background: 'var(--text-muted)' }} />
-          <span style={{ width: `${investedPct}%`, background: 'var(--credit)' }} />
-          <span style={{ width: `${inHandPct}%`, background: 'var(--hi)' }} />
+        <div className="relative">
+          <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+            <span style={{ width: `${spentPct}%`, background: 'var(--text-muted)' }} />
+            <span style={{ width: `${investedPct}%`, background: 'var(--credit)' }} />
+            <span style={{ width: `${inHandPct}%`, background: 'var(--hi)' }} />
+          </div>
+
+          {/* Where the money coming in ran out. Everything to its right was
+              paid for out of what was already in the account. */}
+          {incomeMarkPct != null && (
+            <span
+              aria-hidden
+              className="absolute top-[-4px] bottom-[-4px] w-[2px] -translate-x-px rounded-full"
+              style={{ left: `${incomeMarkPct}%`, background: 'var(--rule-red)' }}
+            />
+          )}
         </div>
+
+        {incomeMarkPct != null && (
+          <p className="micro mt-2" style={{ color: 'var(--rule-red)' }}>
+            past this line, the month drew on what you already had
+          </p>
+        )}
 
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 mt-4">
           <TallyLeg color="var(--text-muted)" label="Spent" minor={t.outMinor} />
           <TallyLeg color="var(--credit)" label="Invested" minor={t.investedMinor} />
+          {/*
+            This leg goes negative and must show it. A month that earned
+            ₹33,133, spent ₹25,366 and invested ₹12,000 has −₹4,233 in hand,
+            and printing that as a cheerful gold "₹4,233" was the card's worst
+            possible reading of its own arithmetic.
+          */}
           <TallyLeg
-            color="var(--hi)"
-            label={overspent ? 'Short by' : 'Still in hand'}
-            minor={Math.abs(t.inHandMinor)}
-            tone={overspent ? 'var(--rule-red)' : undefined}
+            color={overspent || dipped ? 'var(--rule-red)' : 'var(--hi)'}
+            label={overspent ? 'Short by' : dipped ? 'Taken from savings' : 'Still in hand'}
+            minor={t.inHandMinor}
+            signed
+            tone={overspent || dipped ? 'var(--rule-red)' : undefined}
           />
         </dl>
       </div>
@@ -569,8 +609,22 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
           "saved" to be read as "sitting in the bank". */}
       {t.investedMinor > 0 && !overspent && (
         <p className="muted text-[12px] mt-4 leading-relaxed">
-          Saved counts both: <span className="num">{formatINR(t.investedMinor)}</span> already moved into
-          investments, <span className="num">{formatINR(Math.max(0, t.inHandMinor))}</span> still in the account.
+          {dipped ? (
+            /* Clamping this to zero printed "₹0 still in the account" directly
+               under a leg reading ₹4,233 — the card contradicting itself in
+               adjacent lines. */
+            <>
+              <span className="num">{formatINR(t.investedMinor)}</span> went into investments — that is{' '}
+              <span className="num">{formatINR(Math.abs(t.inHandMinor))}</span> more than the month itself
+              produced, so the difference came out of money you already had. Your balance is down by that much
+              even though the month saved <span className="num">{formatINR(t.savedMinor)}</span> on paper.
+            </>
+          ) : (
+            <>
+              Saved counts both: <span className="num">{formatINR(t.investedMinor)}</span> already moved into
+              investments, <span className="num">{formatINR(t.inHandMinor)}</span> still in the account.
+            </>
+          )}
         </p>
       )}
     </Card>
@@ -582,11 +636,14 @@ function TallyLeg({
   label,
   minor,
   tone,
+  signed = false,
 }: {
   color: string;
   label: string;
   minor: number;
   tone?: string;
+  /** Print a minus for a negative figure instead of quietly taking its size. */
+  signed?: boolean;
 }) {
   return (
     <div className="flex items-baseline justify-between sm:justify-start sm:flex-col gap-x-3 sm:gap-y-1">
@@ -595,7 +652,8 @@ function TallyLeg({
         {label}
       </dt>
       <dd className="num text-[15px] font-semibold" style={tone ? { color: tone } : undefined}>
-        {formatINR(minor)}
+        {signed && minor < 0 && '−'}
+        {formatINR(Math.abs(minor))}
       </dd>
     </div>
   );

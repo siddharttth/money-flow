@@ -593,3 +593,44 @@ describe('saving as a habit, month over month', () => {
     expect(aug.savedMinor).toBe(5_000_000);
   });
 });
+
+describe('investing more than the month produced', () => {
+  /** The reported figures: ₹33,133 in, ₹25,366 spent, ₹12,000 invested. */
+  async function theReportedMonth() {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-31T10:00:00Z'));
+    await add(33133, 'Salary', '2026-08-01');
+    await add(25366, 'Outside Food', '2026-08-10');
+    await add(12000, 'SIP', '2026-08-15');
+    return (await getMonthlyPlan(userId, '2026-08')).tally;
+  }
+
+  it('reports a negative in hand rather than its absolute value', async () => {
+    const t = await theReportedMonth();
+    expect(t.savedMinor).toBe(776_700);
+    expect(t.investedMinor).toBe(1_200_000);
+    // The card printed a cheerful gold ₹4,233 here. It is money leaving.
+    expect(t.inHandMinor).toBe(-423_300);
+  });
+
+  it('still keeps the three legs reconciling to the saved figure', async () => {
+    const t = await theReportedMonth();
+    expect(t.investedMinor + t.inHandMinor).toBe(t.savedMinor);
+    expect(t.inMinor - t.outMinor).toBe(t.savedMinor);
+  });
+
+  it('leaves the savings rate alone — the month did save, on paper', async () => {
+    const t = await theReportedMonth();
+    expect(Math.round(t.ratePct!)).toBe(23);
+    expect(t.savedMinor).toBeGreaterThan(0);
+  });
+
+  it('keeps in hand positive when investing stays inside what the month made', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-31T10:00:00Z'));
+    await add(33133, 'Salary', '2026-08-01');
+    await add(25366, 'Outside Food', '2026-08-10');
+    await add(5000, 'SIP', '2026-08-15');
+
+    const { tally } = await getMonthlyPlan(userId, '2026-08');
+    expect(tally.inHandMinor).toBe(276_700);
+  });
+});
