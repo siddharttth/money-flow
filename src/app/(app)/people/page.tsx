@@ -122,7 +122,7 @@ function PeopleHub() {
 
       {/* The net position, and the only two actions that change it. */}
       <Card className="!p-5 sm:!p-6">
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-end">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-end">
           <div>
             <HeroFigure
               label="Net position"

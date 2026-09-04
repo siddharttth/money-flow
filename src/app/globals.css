@@ -185,6 +185,18 @@
   * { box-sizing: border-box; }
 
   /*
+   * Tailwind's `truncate` sets overflow, ellipsis and nowrap — but not
+   * min-width. Inside a flex or grid row that is not enough: an item's default
+   * `min-width: auto` refuses to shrink below its content, so the row's
+   * min-content stays the full width of the untruncated text and the whole
+   * card overflows instead of the text ellipsing.
+   *
+   * Asking to truncate is asking to shrink, so say so. (The 320px overflow
+   * that turned this up had a second cause too — see the grid-cols-1 note.)
+   */
+  .truncate { min-width: 0; }
+
+  /*
    * TOUCH
    * -----
    * `manipulation` drops the double-tap-to-zoom gesture, and with it the

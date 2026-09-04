@@ -67,7 +67,7 @@ export default function InvestmentsPage() {
 
       <Card className="!p-5 sm:!p-6">
         {data ? (
-          <div className="grid lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
             <div>
               <HeroFigure
                 label={`Put in during ${monthName}`}
@@ -163,7 +163,7 @@ export default function InvestmentsPage() {
           }
         />
         {funds.data?.items.length ? (
-          <div className="grid sm:grid-cols-2 gap-5 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
             {funds.data.items.map((f) => (
               <FundCard key={f.categoryId} fund={f} onAdd={() => openAdd()} />
             ))}
@@ -183,7 +183,7 @@ export default function InvestmentsPage() {
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <div>
           <SectionHead label="Where it is going" />
           <Card>

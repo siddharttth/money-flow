@@ -142,8 +142,16 @@ export function StatStrip({
     <div className="card overflow-hidden">
       <div className={`grid grid-cols-2 ${wide} hair-grid`}>
         {items.map((it) => (
+          /*
+           * Labels wrap rather than truncate — "Monthly avera…" is worse than
+           * two lines — and the label block reserves two lines whether it
+           * needs them or not, so the figures below sit on one line across the
+           * row. Pushing the figures down with mt-auto instead would align
+           * their bottoms, which is not the same thing once one cell has a
+           * sub-line and its neighbour does not.
+           */
           <div key={it.label} className="px-3.5 py-3 sm:px-5 sm:py-4 min-w-0">
-            <p className="label mb-1.5 truncate">{it.label}</p>
+            <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem]">{it.label}</p>
             {it.minor !== undefined ? (
               <Money
                 minor={it.minor}

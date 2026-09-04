@@ -88,7 +88,7 @@ function AnalyticsInner() {
 
       {/* ---------- The month, and its pace ---------- */}
       <Card className="!p-5 sm:!p-6">
-        <div className="grid lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
           <div>
             {f ? (
               <>
@@ -162,7 +162,7 @@ function AnalyticsInner() {
       {/* ---------- Rhythm ---------- */}
       <div>
         <SectionHead label="Rhythm" />
-        <div className="grid lg:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <Card>
             <h3 className="text-[15px] font-semibold mb-1">What a weekday costs</h3>
             <p className="muted text-[12px] mb-4">Average across the days of that name that saw any spending.</p>
@@ -237,13 +237,13 @@ function AnalyticsInner() {
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <Card>
             {!cats.data ? (
               <ListSkeleton rows={5} />
             ) : cats.data?.items.length ? (
               <>
-                <div className="grid sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
                   <Donut
                     data={cats.data.items.map((c) => ({ name: c.name, totalMinor: c.totalMinor, color: c.color }))}
                     size={148}
@@ -331,7 +331,7 @@ function AnalyticsInner() {
       {f && f.tickets.count > 0 && (
         <div>
           <SectionHead label="How the money leaves" />
-          <div className="grid lg:grid-cols-2 gap-5 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
             <Card>
               <div className="grid grid-cols-2 gap-5">
                 <div>

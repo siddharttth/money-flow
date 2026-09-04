@@ -258,7 +258,7 @@ export default function SettingsPage() {
       <section>
         <SectionHead label="Data" />
         <Card>
-          <div className="grid sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Link href="/settings/import" className="btn btn-ghost justify-start">
               Import a sheet
             </Link>

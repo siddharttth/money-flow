@@ -87,7 +87,7 @@ export function DashboardPanel() {
         boxShadow: '0 60px 120px -40px color-mix(in oklab, var(--forest-ink) 70%, transparent)',
       }}
     >
-      <div className="grid md:grid-cols-[180px_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-[180px_1fr]">
         <aside
           className="hidden border-r p-5 md:block"
           style={{ borderColor: 'color-mix(in oklab, var(--onforest) 10%, transparent)' }}
@@ -153,7 +153,7 @@ export function DashboardPanel() {
             ))}
           </div>
 
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
               <p className="lp-eyebrow text-[9px]" style={{ color: 'var(--onforest-muted)' }}>
                 Where it went

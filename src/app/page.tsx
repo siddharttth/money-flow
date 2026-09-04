@@ -140,7 +140,7 @@ export default async function LandingPage() {
         {/* ---------------------------- The Movement ----------------------- */}
         {/* No ruled paper here — the rules belong to the hero alone. */}
         <section id="movement" className="mx-auto max-w-6xl px-6 py-24 md:py-36">
-          <div className="grid gap-16 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-16 md:grid-cols-2">
             <Reveal>
               <div>
                 <span className="lp-label">The complication</span>
@@ -200,7 +200,7 @@ export default async function LandingPage() {
           className="py-24 md:py-36"
           style={{ background: 'var(--forest)', color: 'var(--onforest)' }}
         >
-          <div className="mx-auto grid max-w-6xl items-start gap-16 px-6 md:grid-cols-2">
+          <div className="mx-auto grid grid-cols-1 max-w-6xl items-start gap-16 px-6 md:grid-cols-2">
             <Reveal>
               <div className="md:sticky md:top-32">
                 {/* Plain eyebrow here — no flanking rules on this one. */}
@@ -243,7 +243,7 @@ export default async function LandingPage() {
         {/* ----------------------------- The Ledger ------------------------ */}
         {/* Plain paper — the rules stay in the hero. */}
         <section id="ledger" className="mx-auto max-w-6xl px-6 py-24 md:py-36">
-          <div className="grid items-start gap-16 md:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-16 md:grid-cols-2">
             <Reveal>
               <div className="md:sticky md:top-32">
                 <span className="lp-label">The ledger</span>

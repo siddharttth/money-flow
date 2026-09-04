@@ -82,7 +82,7 @@ export default function DashboardPage() {
 
       {/* 1 — the month, and whether it is running hot. */}
       <Card className="!p-5 sm:!p-6">
-        <div className="grid lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
           <div>
             {f ? (
               <HeroFigure
@@ -182,7 +182,7 @@ export default function DashboardPage() {
 
       {/* 2b — what was already decided, and what is still to land. */}
       {plan.data && (plan.data.committed.upcoming.length > 0 || plan.data.committed.committedPaidMinor > 0) && (
-        <div className="grid lg:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <CommittedSplitCard plan={plan.data} />
           <ComingUp plan={plan.data} />
         </div>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
         lists blanked to skeletons and back on every month step while the
         headline figure above them held steady.
       */}
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] gap-5 items-start">
         <Card>
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="text-[15px] font-semibold">
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             !cats.data ? (
               <ListSkeleton rows={5} />
             ) : cats.data?.items.length ? (
-              <div className="grid sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
+              <div className="grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
                 <Donut
                   data={cats.data.items.map((c) => ({ name: c.name, totalMinor: c.totalMinor, color: c.color }))}
                   size={150}

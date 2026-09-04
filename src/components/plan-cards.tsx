@@ -50,7 +50,7 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
 
   return (
     <Card className="!p-5 sm:!p-6">
-      <div className="grid lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
         <div>
           <p className="label mb-2">{plan.overspent ? 'Over budget' : 'Safe to spend'}</p>
           {plan.overspent ? (
