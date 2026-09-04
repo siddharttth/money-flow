@@ -46,56 +46,6 @@ function PlanLine({
 }
 
 /* ------------------------------------------------------------------ *
- * Coming up
- * ------------------------------------------------------------------ */
-
-/**
- * Charges the ledger has learned to expect and that have not landed yet.
- *
- * Solves "why am I always short at the end of the month" — because a chunk of
- * it was already spoken for and nothing said so until it went out.
- */
-export function ComingUp({ plan }: { plan: MonthlyPlan }) {
-  const upcoming = plan.committed.upcoming;
-  if (!upcoming.length) return null;
-
-  const today = Number(todayISO().slice(8, 10));
-
-  return (
-    <Card>
-      <div className="flex items-baseline justify-between gap-3 mb-1">
-        <h2 className="text-[15px] font-semibold">Still to come</h2>
-        <Money minor={plan.committed.committedDueMinor} className="text-[13px] font-semibold" />
-      </div>
-      <p className="muted text-[12px] mb-4">Recognised from your own history. Nothing here was entered as a bill.</p>
-
-      <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-        {upcoming.map((c) => {
-          const overdue = plan.isCurrentMonth && c.typicalDay < today;
-          return (
-            <li key={`${c.categoryId}-${c.label}`} className="flex items-center gap-3 py-2.5">
-              <CategoryIcon icon={c.icon} color={c.color} size={28} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium truncate capitalize">{c.label || c.categoryName}</p>
-                <p className="micro mt-0.5" style={overdue ? { color: 'var(--rule-red)' } : undefined}>
-                  {overdue ? 'expected by now' : `around the ${ordinal(c.typicalDay)}`}
-                </p>
-              </div>
-              <Money minor={c.typicalMinor} className="text-[13px] font-semibold shrink-0" />
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
-function ordinal(n: number): string {
-  const suffix = n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th';
-  return `${n}${suffix}`;
-}
-
-/* ------------------------------------------------------------------ *
  * The underspend sweep
  * ------------------------------------------------------------------ */
 

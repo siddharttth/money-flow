@@ -32,7 +32,6 @@ import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import {
-  ComingUp,
   GoalsStrip,
   LifetimeInHand,
   MonthTally,
@@ -212,10 +211,6 @@ export default function DashboardPage() {
           },
         ]}
       />
-
-      {/* 2b — what is still to land. The committed-vs-discretionary split that
-          used to sit beside this was a cut nobody asked the app to make. */}
-      {plan.data && plan.data.committed.upcoming.length > 0 && <ComingUp plan={plan.data} />}
 
       {/*
         3 — the two dimensions of the same money.
