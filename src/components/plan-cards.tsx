@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSWRConfig } from 'swr';
 import { api } from '@/lib/client';
-import { dayLabel, todayISO } from '@/lib/dates';
+import { dayLabel, targetLabel, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { MonthlyPlan, Sweep } from '@/lib/plan';
 import type { Fund } from '@/lib/funds';
@@ -398,7 +398,7 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
           <p className="muted text-[12px] mt-0.5">
             <span className="num">{formatINR(fund.savedMinor)}</span> of{' '}
             <span className="num">{formatINR(fund.targetMinor)}</span>
-            {fund.targetDate && ` · by ${dayLabel(fund.targetDate)}`}
+            {fund.targetDate && ` · by ${targetLabel(fund.targetDate)}`}
           </p>
         </div>
       </div>
@@ -456,11 +456,11 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
           where the money is actually heading. */}
       {fund.projectedDate && !fund.isComplete && (
         <p className="muted text-[12px] mt-3.5 leading-relaxed">
-          At the rate so far you get there around <strong>{dayLabel(fund.projectedDate)}</strong>
+          At the rate so far you get there around <strong>{targetLabel(fund.projectedDate)}</strong>
           {fund.targetDate && (
             <>
               {' '}
-              — {fund.projectedDate <= fund.targetDate ? 'ahead of' : 'later than'} the {dayLabel(fund.targetDate)}{' '}
+              — {fund.projectedDate <= fund.targetDate ? 'ahead of' : 'later than'} the {targetLabel(fund.targetDate)}{' '}
               target.
             </>
           )}

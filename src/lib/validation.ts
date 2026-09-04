@@ -46,7 +46,14 @@ export const updateExpenseSchema = z.object({
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(60),
   monthlyBudget: z.number().nonnegative().max(100_000_000).nullable().optional(),
-  icon: z.string().trim().max(8).optional(),
+  /*
+   * Icons were emoji once, and 8 characters was generous for one. They are
+   * named keys now — and `transport` is nine, so picking the car silently
+   * failed every save with a raw Zod string-length error. The set is closed
+   * and resolved through `resolveIcon`, which falls back on anything it does
+   * not know, so the length cap is only here to stop abuse.
+   */
+  icon: z.string().trim().max(32).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value').optional(),
   kind: z.enum(['expense', 'investment', 'income']).optional(),
   sortOrder: z.number().int().optional(),
@@ -77,7 +84,7 @@ export const updatePersonSchema = createPersonSchema.partial().extend({
 
 export const createGroupSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(60),
-  icon: z.string().trim().max(8).optional(),
+  icon: z.string().trim().max(32).optional(),
   personIds: z.array(z.string().uuid()).optional().default([]),
 });
 

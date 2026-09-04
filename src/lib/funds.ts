@@ -2,7 +2,7 @@ import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { categories, expenses } from '@/db/schema';
 import { sumToMinor } from './money';
-import { daysApart, monthRange, todayISO } from './dates';
+import { daysApart, monthRange, monthsBetween, todayISO } from './dates';
 
 /**
  * FUNDS
@@ -68,14 +68,6 @@ const PACE_MIN_DAYS = 21;
 /** A projection needs a rate, and one deposit is not a rate. */
 const PROJECTION_MIN_DAYS = 30;
 const PROJECTION_MIN_CONTRIBUTIONS = 2;
-
-/** Months between two ISO dates, never below zero, counting a part month as one. */
-function monthsBetween(from: string, to: string): number {
-  const [fy, fm] = from.split('-').map(Number);
-  const [ty, tm, td] = to.split('-').map(Number);
-  const whole = (ty - fy) * 12 + (tm - fm);
-  return Math.max(0, whole + (td >= Number(from.slice(8, 10)) ? 0 : -1) + 1);
-}
 
 export async function getFunds(userId: string, month: string): Promise<Fund[]> {
   const { start, end } = monthRange(month);

@@ -137,7 +137,7 @@ export default function InvestmentsPage() {
           label="Goals"
           action={
             <Link
-              href={funds.data?.items.length ? '/settings' : '/settings?add=investment'}
+              href={funds.data?.items.length ? '/settings' : '/settings?add=goal'}
               className="micro micro-link"
               style={{ color: 'var(--accent)' }}
             >
@@ -157,7 +157,7 @@ export default function InvestmentsPage() {
               title="No goals yet"
               hint="A goal is an investment category with a target on it — a bike, an emergency buffer, a trip. Give one a target and this screen works out the monthly pace you need to land it on time."
               action={
-                <Link href="/settings?add=investment" className="btn btn-primary">
+                <Link href="/settings?add=goal" className="btn btn-primary">
                   Set a target
                 </Link>
               }
@@ -211,6 +211,19 @@ export default function InvestmentsPage() {
                   <strong>Investment</strong> in Settings — nothing else changes, and its whole history moves with it.
                 </p>
               </>
+            ) : funds.data?.items.length ? (
+              /* A goal already exists — telling this person to go and create an
+                 investment category is telling them to do what they just did.
+                 What is actually missing is a contribution. */
+              <EmptyState
+                title="Nothing contributed yet"
+                hint="Put something into a goal and this is where the running totals appear, one line per category."
+                action={
+                  <button className="btn btn-ghost" onClick={() => openAdd()}>
+                    Record a contribution
+                  </button>
+                }
+              />
             ) : (
               <EmptyState
                 title="No investment categories yet"

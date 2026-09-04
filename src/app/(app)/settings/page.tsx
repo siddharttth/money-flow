@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
-import { currentMonth, dayLabel, monthLabel, shiftMonth } from '@/lib/dates';
+import { currentMonth, dayLabel, monthLabel, shiftMonth, targetLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat } from '@/lib/types';
 import { Card, EmptyState, ListSkeleton, Modal, Money, PageHeader, SectionHead } from '@/components/ui';
@@ -14,6 +14,7 @@ import { useInspector } from '@/components/inspector';
 import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
 import { IncomeSourceModal } from '@/components/income-source-modal';
+import { GoalModal } from '@/components/goal-modal';
 
 type CategoryRow = Category & {
   monthlyBudgetMinor: number | null;
@@ -34,7 +35,7 @@ export default function SettingsPage() {
   const { mutate } = useSWRConfig();
   const [theme, setTheme] = useState<ThemeChoice>('system');
   const [editing, setEditing] = useState<CategoryRow | null>(null);
-  const [creating, setCreating] = useState<null | 'expense' | 'income' | 'investment'>(null);
+  const [creating, setCreating] = useState<null | 'expense' | 'income' | 'investment' | 'goal'>(null);
 
   const me = useSWR<{ user: { name: string; email: string; currency: string } }>('/api/auth/me');
   const incomeThis = useSWR<{ items: CategoryStat[]; grandTotalMinor: number }>(
@@ -74,7 +75,7 @@ export default function SettingsPage() {
    */
   useEffect(() => {
     const add = new URLSearchParams(window.location.search).get('add');
-    if (add === 'income' || add === 'investment' || add === 'expense') {
+    if (add === 'income' || add === 'goal' || add === 'investment' || add === 'expense') {
       setCreating(add);
       // Consume it, so a refresh or a back-tap does not reopen the sheet.
       window.history.replaceState(null, '', window.location.pathname);
@@ -267,7 +268,7 @@ export default function SettingsPage() {
                           {c.kind === 'income'
                             ? 'Income · kept out of spending'
                             : c.targetMinor
-                              ? `Goal · ${formatINR(c.targetMinor)}${c.targetDate ? ` by ${dayLabel(c.targetDate)}` : ''}`
+                              ? `Goal · ${formatINR(c.targetMinor)}${c.targetDate ? ` by ${targetLabel(c.targetDate)}` : ''}`
                               : c.kind === 'investment'
                                 ? 'Investment · kept out of spending'
                                 : 'No monthly budget'}
@@ -419,8 +420,18 @@ export default function SettingsPage() {
         }}
       />
 
+      <GoalModal
+        open={creating === 'goal'}
+        onClose={() => setCreating(null)}
+        onDone={async (msg) => {
+          await refresh();
+          toast(msg);
+          setCreating(null);
+        }}
+      />
+
       <CategoryModal
-        open={(!!creating && creating !== 'income') || !!editing}
+        open={(!!creating && creating !== 'income' && creating !== 'goal') || !!editing}
         category={editing}
         defaultKind={creating === 'investment' ? 'investment' : 'expense'}
         onClose={() => {

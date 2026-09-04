@@ -74,6 +74,24 @@ export function daysBetween(start: string, end: string): number {
   return Math.round((b - a) / 86400000) + 1;
 }
 
+/**
+ * A date that may be years out — a goal's target, a projected finish.
+ *
+ * `dayLabel` drops the year, which is right for a transaction ("15 Aug", and
+ * of course it was this year) and wrong for a target ("by 15 Aug" on a goal
+ * due in 2027 reads as eleven months earlier than it is).
+ */
+export function targetLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const sameYear = y === Number(todayISO().slice(0, 4));
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    timeZone: 'UTC',
+  });
+}
+
 /** '2026-08-23' -> '23 Aug' */
 export function dayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -101,4 +119,20 @@ export function isValidISODate(s: string): boolean {
   if (m < 1 || m > 12) return false;
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return d >= 1 && d <= last;
+}
+
+/**
+ * Whole months from `from` to `to`, counting a part month as one, never below
+ * zero.
+ *
+ * Lives here rather than beside the fund maths because the goal sheet quotes
+ * the same figure live while you pick a date — and when it had its own copy
+ * the two were off by one, so the sheet promised ₹9,091 a month and the saved
+ * goal asked for ₹8,333. One function, one answer.
+ */
+export function monthsBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  const whole = (ty - fy) * 12 + (tm - fm);
+  return Math.max(0, whole + (td >= fd ? 0 : -1) + 1);
 }
