@@ -31,7 +31,14 @@ import { BreakdownList } from '@/components/breakdown';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
-import { CommittedSplitCard, ComingUp, GoalsStrip, MonthTally, SafeToSpend, SweepCard } from '@/components/plan-cards';
+import {
+  ComingUp,
+  GoalsStrip,
+  LifetimeInHand,
+  MonthTally,
+  SweepCard,
+  type LifetimeTallyRow,
+} from '@/components/plan-cards';
 
 /**
  * The dashboard answers four questions, in this order, top to bottom:
@@ -61,6 +68,8 @@ export default function DashboardPage() {
   const daily = useSWR<{ items: { date: string; totalMinor: number }[] }>(`/api/analytics/daily?month=${month}`);
   const recent = useSWR<{ items: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&limit=6`);
   const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
+  /* No month in the key — this one is the same answer whatever is on screen. */
+  const lifetime = useSWR<LifetimeTallyRow>('/api/analytics/lifetime');
   const plan = useSWR<MonthlyPlan & { sweep: Sweep }>(`/api/plan?month=${month}`);
 
   const s = summary.data;
@@ -167,8 +176,15 @@ export default function DashboardPage() {
       */}
       {plan.data && <MonthTally plan={plan.data} monthName={monthLabel(month).split(' ')[0]} />}
 
-      {/* 1c — and the only figure that is about the future rather than the past. */}
-      {plan.data?.isCurrentMonth && <SafeToSpend plan={plan.data} />}
+      {/*
+        1c — the same subtraction, over every month there is.
+
+        Deliberately keyed without the month: a lifetime figure that moved when
+        you pressed the back arrow would not be one. It is the answer to the
+        question a bad month raises — "is this what I always do?" — which the
+        monthly card cannot give, because it resets on the 1st.
+      */}
+      {lifetime.data && <LifetimeInHand data={lifetime.data} />}
 
       {/* 1d — what the saving is for. These were computed correctly and shown
           only at the bottom of Investments, which made working goals feel
@@ -197,13 +213,9 @@ export default function DashboardPage() {
         ]}
       />
 
-      {/* 2b — what was already decided, and what is still to land. */}
-      {plan.data && (plan.data.committed.upcoming.length > 0 || plan.data.committed.committedPaidMinor > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <CommittedSplitCard plan={plan.data} />
-          <ComingUp plan={plan.data} />
-        </div>
-      )}
+      {/* 2b — what is still to land. The committed-vs-discretionary split that
+          used to sit beside this was a cut nobody asked the app to make. */}
+      {plan.data && plan.data.committed.upcoming.length > 0 && <ComingUp plan={plan.data} />}
 
       {/*
         3 — the two dimensions of the same money.

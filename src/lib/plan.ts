@@ -337,3 +337,60 @@ export async function getSavingsHistory(userId: string, months: number): Promise
     };
   });
 }
+
+export type LifetimeTally = {
+  /** True once any income has ever been recorded. */
+  known: boolean;
+  inMinor: number;
+  outMinor: number;
+  investedMinor: number;
+  /** in − out − invested. What every month put together actually left behind. */
+  inHandMinor: number;
+  /** Distinct months with anything in them, for context under the figure. */
+  months: number;
+  /** 'YYYY-MM' of the earliest month with anything in it. */
+  firstMonth: string | null;
+};
+
+/**
+ * EVERY MONTH, ADDED UP.
+ *
+ * A month is a unit of accounting, not a unit of life. August being down
+ * ₹2,233 matters much less if the eleven months before it were not — and the
+ * monthly card, by design, cannot say so: it resets on the 1st and forgets.
+ *
+ * This is the running total the months are instalments of. It deliberately
+ * ignores whichever month the dashboard is looking at, because a lifetime
+ * figure that moved when you pressed the back arrow would not be one.
+ *
+ * Summing each month's leftover is the same arithmetic as differencing the
+ * lifetime totals — Σ(inᵢ − outᵢ − investedᵢ) = Σin − Σout − Σinvested — so
+ * this is one query rather than one per month.
+ */
+export async function getLifetimeTally(userId: string): Promise<LifetimeTally> {
+  const [row] = await db
+    .select({
+      income: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} = 'income'), 0)`,
+      spent: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} NOT IN ('income', 'investment')), 0)`,
+      invested: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} = 'investment'), 0)`,
+      months: sql<string>`COUNT(DISTINCT to_char(${expenses.expenseDate}, 'YYYY-MM'))`,
+      first: sql<string | null>`MIN(to_char(${expenses.expenseDate}, 'YYYY-MM'))`,
+    })
+    .from(expenses)
+    .innerJoin(categories, sql`${categories.id} = ${expenses.categoryId}`)
+    .where(sql`${expenses.userId} = ${userId} AND ${expenses.deletedAt} IS NULL`);
+
+  const inMinor = sumToMinor(row?.income ?? 0);
+  const outMinor = sumToMinor(row?.spent ?? 0);
+  const investedMinor = sumToMinor(row?.invested ?? 0);
+
+  return {
+    known: inMinor > 0,
+    inMinor,
+    outMinor,
+    investedMinor,
+    inHandMinor: inMinor - outMinor - investedMinor,
+    months: Number(row?.months ?? 0),
+    firstMonth: row?.first ?? null,
+  };
+}

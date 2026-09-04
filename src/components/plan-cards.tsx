@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSWRConfig } from 'swr';
 import { api } from '@/lib/client';
-import { dayLabel, targetLabel, todayISO } from '@/lib/dates';
+import { targetLabel, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { MonthlyPlan, Sweep } from '@/lib/plan';
 import type { Fund } from '@/lib/funds';
@@ -12,133 +12,6 @@ import { Card, Money } from './ui';
 import { ShareBar } from './graph';
 import { CategoryIcon } from './icons';
 import { useToast } from './toast';
-
-/* ------------------------------------------------------------------ *
- * Safe to spend
- * ------------------------------------------------------------------ */
-
-/**
- * The one figure that changes what someone does at the counter.
- *
- * Every other number in this app is about the past. "You have spent ₹15,142"
- * is a fact you cannot act on; "₹610 a day" is a decision. The arithmetic is
- * spelled out underneath on purpose — a number nobody can reproduce in their
- * head is a number nobody trusts, and this one has four inputs.
- */
-export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
-  if (!plan.hasIncome) {
-    return (
-      <Card className="!p-5">
-        <p className="label mb-2">Safe to spend</p>
-        <p className="text-[15px] font-semibold">Tell the app what comes in</p>
-        <p className="muted text-[13px] mt-1.5 leading-relaxed max-w-lg">
-          It knows what leaves and nothing about what arrives, so it cannot say what is safe to spend, what your
-          savings rate is, or how long your money lasts. Add an income source, then log each payment under{' '}
-          <strong>Add transaction → Income</strong> — a month that pays differently just gets a different figure.
-        </p>
-        <Link href="/settings?add=income" className="btn btn-primary mt-4">
-          Add an income source
-        </Link>
-      </Card>
-    );
-  }
-
-  const { committed } = plan;
-
-  return (
-    <Card className="!p-5 sm:!p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
-        <div>
-          <p className="label mb-2">
-            {plan.shortfall === 'goals' ? 'Goals ask for more' : plan.overspent ? 'Over budget' : 'Safe to spend'}
-          </p>
-          {plan.shortfall === 'goals' ? (
-            /*
-             * Not overspending. A month can be ₹4,000 out of ₹50,000 and still
-             * come up short because the targets want ₹48,893 of it — and
-             * calling that "over budget" directly under a card reading "saved
-             * ₹46,000" makes the app argue with itself.
-             */
-            <>
-              <Money
-                minor={Math.abs(plan.freeMinor)}
-                className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
-                style={{ color: 'var(--hi)' }}
-              />
-              <p className="muted text-[13px] mt-2.5 leading-relaxed">
-                more than the month has left, once your goals take their share. Your spending is fine — the targets
-                are the stretch.
-              </p>
-              <p className="muted text-[12px] mt-2.5 leading-relaxed">
-                Push a target date out, or put in less this month:{' '}
-                <span className="num">{formatINR(plan.freeBeforeGoalsMinor)}</span> is genuinely free before they
-                are counted.
-              </p>
-            </>
-          ) : plan.overspent ? (
-            <>
-              <Money
-                minor={Math.abs(plan.freeMinor)}
-                className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
-                style={{ color: 'var(--rule-red)' }}
-              />
-              <p className="muted text-[13px] mt-2.5">
-                past what is left for the month, with {plan.daysLeft} {plan.daysLeft === 1 ? 'day' : 'days'} to go
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="flex items-baseline gap-2">
-                <Money
-                  minor={plan.perDayMinor}
-                  className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
-                />
-                <span className="muted text-[15px]">a day</span>
-              </div>
-              <p className="muted text-[13px] mt-2.5">
-                <span className="num">{formatINR(plan.freeMinor)}</span> free over{' '}
-                <span className="num">{plan.daysLeft}</span> {plan.daysLeft === 1 ? 'day' : 'days'}
-              </p>
-              {/* Never let an estimate pass for a fact. */}
-              {plan.usingEstimate && (
-                <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Assuming <span className="num">{formatINR(plan.expectedIncomeMinor)}</span> in, from your last few
-                  months. This updates the moment you log the real figure.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* The working. Four subtractions, in the order they happen. */}
-        <div className="min-w-0">
-          <p className="label mb-2.5">How it gets there</p>
-          <dl className="space-y-2">
-            <PlanLine
-              label={plan.usingEstimate ? 'Income (expected)' : 'Income'}
-              minor={plan.expectedIncomeMinor}
-              sign="+"
-              strong
-            />
-            <PlanLine label="Spent so far" minor={plan.spentMinor} sign="−" />
-            {plan.investedMinor > 0 && <PlanLine label="Invested" minor={plan.investedMinor} sign="−" />}
-            {committed.committedDueMinor > 0 && (
-              <PlanLine label="Bills still due" minor={committed.committedDueMinor} sign="−" />
-            )}
-            {plan.savingsTargetMinor > 0 && (
-              <PlanLine label="Goals still need" minor={plan.savingsTargetMinor} sign="−" />
-            )}
-            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-              <PlanLine label="Free" minor={plan.freeMinor} strong tone={plan.overspent ? 'bad' : 'good'} />
-            </div>
-          </dl>
-
-
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function PlanLine({
   label,
@@ -162,54 +35,13 @@ function PlanLine({
         className={`num text-[13px] ${strong ? 'font-semibold' : ''}`}
         style={{ color: tone === 'bad' ? 'var(--rule-red)' : tone === 'good' ? 'var(--credit)' : undefined }}
       >
-        {sign === '−' ? '−' : ''}
+        {/* An explicit sign wins; failing that, a negative total still has to
+            show one. A "In hand" row reading ₹2,233 when it means −₹2,233 is
+            the same bug this card exists to stop telling. */}
+        {sign === '−' || (!sign && minor < 0) ? '−' : ''}
         {formatINR(Math.abs(minor))}
       </dd>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Committed vs discretionary
- * ------------------------------------------------------------------ */
-
-/**
- * The most clarifying cut in the month, and the one every expense app leaves
- * out: what was already decided, against what was actually chosen.
- */
-export function CommittedSplitCard({ plan }: { plan: MonthlyPlan }) {
-  const { committed } = plan;
-  const total = committed.committedPaidMinor + committed.discretionaryMinor;
-  if (total === 0) return null;
-
-  const committedShare = committed.committedPaidMinor / total;
-
-  return (
-    <Card>
-      <h2 className="text-[15px] font-semibold mb-1">Decided vs chosen</h2>
-      <p className="muted text-[12px] mb-4">
-        Recurring charges were settled months ago. The rest is this month&rsquo;s actual decisions — and the only part
-        worth trying to move.
-      </p>
-
-      <div className="flex h-2.5 rounded-full overflow-hidden mb-4" style={{ background: 'var(--surface-2)' }}>
-        <span style={{ width: `${committedShare * 100}%`, background: 'var(--border-strong)' }} />
-        <span style={{ width: `${(1 - committedShare) * 100}%`, background: 'var(--brass)' }} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="label mb-1.5">Committed</p>
-          <Money minor={committed.committedPaidMinor} className="text-xl font-semibold" />
-          <p className="muted text-[11px] mt-1">{Math.round(committedShare * 100)}% · already decided</p>
-        </div>
-        <div>
-          <p className="label mb-1.5">Discretionary</p>
-          <Money minor={committed.discretionaryMinor} className="text-xl font-semibold" />
-          <p className="muted text-[11px] mt-1">{Math.round((1 - committedShare) * 100)}% · your choices</p>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -876,6 +708,105 @@ export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
         Averaging <strong className="num">{Math.round(avg)}%</strong> kept across{' '}
         {withIncome.length === 1 ? 'the one month' : `${withIncome.length} months`} with income logged.
       </p>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Lifetime
+ * ------------------------------------------------------------------ */
+
+export type LifetimeTallyRow = {
+  known: boolean;
+  inMinor: number;
+  outMinor: number;
+  investedMinor: number;
+  inHandMinor: number;
+  months: number;
+  firstMonth: string | null;
+};
+
+/**
+ * The running total the months are instalments of.
+ *
+ * A month is a unit of accounting, not a unit of life, and the monthly card
+ * cannot help resetting on the 1st. August being down ₹2,233 reads very
+ * differently next to eleven months that were not — so this adds them all up
+ * and, unlike everything else on the dashboard, does not move when you change
+ * the month.
+ */
+export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
+  /*
+   * With nothing coming in there is no figure to give, and this is the only
+   * card on the dashboard that is always present — so it carries the prompt
+   * that used to live on safe-to-spend. Returning null here would leave a
+   * fresh account with no route to setting income up at all.
+   */
+  if (!data.known) {
+    return (
+      <Card className="!p-5">
+        <p className="label mb-2">Lifetime in hand</p>
+        <p className="text-[15px] font-semibold">Tell the app what comes in</p>
+        <p className="muted text-[13px] mt-1.5 leading-relaxed max-w-lg">
+          It knows what leaves and nothing about what arrives, so it cannot say what you have kept. Add an income
+          source, then log each payment under <strong>Add transaction → Income</strong> — a month that pays
+          differently just gets a different figure.
+        </p>
+        <Link href="/settings?add=income" className="btn btn-primary mt-4">
+          Add an income source
+        </Link>
+      </Card>
+    );
+  }
+
+  const down = data.inHandMinor < 0;
+
+  return (
+    <Card className="!p-5 sm:!p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-5 lg:gap-8 items-start">
+        <div>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="label mb-0">Lifetime in hand</p>
+            {/* The one figure here that is not about the month on screen. */}
+            <span className="micro">all time</span>
+          </div>
+
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+            <span
+              className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight num"
+              style={down ? { color: 'var(--rule-red)' } : undefined}
+            >
+              {down && '−'}
+              {formatINR(Math.abs(data.inHandMinor))}
+            </span>
+          </div>
+
+          <p className="muted text-[13px] mt-2.5 leading-relaxed">
+            {down ? 'drawn down' : 'kept'} across {data.months} {data.months === 1 ? 'month' : 'months'}
+            {data.firstMonth && <>, since {monthName(data.firstMonth)}</>}
+          </p>
+        </div>
+
+        {/* The same subtraction as the monthly card, over every month there is. */}
+        <div className="min-w-0">
+          <dl className="space-y-2">
+            <PlanLine label="Everything that came in" minor={data.inMinor} sign="+" strong />
+            <PlanLine label="Everything spent" minor={data.outMinor} sign="−" />
+            {data.investedMinor > 0 && <PlanLine label="Everything invested" minor={data.investedMinor} sign="−" />}
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+              <PlanLine label="In hand" minor={data.inHandMinor} strong tone={down ? 'bad' : 'good'} />
+            </div>
+          </dl>
+
+          {data.investedMinor > 0 && (
+            <p className="muted text-[12px] mt-3.5 leading-relaxed">
+              Investments are subtracted because this is cash, not net worth —{' '}
+              <span className="num">{formatINR(data.investedMinor)}</span> of it is still yours, just not
+              spendable.
+            </p>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }

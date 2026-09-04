@@ -9,7 +9,7 @@ const { createExpense } = await import('@/lib/expenses');
 const { getTotal } = await import('@/lib/analytics');
 const { getRecurringCharges, splitCommitted } = await import('@/lib/recurring');
 const { getFunds, requiredSavingsMinor } = await import('@/lib/funds');
-const { getMonthlyPlan, getSweep, getSavingsHistory } = await import('@/lib/plan');
+const { getMonthlyPlan, getSweep, getSavingsHistory, getLifetimeTally } = await import('@/lib/plan');
 const { eq } = await import('drizzle-orm');
 
 let userId: string;
@@ -632,5 +632,59 @@ describe('investing more than the month produced', () => {
 
     const { tally } = await getMonthlyPlan(userId, '2026-08');
     expect(tally.inHandMinor).toBe(276_700);
+  });
+});
+
+describe('lifetime in hand', () => {
+  it('is every month added up, and matches summing them one by one', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    // August went backwards: ₹33,133 in, ₹25,366 spent, ₹10,000 invested.
+    await add(33133, 'Salary', '2026-08-01');
+    await add(25366, 'Outside Food', '2026-08-10');
+    await add(10000, 'SIP', '2026-08-15');
+    // September did not: ₹40,000 in, ₹30,000 spent, nothing invested.
+    await add(40000, 'Salary', '2026-09-01');
+    await add(30000, 'Outside Food', '2026-09-10');
+
+    const life = await getLifetimeTally(userId);
+    expect(life.inHandMinor).toBe(-223_300 + 1_000_000);
+    expect(life.months).toBe(2);
+    expect(life.firstMonth).toBe('2026-08');
+
+    // The same number by the long route, which is the definition being claimed.
+    const history = await getSavingsHistory(userId, 12);
+    const summed = history.reduce((s, m) => s + m.savedMinor - m.investedMinor, 0);
+    expect(summed).toBe(life.inHandMinor);
+  });
+
+  it('does not move when a different month is asked for', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(10000, 'Outside Food', '2026-08-10');
+
+    // Nothing about it is month-scoped, so there is no month to pass.
+    const a = await getLifetimeTally(userId);
+    await add(1000, 'Outside Food', '2026-09-05');
+    const b = await getLifetimeTally(userId);
+
+    // It moves when the DATA moves, and only then.
+    expect(a.inHandMinor).toBe(4_000_000);
+    expect(b.inHandMinor).toBe(3_900_000);
+  });
+
+  it('subtracts investment, because this is cash and not net worth', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(50000, 'SIP', '2026-08-02');
+
+    const life = await getLifetimeTally(userId);
+    expect(life.investedMinor).toBe(5_000_000);
+    expect(life.inHandMinor).toBe(0);
+  });
+
+  it('says nothing rather than zero for an account with no income at all', async () => {
+    await add(500, 'Outside Food', '2026-08-05');
+    const life = await getLifetimeTally(userId);
+    expect(life.known).toBe(false);
   });
 });
