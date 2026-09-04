@@ -43,11 +43,20 @@ export function ExpenseForm({
   existing,
   onSaved,
   keepOpenAfterSave = false,
+  /**
+   * 'income' turns this into the pay form: income categories instead of
+   * spending ones, no person picker, and wording that does not call a salary
+   * an expense. The row it writes is identical — one table, one create call,
+   * and `kind` on the category is what makes it income.
+   */
+  mode = 'expense',
 }: {
   existing?: Expense;
   onSaved: (e: Expense, again: boolean) => void;
   keepOpenAfterSave?: boolean;
+  mode?: 'expense' | 'income';
 }) {
+  const isIncome = mode === 'income';
   const { mutate } = useSWRConfig();
   const { data: catData } = useSWR<{ items: Category[] }>('/api/categories');
   const { data: personData } = useSWR<{ items: Person[] }>('/api/people');
@@ -80,15 +89,22 @@ export function ExpenseForm({
     if (window.matchMedia('(pointer: fine)').matches) amountRef.current?.focus();
   }, []);
 
-  const categories = useMemo(
-    () => byRecency(catData?.items ?? [], recents.categories),
-    [catData, recents.categories],
-  );
+  /*
+   * Income categories never belong in the expense list and vice versa. Before
+   * this, "Salary" sat among the spending chips where one stray tap filed a
+   * month's pay as an expense.
+   */
+  const categories = useMemo(() => {
+    const pool = (catData?.items ?? []).filter((c) =>
+      isIncome ? c.kind === 'income' : c.kind !== 'income',
+    );
+    return byRecency(pool, recents.categories);
+  }, [catData, recents.categories, isIncome]);
 
   // Default a new expense to "Me" — spending on yourself is the common case,
   // and it stays provisional until the user picks someone else.
   useEffect(() => {
-    if (existing || personTouched || personIds.length) return;
+    if (isIncome || existing || personTouched || personIds.length) return;
     const me = personData?.items.find((p) => p.isSelf);
     if (me) setPersonIds([me.id]);
   }, [personData, existing, personTouched, personIds.length]);
@@ -172,7 +188,7 @@ export function ExpenseForm({
     >
       <div>
         <label className="label" htmlFor="amount">
-          Amount
+          {isIncome ? 'How much came in' : 'Amount'}
         </label>
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl muted">₹</span>
@@ -192,9 +208,16 @@ export function ExpenseForm({
       </div>
 
       <div>
-        <label className="label">Category</label>
+        <label className="label">{isIncome ? 'Source' : 'Category'}</label>
         {categories.length === 0 ? (
-          <p className="muted text-sm">Loading categories…</p>
+          isIncome ? (
+            <p className="muted text-[13px] leading-relaxed">
+              No income sources yet. Add one in Settings — a category with its type set to Income — and your pay
+              lands here.
+            </p>
+          ) : (
+            <p className="muted text-sm">Loading categories…</p>
+          )
         ) : (
           <ChipRow>
             {categories.map((c) => (
@@ -226,70 +249,73 @@ export function ExpenseForm({
         )}
       </div>
 
-      <div>
-        <span className="label">Person</span>
-        <ChipRow>
-          {people.map((p) => (
+      {/* Nobody is "with" a salary. */}
+      {!isIncome && (
+        <div>
+          <span className="label">Person</span>
+          <ChipRow>
+            {people.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="chip"
+                data-selected={personIds.includes(p.id)}
+                onClick={() => selectPerson(p.id)}
+                style={personIds.includes(p.id) ? { background: p.color, borderColor: p.color } : undefined}
+              >
+                {multi && personIds.includes(p.id) && <span aria-hidden>✓</span>}
+                {p.name}
+              </button>
+            ))}
+
+            {/* Splitting across people is rare, so it is opt-in rather than the
+                default behaviour every single-person entry has to work around. */}
             <button
-              key={p.id}
               type="button"
               className="chip"
-              data-selected={personIds.includes(p.id)}
-              onClick={() => selectPerson(p.id)}
-              style={personIds.includes(p.id) ? { background: p.color, borderColor: p.color } : undefined}
+              data-selected={multi}
+              onClick={() => setMulti((m) => !m)}
+              title="Tag several people on this one expense"
             >
-              {multi && personIds.includes(p.id) && <span aria-hidden>✓</span>}
-              {p.name}
+              {multi ? '✓ Multiple' : '＋ Multiple'}
             </button>
-          ))}
+          </ChipRow>
 
-          {/* Splitting across people is rare, so it is opt-in rather than the
-              default behaviour every single-person entry has to work around. */}
-          <button
-            type="button"
-            className="chip"
-            data-selected={multi}
-            onClick={() => setMulti((m) => !m)}
-            title="Tag several people on this one expense"
-          >
-            {multi ? '✓ Multiple' : '＋ Multiple'}
-          </button>
-        </ChipRow>
-
-        {personIds.length > 1 && (
-          <div className="mt-3">
-            <p className="muted text-xs">
-              Still one ₹{amount || '0'} expense, split {personIds.length} ways — about ₹
-              {Math.round((Number(amount) || 0) / personIds.length).toLocaleString('en-IN')} against each of them.
-            </p>
-
-            {/*
-              The one place the two halves of this app meet. Tagging people
-              already works out their shares; without this the app knows what
-              each of them owes you and never says so.
-            */}
-            {othersCount > 0 && !existing && (
-              <button
-                type="button"
-                className="chip mt-2.5"
-                data-selected={lendShares}
-                onClick={() => setLendShares((v) => !v)}
-              >
-                {lendShares ? '✓' : '＋'} They owe me their share
-                {lendShares && othersShareMinor > 0 && (
-                  <span className="num opacity-80">· {formatINR(othersShareMinor)}</span>
-                )}
-              </button>
-            )}
-            {lendShares && othersCount > 0 && (
-              <p className="muted text-[11px] mt-1.5">
-                Adds {othersCount} {othersCount === 1 ? 'entry' : 'entries'} to the ledger. Spending is unchanged —
-                lending never counts as spending.
+          {personIds.length > 1 && (
+            <div className="mt-3">
+              <p className="muted text-xs">
+                Still one ₹{amount || '0'} expense, split {personIds.length} ways — about ₹
+                {Math.round((Number(amount) || 0) / personIds.length).toLocaleString('en-IN')} against each of them.
               </p>
-            )}
-          </div>
-        )}
-      </div>
+
+              {/*
+                The one place the two halves of this app meet. Tagging people
+                already works out their shares; without this the app knows what
+                each of them owes you and never says so.
+              */}
+              {othersCount > 0 && !existing && (
+                <button
+                  type="button"
+                  className="chip mt-2.5"
+                  data-selected={lendShares}
+                  onClick={() => setLendShares((v) => !v)}
+                >
+                  {lendShares ? '✓' : '＋'} They owe me their share
+                  {lendShares && othersShareMinor > 0 && (
+                    <span className="num opacity-80">· {formatINR(othersShareMinor)}</span>
+                  )}
+                </button>
+              )}
+              {lendShares && othersCount > 0 && (
+                <p className="muted text-[11px] mt-1.5">
+                  Adds {othersCount} {othersCount === 1 ? 'entry' : 'entries'} to the ledger. Spending is unchanged —
+                  lending never counts as spending.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -329,7 +355,7 @@ export function ExpenseForm({
             id="note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Dinner, cab, groceries…"
+            placeholder={isIncome ? 'September pay, bonus, refund…' : 'Dinner, cab, groceries…'}
             className="input"
             maxLength={500}
           />
@@ -360,7 +386,7 @@ export function ExpenseForm({
           </button>
         )}
         <button type="submit" className="btn btn-primary flex-1 sm:flex-none" disabled={!valid || saving}>
-          {saving ? 'Saving…' : existing ? 'Save changes' : 'Save expense'}
+          {saving ? 'Saving…' : existing ? 'Save changes' : isIncome ? 'Save income' : 'Save expense'}
         </button>
       </div>
 

@@ -371,3 +371,61 @@ describe('telling a bill from a habit', () => {
     expect(charges.map((c) => c.label)).toEqual(['wifi']);
   });
 });
+
+describe('income that has not arrived yet', () => {
+  it('stands in the median of the last three months until this month is logged', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    await add(50000, 'Salary', '2026-05-01');
+    await add(60000, 'Salary', '2026-06-01');
+    await add(52000, 'Salary', '2026-07-01');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+
+    expect(plan.incomeMinor).toBe(0);
+    expect(plan.usingEstimate).toBe(true);
+    expect(plan.expectedIncomeMinor).toBe(5_200_000); // the median, not the mean
+    expect(plan.hasIncome).toBe(true);
+    expect(plan.perDayMinor).toBeGreaterThan(0);
+  });
+
+  it('hands over to the real figure the moment it lands', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    await add(52000, 'Salary', '2026-07-01');
+    expect((await getMonthlyPlan(userId, '2026-08')).usingEstimate).toBe(true);
+
+    await add(31000, 'Salary', '2026-08-09');
+    const plan = await getMonthlyPlan(userId, '2026-08');
+
+    expect(plan.usingEstimate).toBe(false);
+    expect(plan.expectedIncomeMinor).toBe(3_100_000);
+    expect(plan.incomeMinor).toBe(3_100_000);
+  });
+
+  it('quotes a savings rate only against income that actually arrived', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    await add(52000, 'Salary', '2026-07-01');
+    await add(1000, 'Outside Food', '2026-08-02');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+    expect(plan.usingEstimate).toBe(true);
+    expect(plan.savingsRatePct).toBeNull();
+  });
+
+  it('has nothing to estimate from on a brand-new account', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    const plan = await getMonthlyPlan(userId, '2026-08');
+
+    expect(plan.hasIncome).toBe(false);
+    expect(plan.usingEstimate).toBe(false);
+    expect(plan.expectedIncomeMinor).toBe(0);
+  });
+
+  it('ignores months that had no income rather than averaging in a zero', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    // Nothing in June or July; ₹40,000 in May.
+    await add(40000, 'Salary', '2026-05-01');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+    expect(plan.expectedIncomeMinor).toBe(4_000_000);
+  });
+});

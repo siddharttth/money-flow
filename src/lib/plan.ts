@@ -26,6 +26,15 @@ import { daysBetween, monthRange, shiftMonth, todayISO } from './dates';
  * It needs income to mean anything, and most accounts will not have any at
  * first, so `hasIncome` says so plainly rather than dividing by zero and
  * printing a confident ₹0.
+ *
+ * INCOME THAT HAS NOT ARRIVED YET
+ * Pay is not the same every month and does not always land on the 1st. Using
+ * only what has been logged so far would make safe-to-spend useless for
+ * whoever is paid on the 28th — ₹0 income all month, then a number on the last
+ * day. So until this month's pay is recorded, the median of the last three
+ * months stands in, flagged as an estimate. Median rather than mean because
+ * one freelance month should not reset the baseline. The moment real income is
+ * logged it takes over completely.
  */
 
 export type MonthlyPlan = {
@@ -35,7 +44,12 @@ export type MonthlyPlan = {
   daysInMonth: number;
 
   hasIncome: boolean;
+  /** Actually recorded this month. Zero until pay lands. */
   incomeMinor: number;
+  /** What the plan is working from: the real figure, or the estimate below. */
+  expectedIncomeMinor: number;
+  /** True when no income has been logged yet and the estimate is standing in. */
+  usingEstimate: boolean;
   previousIncomeMinor: number;
 
   spentMinor: number;
@@ -68,17 +82,21 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
 
   const prev = monthRange(shiftMonth(month, -1));
 
-  const [spent, invested, income, previousIncome, charges, funds] = await Promise.all([
+  const [spent, invested, income, history, charges, funds] = await Promise.all([
     getTotal({ userId, start, end }),
     getTotal({ userId, start, end, include: 'investment' }),
     getTotal({ userId, start, end, include: 'income' }),
-    getTotal({ userId, start: prev.start, end: prev.end, include: 'income' }),
+    recentIncome(userId, month, 3),
     getRecurringCharges(userId, month),
     getFunds(userId, month),
   ]);
 
+  const previousIncomeMinor = history[0] ?? 0;
+  const usingEstimate = income.totalMinor === 0 && history.length > 0;
+  const expectedIncomeMinor = usingEstimate ? median(history) : income.totalMinor;
+
   const committed = splitCommitted(charges, spent.totalMinor);
-  const hasIncome = income.totalMinor > 0;
+  const hasIncome = expectedIncomeMinor > 0;
 
   /*
    * Funds already fed this month do not need feeding twice. Netting the
@@ -89,7 +107,7 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
 
   const outAlready = spent.totalMinor + invested.totalMinor;
   const freeMinor = hasIncome
-    ? income.totalMinor - outAlready - committed.committedDueMinor - savingsTargetMinor
+    ? expectedIncomeMinor - outAlready - committed.committedDueMinor - savingsTargetMinor
     : 0;
 
   return {
@@ -100,15 +118,20 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
 
     hasIncome,
     incomeMinor: income.totalMinor,
-    previousIncomeMinor: previousIncome.totalMinor,
+    expectedIncomeMinor,
+    usingEstimate,
+    previousIncomeMinor,
 
     spentMinor: spent.totalMinor,
     investedMinor: invested.totalMinor,
 
     committed,
 
-    netMinor: income.totalMinor - spent.totalMinor,
-    savingsRatePct: hasIncome ? ((income.totalMinor - spent.totalMinor) / income.totalMinor) * 100 : null,
+    netMinor: expectedIncomeMinor - spent.totalMinor,
+    /* Against real income only. A savings rate computed from an estimate is a
+       guess about a guess, and this one gets quoted as a fact. */
+    savingsRatePct:
+      income.totalMinor > 0 ? ((income.totalMinor - spent.totalMinor) / income.totalMinor) * 100 : null,
 
     savingsTargetMinor,
     freeMinor,
@@ -157,4 +180,19 @@ export async function getSweep(userId: string, month: string): Promise<Sweep> {
     previousSpentMinor: b.totalMinor,
     savedMinor: Math.max(0, b.totalMinor - a.totalMinor),
   };
+}
+
+/** Income for each of the N months before `month`, newest first, zeros dropped. */
+async function recentIncome(userId: string, month: string, count: number): Promise<number[]> {
+  const months = Array.from({ length: count }, (_, i) => monthRange(shiftMonth(month, -(i + 1))));
+  const totals = await Promise.all(
+    months.map((m) => getTotal({ userId, start: m.start, end: m.end, include: 'income' })),
+  );
+  return totals.map((t) => t.totalMinor).filter((v) => v > 0);
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }

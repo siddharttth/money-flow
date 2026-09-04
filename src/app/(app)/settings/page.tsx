@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
-import { currentMonth, dayLabel, monthLabel } from '@/lib/dates';
+import { currentMonth, dayLabel, monthLabel, shiftMonth } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat } from '@/lib/types';
 import { Card, EmptyState, ListSkeleton, Modal, Money, PageHeader, SectionHead } from '@/components/ui';
@@ -33,15 +33,23 @@ export default function SettingsPage() {
   const { mutate } = useSWRConfig();
   const [theme, setTheme] = useState<ThemeChoice>('system');
   const [editing, setEditing] = useState<CategoryRow | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<null | 'expense' | 'income' | 'investment'>(null);
 
   const me = useSWR<{ user: { name: string; email: string; currency: string } }>('/api/auth/me');
+  const incomeThis = useSWR<{ items: CategoryStat[]; grandTotalMinor: number }>(
+    `/api/analytics/categories?month=${currentMonth()}&include=income`,
+  );
+  const incomeLast = useSWR<{ grandTotalMinor: number }>(
+    `/api/analytics/categories?month=${shiftMonth(currentMonth(), -1)}&include=income`,
+  );
   const cats = useSWR<{ items: CategoryRow[] }>('/api/categories?includeInactive=true');
   const stats = useSWR<{ items: CategoryStat[] }>(`/api/analytics/categories?month=${currentMonth()}`);
 
   const spendById = new Map((stats.data?.items ?? []).map((s) => [s.categoryId, s.totalMinor]));
-  const active = (cats.data?.items ?? []).filter((c) => c.isActive);
-  const disabled = (cats.data?.items ?? []).filter((c) => !c.isActive);
+  const all = cats.data?.items ?? [];
+  const active = all.filter((c) => c.isActive && c.kind !== 'income');
+  const incomeCats = all.filter((c) => c.isActive && c.kind === 'income');
+  const disabled = all.filter((c) => !c.isActive);
 
   // Only categories that actually carry a budget belong in the budget summary.
   const budgeted = active.filter((c) => c.monthlyBudgetMinor);
@@ -54,6 +62,18 @@ export default function SettingsPage() {
     } catch {
       /* storage unavailable */
     }
+  }, []);
+
+  /*
+   * "Set up income" on the dashboard sends people here, and landing on a
+   * settings page with no obvious income control is the same dead end it was
+   * trying to fix. The link carries ?add=income and opens the sheet ready.
+   * Read from the URL directly rather than useSearchParams, which would need
+   * this whole screen wrapped in a Suspense boundary for one query string.
+   */
+  useEffect(() => {
+    const add = new URLSearchParams(window.location.search).get('add');
+    if (add === 'income' || add === 'investment' || add === 'expense') setCreating(add);
   }, []);
 
   function applyTheme(next: ThemeChoice) {
@@ -119,6 +139,83 @@ export default function SettingsPage() {
         </Card>
       </section>
 
+      {/* ---------- Income ---------- */}
+      <section>
+        <SectionHead
+          label="Income"
+          action={
+            <button className="tag" onClick={() => setCreating('income')}>
+              + Source
+            </button>
+          }
+        />
+        {incomeCats.length ? (
+          <div className="card overflow-clip">
+            <div
+              className="flex items-baseline justify-between gap-3 px-3.5 sm:px-4 py-3 border-b"
+              style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
+            >
+              <span className="label mb-0">{monthLabel(currentMonth()).split(' ')[0]} so far</span>
+              <span className="flex items-baseline gap-3">
+                <Money
+                  minor={incomeThis.data?.grandTotalMinor ?? 0}
+                  className="text-[15px] font-semibold"
+                  style={{ color: 'var(--credit)' }}
+                />
+                <span className="micro">
+                  {monthLabel(shiftMonth(currentMonth(), -1)).split(' ')[0]}{' '}
+                  {formatINR(incomeLast.data?.grandTotalMinor ?? 0)}
+                </span>
+              </span>
+            </div>
+
+            <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {incomeCats.map((c) => {
+                const got = incomeThis.data?.items.find((i) => i.categoryId === c.id)?.totalMinor ?? 0;
+                return (
+                  <li
+                    key={c.id}
+                    className="row flex items-center gap-3 px-3.5 sm:px-4 py-3"
+                    onClick={() => setEditing(c)}
+                  >
+                    <CategoryIcon icon={c.icon} color={c.color} size={34} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold truncate">{c.name}</p>
+                      <p className="muted text-[11px] mt-0.5">
+                        {got > 0 ? 'received this month' : 'nothing yet this month'}
+                      </p>
+                    </div>
+                    <Money
+                      minor={got}
+                      className="num text-[13px] font-semibold shrink-0"
+                      style={got > 0 ? { color: 'var(--credit)' } : undefined}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="muted text-[12px] leading-relaxed px-3.5 sm:px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+              Pay is logged like anything else — <strong>Add transaction → Income</strong> — so a month that pays
+              differently just gets a different figure. Until this month&rsquo;s lands, the plan works from the median
+              of the last three.
+            </p>
+          </div>
+        ) : (
+          <Card>
+            <EmptyState
+              title="No income recorded"
+              hint="Add a source — Salary, Freelance, whatever pays you — then log each payment under it. Without one the app can only say what leaves, never what is safe to spend."
+              action={
+                <button className="btn btn-primary" onClick={() => setCreating('income')}>
+                  Add an income source
+                </button>
+              }
+            />
+          </Card>
+        )}
+      </section>
+
       {/* ---------- Budgets ---------- */}
       {budgetTotal > 0 && (
         <section>
@@ -148,7 +245,7 @@ export default function SettingsPage() {
         <SectionHead
           label="Categories"
           action={
-            <button className="tag" onClick={() => setCreating(true)}>
+            <button className="tag" onClick={() => setCreating('expense')}>
               + New
             </button>
           }
@@ -308,16 +405,17 @@ export default function SettingsPage() {
       </section>
 
       <CategoryModal
-        open={creating || !!editing}
+        open={!!creating || !!editing}
         category={editing}
+        defaultKind={creating ?? 'expense'}
         onClose={() => {
-          setCreating(false);
+          setCreating(null);
           setEditing(null);
         }}
         onDone={async (msg) => {
           await refresh();
           toast(msg);
-          setCreating(false);
+          setCreating(null);
           setEditing(null);
         }}
       />
@@ -383,11 +481,14 @@ function Field({ label, value }: { label: string; value?: string }) {
 function CategoryModal({
   open,
   category,
+  defaultKind = 'expense',
   onClose,
   onDone,
 }: {
   open: boolean;
   category: CategoryRow | null;
+  /** What a NEW category starts as — an income source opens ready to be one. */
+  defaultKind?: 'expense' | 'income' | 'investment';
   onClose: () => void;
   onDone: (msg: string) => void;
 }) {
@@ -402,13 +503,13 @@ function CategoryModal({
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState('');
 
-  const identity = category?.id ?? 'new';
+  const identity = category?.id ?? `new-${defaultKind}`;
   if (key !== identity && open) {
     setKey(identity);
     setName(category?.name ?? '');
     setIcon(resolveIcon(category?.icon));
     setColor(category?.color ?? PALETTE[0]);
-    setKind(category?.kind ?? 'expense');
+    setKind(category?.kind ?? defaultKind);
     setBudget(category?.monthlyBudgetMinor ? String(category.monthlyBudgetMinor / 100) : '');
     setTarget(category?.targetMinor ? String(category.targetMinor / 100) : '');
     setTargetDate(category?.targetDate ?? '');
@@ -444,7 +545,11 @@ function CategoryModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={category ? `Edit ${category.name}` : 'New category'}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={category ? `Edit ${category.name}` : defaultKind === 'income' ? 'New income source' : 'New category'}
+    >
       <div className="space-y-4">
         <div>
           <label className="label" htmlFor="cname">

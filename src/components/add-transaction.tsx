@@ -7,7 +7,7 @@ import { Segmented } from './ui';
 import { ExpenseForm } from './expense-form';
 import { LedgerForm } from './ledger-form';
 
-export type TxMode = 'expense' | 'lent' | 'borrowed';
+export type TxMode = 'expense' | 'income' | 'lent' | 'borrowed';
 
 /**
  * The single "add" surface. One segmented control picks the kind, then the
@@ -50,17 +50,20 @@ export function AddTransaction({
         onChange={setMode}
         options={[
           { value: 'expense', label: 'Expense' },
+          { value: 'income', label: 'Income' },
           { value: 'lent', label: 'I lent' },
           { value: 'borrowed', label: 'I borrowed' },
         ]}
       />
 
-      {mode === 'expense' ? (
+      {mode === 'expense' || mode === 'income' ? (
         <ExpenseForm
-          keepOpenAfterSave
+          key={mode}
+          mode={mode}
+          keepOpenAfterSave={mode === 'expense'}
           onSaved={(_e, again) => {
             refresh();
-            onSaved('Expense saved', again);
+            onSaved(mode === 'income' ? 'Income recorded' : 'Expense saved', again);
           }}
         />
       ) : (

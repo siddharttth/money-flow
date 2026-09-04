@@ -33,20 +33,21 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
         <p className="text-[15px] font-semibold">Tell the app what comes in</p>
         <p className="muted text-[13px] mt-1.5 leading-relaxed max-w-lg">
           It knows what leaves and nothing about what arrives, so it cannot say what is safe to spend, what your
-          savings rate is, or how long your money lasts. Mark a category as <strong>Income</strong> in Settings and
-          log your pay under it.
+          savings rate is, or how long your money lasts. Add an income source, then log each payment under{' '}
+          <strong>Add transaction → Income</strong> — a month that pays differently just gets a different figure.
         </p>
-        <Link href="/settings" className="btn btn-primary mt-4">
-          Set up income
+        <Link href="/settings?add=income" className="btn btn-primary mt-4">
+          Add an income source
         </Link>
       </Card>
     );
   }
 
   const { committed } = plan;
-  const spentShare = plan.incomeMinor > 0 ? plan.spentMinor / plan.incomeMinor : 0;
-  const investedShare = plan.incomeMinor > 0 ? plan.investedMinor / plan.incomeMinor : 0;
-  const dueShare = plan.incomeMinor > 0 ? committed.committedDueMinor / plan.incomeMinor : 0;
+  const base = plan.expectedIncomeMinor;
+  const spentShare = base > 0 ? plan.spentMinor / base : 0;
+  const investedShare = base > 0 ? plan.investedMinor / base : 0;
+  const dueShare = base > 0 ? committed.committedDueMinor / base : 0;
 
   return (
     <Card className="!p-5 sm:!p-6">
@@ -77,6 +78,13 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
                 <span className="num">{formatINR(plan.freeMinor)}</span> free over{' '}
                 <span className="num">{plan.daysLeft}</span> {plan.daysLeft === 1 ? 'day' : 'days'}
               </p>
+              {/* Never let an estimate pass for a fact. */}
+              {plan.usingEstimate && (
+                <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Assuming <span className="num">{formatINR(plan.expectedIncomeMinor)}</span> in, from your last few
+                  months. This updates the moment you log the real figure.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -85,7 +93,12 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
         <div className="min-w-0">
           <p className="label mb-2.5">How it gets there</p>
           <dl className="space-y-2">
-            <PlanLine label="Income" minor={plan.incomeMinor} sign="+" strong />
+            <PlanLine
+              label={plan.usingEstimate ? 'Income (expected)' : 'Income'}
+              minor={plan.expectedIncomeMinor}
+              sign="+"
+              strong
+            />
             <PlanLine label="Spent so far" minor={plan.spentMinor} sign="−" />
             {plan.investedMinor > 0 && <PlanLine label="Invested" minor={plan.investedMinor} sign="−" />}
             {committed.committedDueMinor > 0 && (
