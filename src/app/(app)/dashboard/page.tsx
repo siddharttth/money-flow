@@ -8,6 +8,7 @@ import { formatINR } from '@/lib/money';
 import type { CategoryStat, PersonStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
 import type { InvestmentSummary } from '@/lib/investments';
+import type { MonthlyPlan, Sweep } from '@/lib/plan';
 import type { Transaction } from '@/lib/transactions';
 import {
   Card,
@@ -30,6 +31,7 @@ import { BreakdownList } from '@/components/breakdown';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
+import { CommittedSplitCard, ComingUp, SafeToSpend, SweepCard } from '@/components/plan-cards';
 
 /**
  * The dashboard answers four questions, in this order, top to bottom:
@@ -59,6 +61,7 @@ export default function DashboardPage() {
   const daily = useSWR<{ items: { date: string; totalMinor: number }[] }>(`/api/analytics/daily?month=${month}`);
   const recent = useSWR<{ items: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&limit=6`);
   const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
+  const plan = useSWR<MonthlyPlan & { sweep: Sweep }>(`/api/plan?month=${month}`);
 
   const s = summary.data;
   const f = flow.data;
@@ -73,6 +76,9 @@ export default function DashboardPage() {
         title={monthLabel(month)}
         actions={<MonthPicker month={month} onChange={setMonth} />}
       />
+
+      {/* 0 — last month's underspend, before it evaporates. */}
+      {plan.data && <SweepCard sweep={plan.data.sweep} funds={plan.data.funds} />}
 
       {/* 1 — the month, and whether it is running hot. */}
       <Card className="!p-5 sm:!p-6">
@@ -152,6 +158,9 @@ export default function DashboardPage() {
         </div>
       </Card>
 
+      {/* 1b — and the only figure that is about the future rather than the past. */}
+      {plan.data?.isCurrentMonth && <SafeToSpend plan={plan.data} />}
+
       {/* 2 — pace, at a glance. */}
       <StatStrip
         items={[
@@ -170,6 +179,14 @@ export default function DashboardPage() {
           },
         ]}
       />
+
+      {/* 2b — what was already decided, and what is still to land. */}
+      {plan.data && (plan.data.committed.upcoming.length > 0 || plan.data.committed.committedPaidMinor > 0) && (
+        <div className="grid lg:grid-cols-2 gap-5 items-start">
+          <CommittedSplitCard plan={plan.data} />
+          <ComingUp plan={plan.data} />
+        </div>
+      )}
 
       {/*
         3 — the two dimensions of the same money.

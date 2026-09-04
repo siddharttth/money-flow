@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
-import { currentMonth, monthLabel } from '@/lib/dates';
+import { currentMonth, dayLabel, monthLabel } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat } from '@/lib/types';
 import { Card, EmptyState, ListSkeleton, Modal, Money, PageHeader, SectionHead } from '@/components/ui';
@@ -14,7 +14,11 @@ import { useInspector } from '@/components/inspector';
 import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
 
-type CategoryRow = Category & { monthlyBudgetMinor: number | null };
+type CategoryRow = Category & {
+  monthlyBudgetMinor: number | null;
+  targetMinor: number | null;
+  targetDate: string | null;
+};
 
 type ThemeChoice = 'system' | 'light' | 'dark';
 
@@ -160,7 +164,9 @@ export default function SettingsPage() {
             <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {active.map((c, i) => {
                 const spent = spendById.get(c.id) ?? 0;
-                const budget = c.monthlyBudgetMinor;
+                // Only spending categories carry a budget bar — the analytics
+                // this reads deliberately exclude income and investment.
+                const budget = c.kind === 'expense' ? c.monthlyBudgetMinor : null;
                 const over = budget ? spent > budget : false;
                 return (
                   <li
@@ -187,8 +193,13 @@ export default function SettingsPage() {
                         </div>
                       ) : (
                         <p className="muted text-[11px] mt-0.5">
-                          No monthly budget
-                          {c.kind === 'investment' && ' · investment'}
+                          {c.kind === 'income'
+                            ? 'Income · kept out of spending'
+                            : c.targetMinor
+                              ? `Fund · ${formatINR(c.targetMinor)}${c.targetDate ? ` by ${dayLabel(c.targetDate)}` : ''}`
+                              : c.kind === 'investment'
+                                ? 'Investment · kept out of spending'
+                                : 'No monthly budget'}
                         </p>
                       )}
                     </div>
@@ -385,6 +396,8 @@ function CategoryModal({
   const [color, setColor] = useState(PALETTE[0]);
   const [kind, setKind] = useState('expense');
   const [budget, setBudget] = useState('');
+  const [target, setTarget] = useState('');
+  const [targetDate, setTargetDate] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState('');
@@ -397,6 +410,8 @@ function CategoryModal({
     setColor(category?.color ?? PALETTE[0]);
     setKind(category?.kind ?? 'expense');
     setBudget(category?.monthlyBudgetMinor ? String(category.monthlyBudgetMinor / 100) : '');
+    setTarget(category?.targetMinor ? String(category.targetMinor / 100) : '');
+    setTargetDate(category?.targetDate ?? '');
     setError(null);
   }
 
@@ -409,6 +424,9 @@ function CategoryModal({
       color,
       kind,
       monthlyBudget: budget.trim() === '' ? null : Math.round(Number(budget) * 100) / 100,
+      // A target only means anything on money being set aside.
+      target: kind === 'investment' && target.trim() !== '' ? Math.round(Number(target) * 100) / 100 : null,
+      targetDate: kind === 'investment' && targetDate ? targetDate : null,
     };
     try {
       if (category) {
@@ -484,16 +502,69 @@ function CategoryModal({
         </div>
 
         <div>
-          <label className="label">Type</label>
-          <div className="flex gap-2">
+          <span className="label">Type</span>
+          <div className="flex flex-wrap gap-2">
             <button className="chip" data-selected={kind === 'expense'} onClick={() => setKind('expense')}>
-              Consumption
+              Spending
             </button>
             <button className="chip" data-selected={kind === 'investment'} onClick={() => setKind('investment')}>
               Investment
             </button>
+            <button className="chip" data-selected={kind === 'income'} onClick={() => setKind('income')}>
+              Income
+            </button>
           </div>
+          <p className="muted text-[12px] mt-2 leading-relaxed">
+            {kind === 'income'
+              ? 'Money arriving. Kept out of every spending figure, and what makes safe-to-spend and your savings rate possible.'
+              : kind === 'investment'
+                ? 'Money set aside rather than gone. Kept out of spending, and shown on the Investments screen.'
+                : 'Ordinary spending. Counts towards the month.'}
+          </p>
         </div>
+
+        {/*
+          A target is what turns an investment category into a fund. It lives
+          here rather than on a screen of its own because a fund IS a category
+          — giving one a number is the whole act of creating a goal.
+        */}
+        {kind === 'investment' && (
+          <div className="well px-3.5 py-3.5">
+            <p className="label mb-1">Make it a fund</p>
+            <p className="muted text-[12px] mb-3 leading-relaxed">
+              Give it a target and everything logged here becomes progress towards it, with the monthly pace worked
+              out for you.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label" htmlFor="ctarget">
+                  Target
+                </label>
+                <input
+                  id="ctarget"
+                  className="input num"
+                  inputMode="decimal"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
+                  placeholder="No goal"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="ctargetdate">
+                  By when
+                </label>
+                <input
+                  id="ctargetdate"
+                  type="date"
+                  className="input"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  disabled={!target.trim()}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <p className="text-sm" style={{ color: 'var(--danger)' }}>

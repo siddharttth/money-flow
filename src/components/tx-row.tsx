@@ -45,6 +45,13 @@ export function TransactionRow({
 
   const clustered = count > 1;
   const shown = amountMinor ?? tx.amountMinor;
+  /*
+   * Income sits in the same table and the same feed, so without this it reads
+   * as a ₹52,000 expense — the single most alarming row the app could print.
+   * Money arriving is green; a contribution is marked but stays neutral.
+   */
+  const incoming = tx.category?.kind === 'income';
+  const investing = tx.category?.kind === 'investment';
   const title = tx.note || tx.category?.name || (tx.kind === 'lent' ? 'Money given' : 'Money received');
   // An untitled expense already shows its category as the title; repeating it
   // as a tag underneath was the same word twice on every second row.
@@ -58,7 +65,11 @@ export function TransactionRow({
       className={`row group flex items-start gap-3 px-3.5 sm:px-4 py-3 ${clustered ? 'w-full text-left' : ''}`}
     >
       {tx.category ? (
-        <CategoryIcon icon={tx.category.icon} color={tx.category.color} size={34} />
+        <CategoryIcon
+          icon={tx.category.icon}
+          color={incoming ? 'var(--credit)' : tx.category.color}
+          size={34}
+        />
       ) : (
         <span
           className="w-[34px] h-[34px] rounded-lg flex items-center justify-center shrink-0"
@@ -93,7 +104,11 @@ export function TransactionRow({
               ×{count}
             </span>
           )}
-          <Money minor={shown} className="text-[13.5px] font-semibold shrink-0" />
+          <Money
+            minor={shown}
+            className="text-[13.5px] font-semibold shrink-0"
+            style={incoming ? { color: 'var(--credit)' } : undefined}
+          />
         </div>
 
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -129,6 +144,21 @@ export function TransactionRow({
               }}
             >
               {tx.kind}
+            </span>
+          )}
+
+          {/* Neither of these is spending, and a row that does not say so gets
+              added up by the reader even when the app does not. */}
+          {(incoming || investing) && (
+            <span
+              className="micro px-1.5 py-0.5 rounded"
+              style={
+                incoming
+                  ? { background: 'var(--credit-soft)', color: 'var(--credit)' }
+                  : { background: 'var(--surface-2)', color: 'var(--text-muted)' }
+              }
+            >
+              {incoming ? 'income' : 'invested'}
             </span>
           )}
 

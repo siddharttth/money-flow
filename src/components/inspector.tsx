@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useState, ReactNode } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import Link from 'next/link';
+import { api } from '@/lib/client';
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/lib/transactions';
@@ -10,6 +11,7 @@ import type { PersonExpense } from '@/lib/analytics';
 import { Drawer } from './drawer';
 import { ListSkeleton, EmptyState, Money } from './ui';
 import { CategoryIcon, PersonMark } from './icons';
+import { useToast } from './toast';
 
 /**
  * The app's connective tissue: a person or category name is clickable
@@ -139,9 +141,43 @@ type PersonInsight = {
 };
 
 function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data, isLoading } = useSWR<PersonInsight>(`/api/insights/person/${id}`);
+  const { data, isLoading, mutate } = useSWR<PersonInsight>(`/api/insights/person/${id}`);
   const [tab, setTab] = useState('Expenses');
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const { openCategory } = useInspector();
+  const toast = useToast();
+  const { mutate: mutateAll } = useSWRConfig();
+
+  /**
+   * Soft-deletes every entry with this person and offers the way back.
+   *
+   * The undo is not decoration: this is one tap that erases years of history,
+   * and the rows are only marked deleted, so restoring them is exact rather
+   * than a re-entry job.
+   */
+  async function clearLedger() {
+    setClearing(true);
+    try {
+      const { ids, cleared } = await api.post<{ ids: string[]; cleared: number }>(
+        `/api/ledger/person/${id}/clear`,
+      );
+      await Promise.all([mutate(), mutateAll((k) => typeof k === 'string' && k.startsWith('/api/'))]);
+      setConfirmClear(false);
+      toast(`Cleared ${cleared} ${cleared === 1 ? 'entry' : 'entries'}`, 'success', {
+        label: 'Undo',
+        onClick: async () => {
+          await api.post('/api/ledger/restore', { ids });
+          await Promise.all([mutate(), mutateAll((k) => typeof k === 'string' && k.startsWith('/api/'))]);
+          toast('History restored');
+        },
+      });
+    } catch {
+      toast('Could not clear the history', 'error');
+    } finally {
+      setClearing(false);
+    }
+  }
 
   const bal = data?.balanceMinor ?? 0;
 
@@ -243,6 +279,40 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
           ) : (
             <EmptyState title="Nothing lent or borrowed" hint="Record it from the People screen." />
+          )}
+
+          {/*
+            Wiping the slate. Sits under the entries rather than in the footer:
+            it belongs to this tab, and it should take a deliberate scroll to
+            reach rather than sitting next to the buttons people press often.
+          */}
+          {tab !== 'Expenses' && data.ledger.length > 0 && (
+            <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              {confirmClear ? (
+                <div className="well px-3.5 py-3">
+                  <p className="text-[13px] leading-relaxed">
+                    Clear all {data.ledger.length} entries with {data.person.name}? The balance goes to settled and
+                    the history disappears from the app.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button className="btn btn-ghost flex-1" onClick={() => setConfirmClear(false)} disabled={clearing}>
+                      Keep them
+                    </button>
+                    <button className="btn btn-danger flex-1" onClick={clearLedger} disabled={clearing}>
+                      {clearing ? 'Clearing…' : 'Clear history'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="tag"
+                  style={{ color: 'var(--rule-red)' }}
+                  onClick={() => setConfirmClear(true)}
+                >
+                  Clear all lending history
+                </button>
+              )}
+            </div>
           )}
         </>
       )}

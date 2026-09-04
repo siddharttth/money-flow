@@ -55,6 +55,19 @@ function fromDate(d: Date): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
+/**
+ * Days from one date to another, exclusive — 1 Aug to 2 Aug is 1.
+ *
+ * `daysBetween` counts both ends, which is what "how many days in August"
+ * means. It is the wrong measure for how far along a span you are: counting
+ * both ends made a fund created today already 1/366th behind its own line.
+ */
+export function daysApart(start: string, end: string): number {
+  const a = Date.parse(`${start}T00:00:00Z`);
+  const b = Date.parse(`${end}T00:00:00Z`);
+  return Math.round((b - a) / 86400000);
+}
+
 export function daysBetween(start: string, end: string): number {
   const a = Date.parse(`${start}T00:00:00Z`);
   const b = Date.parse(`${end}T00:00:00Z`);

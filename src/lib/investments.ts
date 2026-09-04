@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { categories, expenses } from '@/db/schema';
+import { kindPredicate } from './analytics';
 import { sumToMinor } from './money';
 import { monthRange, shiftMonth, todayISO } from './dates';
 
@@ -113,7 +114,13 @@ async function windowTotal(userId: string, start: string, end: string) {
   return sumToMinor(row?.total);
 }
 
-/** The month's actual spending, so the screen can state the split honestly. */
+/**
+ * The month's actual spending, so the screen can state the split honestly.
+ *
+ * Goes through the shared predicate rather than inverting the investment test
+ * locally. "Not an investment" stopped meaning "spending" the day income
+ * arrived, and this quietly reported a ₹52,000 salary as ₹52,000 spent.
+ */
 async function spendingTotal(userId: string, start: string, end: string) {
   const [row] = await db
     .select({ total: sql<string>`COALESCE(SUM(${expenses.amountMinor}), 0)` })
@@ -124,7 +131,7 @@ async function spendingTotal(userId: string, start: string, end: string) {
         isNull(expenses.deletedAt),
         gte(expenses.expenseDate, start),
         lte(expenses.expenseDate, end),
-        sql`NOT ${isInvestment}`,
+        kindPredicate('spending'),
       ),
     );
 

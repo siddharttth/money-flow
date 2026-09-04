@@ -33,6 +33,20 @@ export const PATCH = withAuth<Ctx>(async (req, session, { params }) => {
   if (input.monthlyBudget !== undefined) {
     patch.monthlyBudgetMinor = input.monthlyBudget != null ? Math.round(input.monthlyBudget * 100) : null;
   }
+  if (input.target !== undefined) {
+    patch.targetMinor = input.target != null ? Math.round(input.target * 100) : null;
+  }
+  if (input.targetDate !== undefined) patch.targetDate = input.targetDate;
+
+  /*
+   * A target only means anything on money being set aside. Marking a fund back
+   * to a spending category has to drop it, or the fund would keep appearing on
+   * a screen whose figures no longer include it.
+   */
+  if (input.kind !== undefined && input.kind !== 'investment') {
+    patch.targetMinor = null;
+    patch.targetDate = null;
+  }
 
   const [row] = await db.update(categories).set(patch).where(eq(categories.id, id)).returning();
   return ok(row);

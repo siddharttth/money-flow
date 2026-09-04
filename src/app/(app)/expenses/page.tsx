@@ -99,10 +99,12 @@ function Transactions() {
     const sum = (rows: Transaction[]) => rows.reduce((s, t) => s + t.amountMinor, 0);
     const of = (kind: TxKind) => sum(items.filter((t) => t.kind === kind));
     const expenseRows = items.filter((t) => t.kind === 'expense');
-    const invested = expenseRows.filter((t) => t.category?.kind === 'investment');
+    // Spending is the kind that is actually spending — an income row and a
+    // contribution both live in this feed and neither belongs in the total.
     return {
-      spent: sum(expenseRows.filter((t) => t.category?.kind !== 'investment')),
-      invested: sum(invested),
+      spent: sum(expenseRows.filter((t) => t.category?.kind === 'expense')),
+      invested: sum(expenseRows.filter((t) => t.category?.kind === 'investment')),
+      income: sum(expenseRows.filter((t) => t.category?.kind === 'income')),
       lent: of('lent'),
       borrowed: of('borrowed'),
       count: items.length,
@@ -172,10 +174,10 @@ function Transactions() {
         items={[
           { label: 'Spent', minor: totals.spent, sub: `${totals.count} shown` },
           {
-            label: 'Invested',
-            minor: totals.invested,
-            tone: totals.invested ? 'var(--credit)' : undefined,
-            sub: totals.invested ? 'not spending' : undefined,
+            label: totals.income > 0 ? 'Income' : 'Invested',
+            minor: totals.income > 0 ? totals.income : totals.invested,
+            tone: 'var(--credit)',
+            sub: totals.income > 0 ? 'came in' : totals.invested ? 'not spending' : undefined,
           },
           { label: 'Lent out', minor: totals.lent, tone: totals.lent ? 'var(--rule-red)' : undefined },
           { label: 'Borrowed', minor: totals.borrowed, tone: totals.borrowed ? 'var(--credit)' : undefined },
@@ -242,7 +244,7 @@ function Transactions() {
         <div className="card overflow-clip">
           {groups.map(({ date, items, clusters }, groupIndex) => {
             const spent = items
-              .filter((i) => i.kind === 'expense' && i.category?.kind !== 'investment')
+              .filter((i) => i.kind === 'expense' && i.category?.kind === 'expense')
               .reduce((s, i) => s + i.amountMinor, 0);
             return (
               <section key={date}>

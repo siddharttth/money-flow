@@ -22,17 +22,24 @@ import { daysBetween, monthRange, shiftMonth, todayISO, weekRange } from './date
  * plus the untagged remainder equal the grand total to the paisa. Responses
  * still ship `grandTotal` alongside, now as something the parts add up to.
  *
- * THE SECOND RULE: INVESTING IS NOT SPENDING
+ * THE SECOND RULE: ONLY SPENDING IS SPENDING
  * ------------------------------------------
- * ₹10,000 into a SIP left the current account but did not leave your net
- * worth — it moved from one pocket to another, the same way a loan does.
- * Counting it as spending makes every month look ruinous and makes the
- * daily pace, the projection and the month-over-month comparison meaningless.
+ * Three kinds of money move through the same table and only one of them is
+ * spending:
  *
- * So every query here excludes categories marked `kind = 'investment'` by
- * default. `include` opts back in: 'investment' for the investments screen,
- * 'all' for anything that genuinely means "money that moved".
+ *   investment  ₹10,000 into a SIP left the current account but not your net
+ *               worth. Counting it makes every month look ruinous and makes
+ *               the pace, the projection and the comparison meaningless.
+ *   income      money arriving is not money leaving. Counting it as spending
+ *               would be absurd; leaving it out of the table entirely would
+ *               mean the app never learns what you earn.
+ *
+ * So every query here defaults to `include: 'spending'`, which is neither.
+ * The other values opt back in — 'investment' and 'income' for their own
+ * screens, 'all' for anything that genuinely means "money that moved".
  */
+
+export type CategoryKind = 'expense' | 'investment' | 'income';
 
 export type Filters = {
   userId: string;
@@ -40,8 +47,8 @@ export type Filters = {
   end?: string;
   categoryIds?: string[];
   personIds?: string[];
-  /** Defaults to 'spending' — investment categories are left out. */
-  include?: 'spending' | 'investment' | 'all';
+  /** Defaults to 'spending' — investment and income categories are left out. */
+  include?: 'spending' | 'investment' | 'income' | 'all';
 };
 
 /**
@@ -52,11 +59,18 @@ export type Filters = {
  */
 export function kindPredicate(include: Filters['include']) {
   if (include === 'all') return undefined;
-  const test = include === 'investment' ? sql`=` : sql`<>`;
-  return sql`EXISTS (
-    SELECT 1 FROM ${categories} c
-    WHERE c.id = ${expenses.categoryId} AND c.kind ${test} 'investment'
-  )`;
+
+  const match =
+    include === 'investment'
+      ? sql`c.kind = 'investment'`
+      : include === 'income'
+        ? sql`c.kind = 'income'`
+        : // Spending is everything that is neither. Written as a NOT IN rather
+          // than `= 'expense'` so a kind added later is excluded by default,
+          // which is the safe direction to be wrong in.
+          sql`c.kind NOT IN ('investment', 'income')`;
+
+  return sql`EXISTS (SELECT 1 FROM ${categories} c WHERE c.id = ${expenses.categoryId} AND ${match})`;
 }
 
 /**

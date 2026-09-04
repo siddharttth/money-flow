@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { currentMonth, dayLabel, monthLabel, shiftMonth } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { InvestmentSummary } from '@/lib/investments';
+import type { Fund } from '@/lib/funds';
 import {
   Card,
   Delta,
@@ -25,6 +26,7 @@ import { BreakdownList } from '@/components/breakdown';
 import { CategoryIcon } from '@/components/icons';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
+import { FundCard } from '@/components/plan-cards';
 
 /**
  * Where the money that is not spending goes.
@@ -43,6 +45,7 @@ export default function InvestmentsPage() {
   const { openCategory } = useInspector();
 
   const { data, error, mutate } = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
+  const funds = useSWR<{ items: Fund[] }>(`/api/funds?month=${month}`);
 
   if (error) return <ErrorState message={error.message} onRetry={() => mutate()} />;
 
@@ -144,6 +147,41 @@ export default function InvestmentsPage() {
           },
         ]}
       />
+
+      {/*
+        Funds first. An investment category with a target is a goal, and a goal
+        with a date on it is the only thing on this screen that can be off
+        track — which makes it the thing worth seeing before any total.
+      */}
+      <div>
+        <SectionHead
+          label="Funds"
+          action={
+            <Link href="/settings" className="micro" style={{ color: 'var(--accent)' }}>
+              {funds.data?.items.length ? 'Manage' : 'Create one'}
+            </Link>
+          }
+        />
+        {funds.data?.items.length ? (
+          <div className="grid sm:grid-cols-2 gap-5 items-start">
+            {funds.data.items.map((f) => (
+              <FundCard key={f.categoryId} fund={f} onAdd={() => openAdd()} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <EmptyState
+              title="No funds yet"
+              hint="A fund is an investment category with a target on it — a bike, an emergency buffer, a trip. Give one a target in Settings and this screen starts tracking the pace you need."
+              action={
+                <Link href="/settings" className="btn btn-primary">
+                  Set a target
+                </Link>
+              }
+            />
+          </Card>
+        )}
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-5 items-start">
         <div>

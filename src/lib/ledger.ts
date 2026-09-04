@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql, desc, asc } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql, desc, asc } from 'drizzle-orm';
 import { db } from '@/db';
 import { ledgerEntries, people } from '@/db/schema';
 import { toMinor, sumToMinor } from './money';
@@ -242,6 +242,38 @@ export async function deleteLedgerEntry(userId: string, id: string) {
     .where(and(eq(ledgerEntries.id, id), live(userId)))
     .returning({ id: ledgerEntries.id });
   if (!result.length) throw new ApiError(404, 'Entry not found');
+}
+
+/**
+ * Wipes one person's whole lending history in a single act.
+ *
+ * Soft, like every other delete here: the rows keep their place in the table
+ * with `deleted_at` set, so they vanish from the UI and from every balance
+ * while the record of what actually happened survives. A ledger that can
+ * forget on purpose is a ledger nobody can audit.
+ *
+ * Returns the ids so the caller can offer an undo — clearing years of history
+ * on one tap needs a way back that does not involve retyping it.
+ */
+export async function clearPersonLedger(userId: string, personId: string): Promise<{ ids: string[] }> {
+  const rows = await db
+    .update(ledgerEntries)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(live(userId), eq(ledgerEntries.personId, personId)))
+    .returning({ id: ledgerEntries.id });
+
+  return { ids: rows.map((r) => r.id) };
+}
+
+/** Undo for the above. Restores exactly the rows a clear soft-deleted. */
+export async function restoreLedgerEntries(userId: string, ids: string[]): Promise<number> {
+  if (!ids.length) return 0;
+  const rows = await db
+    .update(ledgerEntries)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(and(eq(ledgerEntries.userId, userId), inArray(ledgerEntries.id, ids)))
+    .returning({ id: ledgerEntries.id });
+  return rows.length;
 }
 
 export async function restoreLedgerEntry(userId: string, id: string) {

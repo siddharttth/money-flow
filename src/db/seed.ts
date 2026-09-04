@@ -106,6 +106,35 @@ const LEDGER: [month: string, day: number, direction: 'out' | 'in', amount: numb
   ['2026-08', 18, 'in', 2500, 'Aditi', 'Borrowed for rent'],
 ];
 
+/** Pay, so the plan has a numerator. */
+const INCOME: [month: string, day: number, amount: number, note: string][] = [
+  ['2026-05', 1, 52000, 'Salary'],
+  ['2026-06', 1, 52000, 'Salary'],
+  ['2026-07', 1, 52000, 'Salary'],
+  ['2026-08', 1, 52000, 'Salary'],
+  ['2026-09', 1, 52000, 'Salary'],
+];
+
+/** A goal with a date, so the fund card has a pace to report. */
+const FUND = { name: 'Bike fund', target: 42000, date: '2027-03-31' };
+const FUND_ROWS: [month: string, day: number, amount: number][] = [
+  ['2026-06', 20, 6000],
+  ['2026-07', 20, 6000],
+  ['2026-08', 20, 6400],
+];
+
+/** A few days of the current month, so the live screens are not empty. */
+const SEPTEMBER: Row[] = [
+  [1, 599, 'Bills / Recharge', 'Me', 'Mobile recharge'],
+  [1, 75, 'Outside Food', 'Papa', null],
+  [1, 45, 'Fruits / Veggies', 'Mumma', null],
+  [2, 120, 'Ciggs / Alc', 'Me', null],
+  [3, 260, 'Outside Food', 'Sankalp', 'Chai'],
+  [3, 90, 'Transport', 'Me', 'Auto'],
+  [4, 1450, 'Shopping', 'Aditi', null],
+  [4, 110, 'Ciggs / Alc', 'Me', null],
+];
+
 async function main() {
   const [existing] = await db.select().from(users).where(eq(users.email, EMAIL)).limit(1);
 
@@ -147,6 +176,7 @@ async function main() {
     ['2026-07', JULY],
     ['2026-06', JUNE],
     ['2026-05', MAY],
+    ['2026-09', SEPTEMBER],
   ] as const) {
     for (const [day, amount, category, person, note] of rows) {
       const categoryId = catId(category);
@@ -182,7 +212,70 @@ async function main() {
     });
   }
 
-  const total = [...AUGUST, ...JULY, ...JUNE, ...MAY].reduce((s, r) => s + r[1], 0);
+  /*
+   * Income and a fund. Both are ordinary categories with a `kind` (and, for
+   * the fund, a target) — which is the point of the design: no new tables, and
+   * the seed logs contributions exactly the way the add form does.
+   */
+  const salary =
+    cats.find((c) => c.name === 'Salary') ??
+    (
+      await db
+        .insert(categories)
+        .values({
+          userId: user.id,
+          name: 'Salary',
+          slug: 'salary',
+          kind: 'income',
+          icon: 'cash',
+          color: '#4b8454',
+          sortOrder: cats.length,
+        })
+        .returning()
+    )[0];
+
+  const fund =
+    cats.find((c) => c.name === FUND.name) ??
+    (
+      await db
+        .insert(categories)
+        .values({
+          userId: user.id,
+          name: FUND.name,
+          slug: 'bike-fund',
+          kind: 'investment',
+          icon: 'transport',
+          color: '#936d2b',
+          targetMinor: toMinor(FUND.target),
+          targetDate: FUND.date,
+          sortOrder: cats.length + 1,
+        })
+        .returning()
+    )[0];
+
+  for (const [month, day, amount, note] of INCOME) {
+    await db.insert(expenses).values({
+      userId: user.id,
+      amountMinor: toMinor(amount),
+      categoryId: salary.id,
+      expenseDate: `${month}-${String(day).padStart(2, '0')}`,
+      note,
+      source: 'manual',
+    });
+  }
+
+  for (const [month, day, amount] of FUND_ROWS) {
+    await db.insert(expenses).values({
+      userId: user.id,
+      amountMinor: toMinor(amount),
+      categoryId: fund.id,
+      expenseDate: `${month}-${String(day).padStart(2, '0')}`,
+      note: 'Bike',
+      source: 'manual',
+    });
+  }
+
+  const total = [...AUGUST, ...JULY, ...JUNE, ...MAY, ...SEPTEMBER].reduce((s, r) => s + r[1], 0);
   console.log(`✅ Seeded ${inserted} expenses (₹${total.toLocaleString('en-IN')}) for ${EMAIL}`);
   console.log(`   Sign in with: ${EMAIL} / ${PASSWORD}`);
   await closeDb();

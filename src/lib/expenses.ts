@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, isNull, sql, inArray, desc, asc } from 'drizzle-orm';
 import { db } from '@/db';
-import { expenses, expensePeople, categories, people } from '@/db/schema';
+import { expenses, expensePeople, categories, people, ledgerEntries } from '@/db/schema';
 import { toMinor } from './money';
 import { ApiError } from './api';
 import type { CreateExpenseInput, UpdateExpenseInput } from './validation';
@@ -220,13 +220,14 @@ export async function getSelfPersonId(userId: string): Promise<string | null> {
 export async function createExpense(userId: string, input: CreateExpenseInput): Promise<ExpenseDTO> {
   await assertCategory(userId, input.categoryId);
   const personIds = await resolvePersonIds(userId, input.personIds ?? []);
+  const amountMinor = toMinor(input.amount);
 
   const id = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(expenses)
       .values({
         userId,
-        amountMinor: toMinor(input.amount),
+        amountMinor,
         categoryId: input.categoryId,
         expenseDate: input.expenseDate,
         note: input.note?.trim() || null,
@@ -239,6 +240,48 @@ export async function createExpense(userId: string, input: CreateExpenseInput): 
         personIds.map((personId) => ({ expenseId: row.id, personId, shareAmountMinor: null })),
       );
     }
+
+    /*
+     * CLOSING THE LOOP
+     * You paid for dinner and tagged three people. The app knew their shares
+     * and then forgot that two of them owe you for it — the split half and the
+     * lending half of this product never spoke to each other. `lendShares`
+     * makes them: each participant who is not you gets a ledger entry for
+     * exactly the share this expense assigned them.
+     *
+     * Same allocation as everywhere else, so the entries add back to the bill:
+     * an even split with the remainder handed out one paisa at a time, in the
+     * same person-id order the SQL uses.
+     */
+    if (input.lendShares && personIds.length > 1) {
+      const others = await tx
+        .select({ id: people.id })
+        .from(people)
+        .where(and(eq(people.userId, userId), inArray(people.id, personIds), eq(people.isSelf, false)));
+
+      if (others.length) {
+        const ordered = [...personIds].sort();
+        const base = Math.floor(amountMinor / personIds.length);
+        const spare = amountMinor % personIds.length;
+        const owed = new Set(others.map((o) => o.id));
+
+        const entries = ordered
+          .map((personId, i) => ({ personId, shareMinor: base + (i < spare ? 1 : 0) }))
+          .filter((e) => owed.has(e.personId));
+
+        await tx.insert(ledgerEntries).values(
+          entries.map((e) => ({
+            userId,
+            personId: e.personId,
+            direction: 'out' as const,
+            amountMinor: e.shareMinor,
+            entryDate: input.expenseDate,
+            note: input.note?.trim() ? `Share of ${input.note.trim()}` : 'Share of a shared expense',
+          })),
+        );
+      }
+    }
+
     return row.id;
   });
 

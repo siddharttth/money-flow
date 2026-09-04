@@ -6,6 +6,7 @@ import { api, RequestError } from '@/lib/client';
 import { todayISO } from '@/lib/dates';
 import type { Category, Expense, Person } from '@/lib/types';
 import { ChipRow } from './ui';
+import { formatINR } from '@/lib/money';
 import { Icon, resolveIcon } from '@/components/icons';
 
 /** Categories and people the user picked most recently, surfaced first so the
@@ -61,6 +62,7 @@ export function ExpenseForm({
   // Multi-select is opt-in. Tapping a chip normally just switches person,
   // which is what almost every entry needs and requires no unchecking.
   const [multi, setMulti] = useState((existing?.people.length ?? 0) > 1);
+  const [lendShares, setLendShares] = useState(false);
   const [expenseDate, setExpenseDate] = useState(existing?.expenseDate ?? todayISO());
   const [note, setNote] = useState(existing?.note ?? '');
   const [saving, setSaving] = useState(false);
@@ -95,6 +97,14 @@ export function ExpenseForm({
   const amountValue = Number(amount);
   const valid = amount !== '' && Number.isFinite(amountValue) && amountValue > 0 && !!categoryId;
 
+  // Everyone on the expense who is not you — the ones who could owe you.
+  const others = personIds.filter((id) => !personData?.items.find((p) => p.id === id)?.isSelf);
+  const othersCount = others.length;
+  const othersShareMinor =
+    personIds.length > 1
+      ? Math.round((Math.round(amountValue * 100) || 0) * (othersCount / personIds.length))
+      : 0;
+
   async function submit(addAnother: boolean) {
     if (!valid || saving) return;
     setSaving(true);
@@ -106,6 +116,7 @@ export function ExpenseForm({
       expenseDate,
       note: note.trim() || null,
       personIds,
+      lendShares: lendShares && othersCount > 0 && personIds.length > 1,
     };
 
     try {
@@ -246,10 +257,37 @@ export function ExpenseForm({
         </ChipRow>
 
         {personIds.length > 1 && (
-          <p className="muted text-xs mt-2">
-            Still one ₹{amount || '0'} expense, split {personIds.length} ways — about ₹
-            {Math.round((Number(amount) || 0) / personIds.length).toLocaleString('en-IN')} against each of them.
-          </p>
+          <div className="mt-3">
+            <p className="muted text-xs">
+              Still one ₹{amount || '0'} expense, split {personIds.length} ways — about ₹
+              {Math.round((Number(amount) || 0) / personIds.length).toLocaleString('en-IN')} against each of them.
+            </p>
+
+            {/*
+              The one place the two halves of this app meet. Tagging people
+              already works out their shares; without this the app knows what
+              each of them owes you and never says so.
+            */}
+            {othersCount > 0 && !existing && (
+              <button
+                type="button"
+                className="chip mt-2.5"
+                data-selected={lendShares}
+                onClick={() => setLendShares((v) => !v)}
+              >
+                {lendShares ? '✓' : '＋'} They owe me their share
+                {lendShares && othersShareMinor > 0 && (
+                  <span className="num opacity-80">· {formatINR(othersShareMinor)}</span>
+                )}
+              </button>
+            )}
+            {lendShares && othersCount > 0 && (
+              <p className="muted text-[11px] mt-1.5">
+                Adds {othersCount} {othersCount === 1 ? 'entry' : 'entries'} to the ledger. Spending is unchanged —
+                lending never counts as spending.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

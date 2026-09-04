@@ -4,7 +4,8 @@ import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { api } from '@/lib/client';
-import { Modal, Toast } from './ui';
+import { Modal } from './ui';
+import { useToast, type ToastAction } from './toast';
 import { Logo } from './logo';
 import { InspectorProvider } from './inspector';
 import { CommandPalette } from './command-palette';
@@ -29,8 +30,6 @@ const NAV: { href: string; label: string; short: string; icon: NavIconKey }[] = 
 /** Everything except Settings, which lives in the header. */
 const MOBILE_TABS = ['/dashboard', '/expenses', '/investments', '/people', '/analytics'];
 
-type ToastAction = { label: string; onClick: () => void };
-
 type ShellCtx = {
   openAdd: (existing?: Expense) => void;
   toast: (message: string, tone?: 'success' | 'error', action?: ToastAction) => void;
@@ -45,19 +44,9 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | undefined>();
-  const [toastMsg, setToastMsg] = useState<{
-    text: string;
-    tone: 'success' | 'error';
-    action?: ToastAction;
-  } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const toast = useCallback((text: string, tone: 'success' | 'error' = 'success', action?: ToastAction) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToastMsg({ text, tone, action });
-    // An undoable toast sticks around longer — 2.6s is not enough to react to.
-    toastTimer.current = setTimeout(() => setToastMsg(null), action ? 6000 : 2600);
-  }, []);
+  // Toasts are owned by a provider above this, so the inspector can raise one
+  // without importing the shell back.
+  const toast = useToast();
 
   const openAdd = useCallback((existing?: Expense) => {
     setEditing(existing);
@@ -256,22 +245,6 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
         </Modal>
 
         <CommandPalette onAdd={() => openAdd()} />
-
-        {toastMsg && (
-          <Toast
-            message={toastMsg.text}
-            tone={toastMsg.tone}
-            action={
-              toastMsg.action && {
-                label: toastMsg.action.label,
-                onClick: () => {
-                  toastMsg.action!.onClick();
-                  setToastMsg(null);
-                },
-              }
-            }
-          />
-        )}
       </InspectorProvider>
     </Ctx.Provider>
   );

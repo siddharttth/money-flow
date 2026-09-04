@@ -30,6 +30,8 @@ export const createExpenseSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   personIds: z.array(z.string().uuid()).max(20).optional().default([]),
   paymentMethod: z.string().trim().max(32).optional().nullable(),
+  /** Also record each other participant's share as money they owe you. */
+  lendShares: z.boolean().optional(),
 });
 
 export const updateExpenseSchema = z.object({
@@ -46,8 +48,11 @@ export const createCategorySchema = z.object({
   monthlyBudget: z.number().nonnegative().max(100_000_000).nullable().optional(),
   icon: z.string().trim().max(8).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value').optional(),
-  kind: z.enum(['expense', 'investment']).optional(),
+  kind: z.enum(['expense', 'investment', 'income']).optional(),
   sortOrder: z.number().int().optional(),
+  /** A target turns an investment category into a fund. */
+  target: z.number().positive().max(1_000_000_000).nullable().optional(),
+  targetDate: isoDate.nullable().optional(),
 });
 
 export const updateCategorySchema = createCategorySchema.partial().extend({

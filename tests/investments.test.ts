@@ -222,3 +222,26 @@ describe('the investments screen', () => {
     expect((await getTotal({ userId, ...AUG })).totalMinor).toBe(0);
   });
 });
+
+describe('income is not spending either', () => {
+  it('does not report a salary as the month’s spending on the split', async () => {
+    const [salary] = await testDb
+      .insert(categories)
+      .values({ userId, name: 'Salary', slug: 'salary', kind: 'income', sortOrder: 9 })
+      .returning();
+
+    await createExpense(userId, {
+      amount: 52000,
+      categoryId: salary.id,
+      expenseDate: '2026-08-01',
+      note: null,
+      personIds: [],
+    });
+    await add(2749, 'Outside Food', '2026-08-05');
+    await add(10000, 'Investment', '2026-08-07');
+
+    const inv = await getInvestmentSummary(userId, '2026-08');
+    expect(inv.monthSpendingMinor).toBe(274_900);
+    expect(inv.monthMinor).toBe(1_000_000);
+  });
+});

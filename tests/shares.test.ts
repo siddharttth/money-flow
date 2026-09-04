@@ -207,3 +207,92 @@ describe('an explicit share', () => {
     expect(s['C']).toBe(3000);
   });
 });
+
+describe('recording the others’ shares as a loan', () => {
+  it('creates one ledger entry per person who is not me, for their share', async () => {
+    const { ledgerEntries } = await import('@/db/schema');
+
+    await createExpense(userId, {
+      amount: 900,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-16',
+      note: 'Dinner',
+      personIds: [person['Me'], person['A'], person['B']],
+      lendShares: true,
+    });
+
+    const rows = await testDb.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId));
+
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.direction === 'out')).toBe(true);
+    expect(rows.reduce((s, r) => s + r.amountMinor, 0)).toBe(60_000);
+    expect(rows[0].note).toBe('Share of Dinner');
+  });
+
+  it('leaves me out of it — you cannot lend to yourself', async () => {
+    const { ledgerEntries } = await import('@/db/schema');
+
+    await createExpense(userId, {
+      amount: 900,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-16',
+      note: null,
+      personIds: [person['Me'], person['A'], person['B']],
+      lendShares: true,
+    });
+
+    const rows = await testDb.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId));
+    expect(rows.some((r) => r.personId === person['Me'])).toBe(false);
+  });
+
+  it('hands out the same shares the analytics do, to the paisa', async () => {
+    const { ledgerEntries } = await import('@/db/schema');
+
+    await createExpense(userId, {
+      amount: 100,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-16',
+      note: null,
+      personIds: [person['A'], person['B'], person['C']],
+      lendShares: true,
+    });
+
+    const rows = await testDb.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId));
+    const byPerson = Object.fromEntries(rows.map((r) => [r.personId, r.amountMinor]));
+    const s = await shares();
+
+    for (const name of ['A', 'B', 'C']) {
+      expect(byPerson[person[name]]).toBe(s[name]);
+    }
+    expect(rows.reduce((a, r) => a + r.amountMinor, 0)).toBe(10_000);
+  });
+
+  it('does nothing at all when the expense is only yours', async () => {
+    const { ledgerEntries } = await import('@/db/schema');
+
+    await createExpense(userId, {
+      amount: 500,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-16',
+      note: null,
+      personIds: [person['A']],
+      lendShares: true,
+    });
+
+    expect(await testDb.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId))).toHaveLength(0);
+  });
+
+  it('stays off unless asked — the flag is opt-in', async () => {
+    const { ledgerEntries } = await import('@/db/schema');
+
+    await createExpense(userId, {
+      amount: 900,
+      categoryId: cat['Outside Food'],
+      expenseDate: '2026-08-16',
+      note: null,
+      personIds: [person['A'], person['B']],
+    });
+
+    expect(await testDb.select().from(ledgerEntries).where(eq(ledgerEntries.userId, userId))).toHaveLength(0);
+  });
+});

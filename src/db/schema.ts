@@ -33,10 +33,20 @@ export const users = pgTable('users', {
 }));
 
 /**
- * Categories = WHAT the money was spent on.
- * User scoped so each account can rename/add/reorder freely.
- * `kind` lets INVESTMENT be visually/analytically distinguished from
- * consumption without needing a schema change later.
+ * Categories = WHAT the money was spent on — and, by `kind`, whether it was
+ * spending at all.
+ *
+ *   expense     money gone. The only kind that counts as spending.
+ *   investment  money moved, not lost. Excluded from every spending figure.
+ *   income      money in. Excluded too, and negated where a net is wanted.
+ *
+ * One column keeps three fundamentally different flows in one table without
+ * three code paths — every query filters on it through `kindPredicate`.
+ *
+ * A FUND is an investment category with a target on it. That is the whole
+ * mechanism: contributions are logged exactly like any other transaction, are
+ * already excluded from spending, and `targetMinor` / `targetDate` turn the
+ * running total into progress and a required pace.
  */
 export const categories = pgTable('categories', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -45,9 +55,12 @@ export const categories = pgTable('categories', {
   slug: text('slug').notNull(),
   icon: text('icon').notNull().default('💸'),
   color: text('color').notNull().default('#6366f1'),
-  kind: text('kind').notNull().default('expense'), // 'expense' | 'investment'
+  kind: text('kind').notNull().default('expense'), // 'expense' | 'investment' | 'income'
   /** Optional monthly cap, in paise. Null means the category is untracked. */
   monthlyBudgetMinor: integer('monthly_budget_minor'),
+  /** Set on an investment category to make it a fund with a goal. */
+  targetMinor: integer('target_minor'),
+  targetDate: date('target_date'),
   isActive: boolean('is_active').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
