@@ -492,10 +492,21 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
  * The arithmetic is one subtraction and one split, and the bar draws exactly
  * the same three numbers so the picture and the list can never disagree:
  *
- *     came in − spent = saved,   saved = invested + still in hand
+ *     came in − spent − invested = what is left
+ *
+ * The headline used to be `came in − spent`, captioned "Saved". That is the
+ * textbook savings rate and it was actively misleading: a month that earned
+ * ₹33,133, spent ₹25,366 and invested ₹10,000 announced "SAVED ₹7,767" while
+ * the account it describes ended ₹2,233 lighter. Nobody reading that has
+ * saved anything they can point at.
+ *
+ * So the big number is what is actually left after everything left — and the
+ * savings rate keeps its place underneath, where it can be qualified rather
+ * than mistaken for cash.
  *
  * It runs on money that actually arrived. Safe-to-spend may lean on an
- * estimate to be useful before payday; a figure captioned "saved" may not.
+ * estimate to be useful before payday; a figure describing what you have
+ * may not.
  */
 export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: string }) {
   const t = plan.tally;
@@ -506,6 +517,9 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
   const overspent = t.savedMinor < 0;
   /** Spending did not, but spending plus investing did — the balance fell. */
   const dipped = t.inHandMinor < 0;
+  /** The headline: what the month actually left behind, in cash. */
+  const net = t.inHandMinor;
+  const down = net < 0;
 
   /*
    * The bar is scaled to whichever is larger: what came in, or what went out.
@@ -529,7 +543,7 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
     <Card className="!p-5 sm:!p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="label mb-0">
-          {overspent ? 'Overspent in' : 'Saved in'} {monthName}
+          {down ? 'Down in' : 'Left in hand ·'} {monthName}
           {short && ' so far'}
         </p>
         <p className="muted text-[12px]">
@@ -538,17 +552,22 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
       </div>
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-        <Money
-          minor={Math.abs(t.savedMinor)}
-          className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
-          style={overspent ? { color: 'var(--rule-red)' } : undefined}
-        />
-        {t.ratePct != null && !overspent && (
-          <span className="text-[13px]" style={{ color: 'var(--credit)' }}>
-            <span className="num">{Math.round(t.ratePct)}%</span> of what came in
-          </span>
-        )}
-        {overspent && <span className="muted text-[13px]">more than came in</span>}
+        <span
+          className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight num"
+          style={down ? { color: 'var(--rule-red)' } : undefined}
+        >
+          {down && '−'}
+          {formatINR(Math.abs(net))}
+        </span>
+        <span className="muted text-[13px]">
+          after <span className="num">{formatINR(t.outMinor)}</span> spent
+          {t.investedMinor > 0 && (
+            <>
+              {' '}
+              and <span className="num">{formatINR(t.investedMinor)}</span> invested
+            </>
+          )}
+        </span>
       </div>
 
       {/*
@@ -585,50 +604,85 @@ export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: 
           </p>
         )}
 
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 mt-4">
+        <dl
+          className={`grid grid-cols-1 gap-x-6 gap-y-2 mt-4 ${
+            t.investedMinor > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+          }`}
+        >
           <TallyLeg color="var(--text-muted)" label="Spent" minor={t.outMinor} />
-          <TallyLeg color="var(--credit)" label="Invested" minor={t.investedMinor} />
-          {/*
-            This leg goes negative and must show it. A month that earned
-            ₹33,133, spent ₹25,366 and invested ₹12,000 has −₹4,233 in hand,
-            and printing that as a cheerful gold "₹4,233" was the card's worst
-            possible reading of its own arithmetic.
-          */}
+          {/* The bar has no green segment when nothing was invested, so the
+              legend should not carry a ₹0 entry explaining it. */}
+          {t.investedMinor > 0 && (
+            <TallyLeg color="var(--credit)" label="Invested" minor={t.investedMinor} />
+          )}
+          {/* Goes negative and shows it. Printing this as a cheerful gold
+              "₹4,233" was the card's worst possible reading of its own
+              arithmetic. */}
           <TallyLeg
-            color={overspent || dipped ? 'var(--rule-red)' : 'var(--hi)'}
-            label={overspent ? 'Short by' : dipped ? 'Taken from savings' : 'Still in hand'}
-            minor={t.inHandMinor}
+            color={down ? 'var(--rule-red)' : 'var(--hi)'}
+            label={down ? 'Taken from savings' : 'Left in hand'}
+            minor={net}
             signed
-            tone={overspent || dipped ? 'var(--rule-red)' : undefined}
+            tone={down ? 'var(--rule-red)' : undefined}
           />
         </dl>
       </div>
 
-      {/* Investing is not spending, and this is the one card where both sit
-          side by side — so it says which pile is which rather than leaving
-          "saved" to be read as "sitting in the bank". */}
-      {t.investedMinor > 0 && !overspent && (
-        <p className="muted text-[12px] mt-4 leading-relaxed">
-          {dipped ? (
-            /* Clamping this to zero printed "₹0 still in the account" directly
-               under a leg reading ₹4,233 — the card contradicting itself in
-               adjacent lines. */
-            <>
-              <span className="num">{formatINR(t.investedMinor)}</span> went into investments — that is{' '}
-              <span className="num">{formatINR(Math.abs(t.inHandMinor))}</span> more than the month itself
-              produced, so the difference came out of money you already had. Your balance is down by that much
-              even though the month saved <span className="num">{formatINR(t.savedMinor)}</span> on paper.
-            </>
-          ) : (
-            <>
-              Saved counts both: <span className="num">{formatINR(t.investedMinor)}</span> already moved into
-              investments, <span className="num">{formatINR(t.inHandMinor)}</span> still in the account.
-            </>
-          )}
-        </p>
-      )}
+      {/*
+        The savings rate, kept but demoted.
+
+        `income − spending` is the textbook figure and it is worth knowing, but
+        as a 48px headline captioned "Saved" it told someone whose balance had
+        just fallen that they had put ₹7,767 away. Down here it can be given
+        the one qualifier that makes it true.
+      */}
+      <p className="muted text-[12px] mt-4 leading-relaxed">
+        {t.investedMinor > 0 ? (
+          <>
+            Income less spending is <span className="num">{formatINR(t.savedMinor)}</span>
+            {t.ratePct != null && !overspent && (
+              <>
+                {' '}
+                — {article(Math.round(t.ratePct))} {Math.round(t.ratePct)}% savings rate
+              </>
+            )}
+            , but{' '}
+            <span className="num">{formatINR(t.investedMinor)}</span> of it went into investments
+            {dipped ? (
+              <>
+                {' '}
+                — <span className="num">{formatINR(Math.abs(net))}</span> more than the month produced, so the
+                difference came out of money you already had.
+              </>
+            ) : (
+              <>
+                , which you still have — just not in cash.
+              </>
+            )}
+          </>
+        ) : overspent ? (
+          <>
+            <span className="num">{formatINR(Math.abs(t.savedMinor))}</span> more went out than came in.
+          </>
+        ) : (
+          <>
+            That is {article(Math.round(t.ratePct ?? 0))} {Math.round(t.ratePct ?? 0)}% savings rate — the
+            share of what came in that is still sitting there.
+          </>
+        )}
+      </p>
+
     </Card>
   );
+}
+
+/**
+ * "a" or "an" for a percentage read aloud. Eighty, eleven and eighteen all
+ * start with a vowel sound; every other leading digit does not.
+ */
+function article(n: number): string {
+  const lead = String(Math.abs(n));
+  return lead.startsWith('8') || lead === '11' || lead === '18' ? 'an' : 'a';
 }
 
 function TallyLeg({
