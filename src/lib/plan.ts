@@ -1,3 +1,7 @@
+import { sql } from 'drizzle-orm';
+import { db } from '@/db';
+import { categories, expenses } from '@/db/schema';
+import { sumToMinor } from './money';
 import { getTotal } from './analytics';
 import { getFunds, requiredSavingsMinor, type Fund } from './funds';
 import { getRecurringCharges, splitCommitted, type CommittedSplit } from './recurring';
@@ -62,11 +66,52 @@ export type MonthlyPlan = {
   /** (income − spending) ÷ income. Null without income to divide by. */
   savingsRatePct: number | null;
 
+  /*
+   * THE TALLY — what the month actually came to.
+   *
+   * Everything above is either a report of the past or a forecast. None of it
+   * answers the question people actually open a money app to ask: how much did
+   * I keep this month? These three add up, and they add up against money that
+   * genuinely arrived — never the estimate, because a tally of money you have
+   * not been paid yet is not a tally.
+   *
+   *     came in − spent = saved
+   *     saved = invested + still in hand
+   */
+  tally: {
+    /** True once real income exists to reconcile against. */
+    known: boolean;
+    inMinor: number;
+    outMinor: number;
+    /** in − out. Negative means the month ate into what was already there. */
+    savedMinor: number;
+    /** The part of it already moved somewhere deliberate. */
+    investedMinor: number;
+    /** The rest — still sitting in the account. */
+    inHandMinor: number;
+    /** saved ÷ in, as a percentage. Null when there is nothing to divide by. */
+    ratePct: number | null;
+  };
+
   savingsTargetMinor: number;
   freeMinor: number;
   perDayMinor: number;
   /** True when the plan is already blown — free money has gone negative. */
   overspent: boolean;
+  /**
+   * WHY it is blown, which is not a detail.
+   *
+   * Two ambitious goals can drive free money negative in a month where ₹4,000
+   * was spent against ₹50,000 of income. Captioning that "over budget" next to
+   * a card reading "saved ₹46,000" makes the app contradict itself and the
+   * user distrust both figures. So the plan says which it is:
+   *
+   *   'spending' — money genuinely went out faster than it came in
+   *   'goals'    — spending is fine; the targets ask for more than is left
+   */
+  shortfall: 'none' | 'spending' | 'goals';
+  /** What would be free if the goals were not asking for anything. */
+  freeBeforeGoalsMinor: number;
 
   funds: Fund[];
 };
@@ -106,9 +151,8 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
   const savingsTargetMinor = Math.max(0, requiredSavingsMinor(funds) - invested.totalMinor);
 
   const outAlready = spent.totalMinor + invested.totalMinor;
-  const freeMinor = hasIncome
-    ? expectedIncomeMinor - outAlready - committed.committedDueMinor - savingsTargetMinor
-    : 0;
+  const freeBeforeGoalsMinor = hasIncome ? expectedIncomeMinor - outAlready - committed.committedDueMinor : 0;
+  const freeMinor = hasIncome ? freeBeforeGoalsMinor - savingsTargetMinor : 0;
 
   return {
     month,
@@ -128,6 +172,9 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
     committed,
 
     netMinor: expectedIncomeMinor - spent.totalMinor,
+
+    tally: buildTally(income.totalMinor, spent.totalMinor, invested.totalMinor),
+
     /* Against real income only. A savings rate computed from an estimate is a
        guess about a guess, and this one gets quoted as a fact. */
     savingsRatePct:
@@ -137,6 +184,9 @@ export async function getMonthlyPlan(userId: string, month: string): Promise<Mon
     freeMinor,
     perDayMinor: isCurrentMonth && daysLeft > 0 ? Math.floor(Math.max(0, freeMinor) / daysLeft) : 0,
     overspent: hasIncome && freeMinor < 0,
+    shortfall:
+      !hasIncome || freeMinor >= 0 ? 'none' : freeBeforeGoalsMinor >= 0 ? 'goals' : 'spending',
+    freeBeforeGoalsMinor,
 
     funds,
   };
@@ -182,6 +232,28 @@ export async function getSweep(userId: string, month: string): Promise<Sweep> {
   };
 }
 
+/**
+ * The month reconciled against money that actually arrived.
+ *
+ * Deliberately built from `incomeMinor` and not `expectedIncomeMinor`: the
+ * estimate is there so safe-to-spend works before payday, and quietly folding
+ * it into a figure captioned "saved" would report money nobody has been paid.
+ */
+function buildTally(inMinor: number, spentMinor: number, investedMinor: number): MonthlyPlan['tally'] {
+  const savedMinor = inMinor - spentMinor;
+  return {
+    known: inMinor > 0,
+    inMinor,
+    outMinor: spentMinor,
+    savedMinor,
+    investedMinor,
+    // Investing more than you earned this month is possible — the money came
+    // from somewhere else — and must not draw a negative "in hand".
+    inHandMinor: savedMinor - investedMinor,
+    ratePct: inMinor > 0 ? (savedMinor / inMinor) * 100 : null,
+  };
+}
+
 /** Income for each of the N months before `month`, newest first, zeros dropped. */
 async function recentIncome(userId: string, month: string, count: number): Promise<number[]> {
   const months = Array.from({ length: count }, (_, i) => monthRange(shiftMonth(month, -(i + 1))));
@@ -195,4 +267,64 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+export type SavedMonth = {
+  month: string;
+  inMinor: number;
+  outMinor: number;
+  investedMinor: number;
+  savedMinor: number;
+  /** Null in a month with no income to divide by. */
+  ratePct: number | null;
+};
+
+/**
+ * SAVING, AS A HABIT RATHER THAN A MONTH.
+ *
+ * One month's tally answers "how did this month go". It cannot answer the
+ * question underneath it — am I getting better at this? — and a savings rate
+ * seen once a month, alone, is the easiest number in personal finance to
+ * rationalise. Six of them in a row is not.
+ *
+ * Months with no income are returned as they are rather than skipped: a gap in
+ * the record is itself worth seeing, and quietly dropping them would flatter
+ * the average.
+ */
+export async function getSavingsHistory(userId: string, months: number): Promise<SavedMonth[]> {
+  const from = monthRange(shiftMonth(todayISO().slice(0, 7), -(months - 1))).start;
+
+  /*
+   * A plain join, not the EXISTS subqueries used elsewhere: those exist to
+   * avoid multiplying rows across the people join, and there is no people
+   * join here. Every expense has exactly one category, so this cannot fan out.
+   */
+  const rows = await db
+    .select({
+      month: sql<string>`to_char(${expenses.expenseDate}, 'YYYY-MM')`,
+      income: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} = 'income'), 0)`,
+      spent: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} NOT IN ('income', 'investment')), 0)`,
+      invested: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} = 'investment'), 0)`,
+    })
+    .from(expenses)
+    .innerJoin(categories, sql`${categories.id} = ${expenses.categoryId}`)
+    .where(
+      sql`${expenses.userId} = ${userId} AND ${expenses.deletedAt} IS NULL AND ${expenses.expenseDate} >= ${from}`,
+    )
+    .groupBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM')`);
+
+  return rows.map((r) => {
+    const inMinor = sumToMinor(r.income);
+    const outMinor = sumToMinor(r.spent);
+    const savedMinor = inMinor - outMinor;
+    return {
+      month: r.month,
+      inMinor,
+      outMinor,
+      investedMinor: sumToMinor(r.invested),
+      savedMinor,
+      ratePct: inMinor > 0 ? (savedMinor / inMinor) * 100 : null,
+    };
+  });
 }

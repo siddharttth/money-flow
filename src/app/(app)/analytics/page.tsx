@@ -25,6 +25,7 @@ import {
 } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { DayBars, DeltaBar, Donut, FlowCurve, MonthBars, ShareBar, WeekdayBars } from '@/components/graph';
+import { SavingsHistory, type SavedMonthRow } from '@/components/plan-cards';
 import { BreakdownList } from '@/components/breakdown';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
@@ -72,6 +73,7 @@ function AnalyticsInner() {
     `/api/analytics/daily${qs({ month, personIds })}`,
   );
   const trends = useSWR<{ items: { month: string; totalMinor: number }[] }>('/api/analytics/trends?months=12');
+  const saved = useSWR<{ items: SavedMonthRow[] }>('/api/analytics/savings?months=6');
   const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
 
   const s = summary.data;
@@ -505,19 +507,29 @@ function AnalyticsInner() {
         </div>
       )}
 
-      {/* ---------- The long view ---------- */}
+      {/*
+        ---------- The long view ----------
+        Spending over time on the left, what survived it on the right. The
+        second half only appears once income exists to divide by — a savings
+        rate with no income is not a zero, it is a blank.
+      */}
       <div>
         <SectionHead label="The long view" />
-        <Card>
-          {(trends.data?.items.length ?? 0) >= 2 ? (
-            <>
-              <MonthBars data={trends.data!.items} activeMonth={month} onPick={setMonth} height={150} />
-              <p className="muted text-[12px] mt-4">Tap a bar to open that month.</p>
-            </>
-          ) : (
-            <EmptyState title="Not enough history yet" hint="A trend needs at least two months." />
-          )}
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          <Card>
+            {(trends.data?.items.length ?? 0) >= 2 ? (
+              <>
+                <h3 className="text-[15px] font-semibold mb-1">What you spend</h3>
+                <p className="muted text-[12px] mb-4">Month by month. Tap a bar to open that month.</p>
+                <MonthBars data={trends.data!.items} activeMonth={month} onPick={setMonth} height={150} />
+              </>
+            ) : (
+              <EmptyState title="Not enough history yet" hint="A trend needs at least two months." />
+            )}
+          </Card>
+
+          {saved.data?.items.length ? <SavingsHistory rows={saved.data.items} /> : null}
+        </div>
       </div>
 
       <CategoryDrilldown

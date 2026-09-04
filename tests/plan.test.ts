@@ -9,7 +9,7 @@ const { createExpense } = await import('@/lib/expenses');
 const { getTotal } = await import('@/lib/analytics');
 const { getRecurringCharges, splitCommitted } = await import('@/lib/recurring');
 const { getFunds, requiredSavingsMinor } = await import('@/lib/funds');
-const { getMonthlyPlan, getSweep } = await import('@/lib/plan');
+const { getMonthlyPlan, getSweep, getSavingsHistory } = await import('@/lib/plan');
 const { eq } = await import('drizzle-orm');
 
 let userId: string;
@@ -427,5 +427,169 @@ describe('income that has not arrived yet', () => {
 
     const plan = await getMonthlyPlan(userId, '2026-08');
     expect(plan.expectedIncomeMinor).toBe(4_000_000);
+  });
+});
+
+describe('the tally — what the month came to', () => {
+  it('reconciles: what came in, less what was spent, is what was saved', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-20T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(4000, 'Outside Food', '2026-08-05');
+    await add(8000, 'SIP', '2026-08-07');
+
+    const { tally } = await getMonthlyPlan(userId, '2026-08');
+    expect(tally.known).toBe(true);
+    expect(tally.inMinor).toBe(5_000_000);
+    expect(tally.outMinor).toBe(400_000);
+    expect(tally.savedMinor).toBe(4_600_000);
+    // Saved splits into the part already moved and the part still liquid.
+    expect(tally.investedMinor).toBe(800_000);
+    expect(tally.inHandMinor).toBe(3_800_000);
+    expect(tally.investedMinor + tally.inHandMinor).toBe(tally.savedMinor);
+    expect(Math.round(tally.ratePct!)).toBe(92);
+  });
+
+  it('never quietly tallies an estimate — an unpaid month is not a saved month', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-20T10:00:00Z'));
+    // Two paid months behind it, so the plan HAS an estimate to lean on.
+    await add(50000, 'Salary', '2026-06-01');
+    await add(50000, 'Salary', '2026-07-01');
+    await add(4000, 'Outside Food', '2026-08-05');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+    expect(plan.usingEstimate).toBe(true);
+    expect(plan.expectedIncomeMinor).toBe(5_000_000);
+    // ...and the tally still refuses to report money nobody has been paid.
+    expect(plan.tally.known).toBe(false);
+    expect(plan.tally.inMinor).toBe(0);
+    expect(plan.tally.ratePct).toBeNull();
+  });
+
+  it('goes negative when the month ate into what was already there', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-20T10:00:00Z'));
+    await add(10000, 'Salary', '2026-08-01');
+    await add(14000, 'Outside Food', '2026-08-05');
+
+    const { tally } = await getMonthlyPlan(userId, '2026-08');
+    expect(tally.savedMinor).toBe(-400_000);
+    expect(tally.ratePct).toBeLessThan(0);
+  });
+});
+
+describe('a goal does not claim a pace it has not earned', () => {
+  it('withholds pace and projection from a fund a few days old', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-05T10:00:00Z'));
+    await makeCategory('Bike', 'investment', { targetMinor: 8_000_000, targetDate: '2027-03-31' });
+    await add(8000, 'Bike', '2026-08-02');
+
+    const [fund] = await getFunds(userId, '2026-08');
+    // The arithmetic still runs — it is the confidence that is withheld.
+    expect(fund.paceDeltaMinor).toBeGreaterThan(0);
+    expect(fund.paceConfident).toBe(false);
+    expect(fund.projectedDate).toBeNull();
+  });
+
+  it('states a pace once the fund has been running three weeks', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-31T10:00:00Z'));
+    await makeCategory('Bike', 'investment', { targetMinor: 8_000_000, targetDate: '2027-03-31' });
+    await add(8000, 'Bike', '2026-08-02');
+
+    const [fund] = await getFunds(userId, '2026-08');
+    expect(fund.paceConfident).toBe(true);
+  });
+
+  it('needs a second contribution before it will project a finish date', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-10T10:00:00Z'));
+    await makeCategory('Bike', 'investment', { targetMinor: 8_000_000, targetDate: '2027-03-31' });
+    await add(8000, 'Bike', '2026-08-02');
+    // 39 days of history, but one deposit is a lump sum, not a rate.
+    expect((await getFunds(userId, '2026-09'))[0].projectedDate).toBeNull();
+
+    await add(8000, 'Bike', '2026-09-02');
+    expect((await getFunds(userId, '2026-09'))[0].projectedDate).not.toBeNull();
+  });
+});
+
+describe('a shortfall says which kind of shortfall it is', () => {
+  async function ambitiousGoals() {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-05T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await makeCategory('Bike', 'investment', { targetMinor: 8_000_000, targetDate: '2026-12-31' });
+    await makeCategory('Buffer', 'investment', { targetMinor: 20_000_000, targetDate: '2026-12-31' });
+  }
+
+  it('blames the goals when spending is nowhere near the problem', async () => {
+    await ambitiousGoals();
+    await add(4000, 'Outside Food', '2026-08-03');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+    expect(plan.freeMinor).toBeLessThan(0);
+    expect(plan.freeBeforeGoalsMinor).toBeGreaterThan(0);
+    expect(plan.shortfall).toBe('goals');
+    // And the month itself was a good one, which is why the distinction matters.
+    expect(plan.tally.savedMinor).toBe(4_600_000);
+  });
+
+  it('blames the spending when the spending really is the problem', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-05T10:00:00Z'));
+    await add(10000, 'Salary', '2026-08-01');
+    await add(14000, 'Outside Food', '2026-08-03');
+
+    const plan = await getMonthlyPlan(userId, '2026-08');
+    expect(plan.shortfall).toBe('spending');
+    expect(plan.freeBeforeGoalsMinor).toBeLessThan(0);
+  });
+
+  it('says nothing at all when there is money left', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-05T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(4000, 'Outside Food', '2026-08-03');
+
+    expect((await getMonthlyPlan(userId, '2026-08')).shortfall).toBe('none');
+  });
+});
+
+describe('saving as a habit, month over month', () => {
+  it('reports what came in, what went out and what stayed, per month', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-15T10:00:00Z'));
+    await add(50000, 'Salary', '2026-07-01');
+    await add(20000, 'Outside Food', '2026-07-08');
+    await add(5000, 'SIP', '2026-07-09');
+
+    await add(50000, 'Salary', '2026-08-01');
+    await add(10000, 'Outside Food', '2026-08-08');
+
+    const history = await getSavingsHistory(userId, 3);
+    expect(history.map((h) => h.month)).toEqual(['2026-07', '2026-08']);
+
+    const [jul, aug] = history;
+    expect(jul).toMatchObject({ inMinor: 5_000_000, outMinor: 2_000_000, investedMinor: 500_000, savedMinor: 3_000_000 });
+    expect(Math.round(jul.ratePct!)).toBe(60);
+    expect(aug.savedMinor).toBe(4_000_000);
+    expect(Math.round(aug.ratePct!)).toBe(80);
+  });
+
+  it('keeps a month with no income instead of quietly flattering the average', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-15T10:00:00Z'));
+    await add(3000, 'Outside Food', '2026-07-08');
+    await add(50000, 'Salary', '2026-08-01');
+
+    const history = await getSavingsHistory(userId, 3);
+    const jul = history.find((h) => h.month === '2026-07')!;
+    expect(jul.inMinor).toBe(0);
+    expect(jul.ratePct).toBeNull();
+    // Spending with nothing coming in is a negative month, and says so.
+    expect(jul.savedMinor).toBe(-300_000);
+  });
+
+  it('does not let an investment leak into the spending column', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-15T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(9000, 'SIP', '2026-08-02');
+
+    const [aug] = await getSavingsHistory(userId, 1);
+    expect(aug.outMinor).toBe(0);
+    expect(aug.investedMinor).toBe(900_000);
+    expect(aug.savedMinor).toBe(5_000_000);
   });
 });

@@ -44,17 +44,38 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
   }
 
   const { committed } = plan;
-  const base = plan.expectedIncomeMinor;
-  const spentShare = base > 0 ? plan.spentMinor / base : 0;
-  const investedShare = base > 0 ? plan.investedMinor / base : 0;
-  const dueShare = base > 0 ? committed.committedDueMinor / base : 0;
 
   return (
     <Card className="!p-5 sm:!p-6">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
         <div>
-          <p className="label mb-2">{plan.overspent ? 'Over budget' : 'Safe to spend'}</p>
-          {plan.overspent ? (
+          <p className="label mb-2">
+            {plan.shortfall === 'goals' ? 'Goals ask for more' : plan.overspent ? 'Over budget' : 'Safe to spend'}
+          </p>
+          {plan.shortfall === 'goals' ? (
+            /*
+             * Not overspending. A month can be ₹4,000 out of ₹50,000 and still
+             * come up short because the targets want ₹48,893 of it — and
+             * calling that "over budget" directly under a card reading "saved
+             * ₹46,000" makes the app argue with itself.
+             */
+            <>
+              <Money
+                minor={Math.abs(plan.freeMinor)}
+                className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
+                style={{ color: 'var(--hi)' }}
+              />
+              <p className="muted text-[13px] mt-2.5 leading-relaxed">
+                more than the month has left, once your goals take their share. Your spending is fine — the targets
+                are the stretch.
+              </p>
+              <p className="muted text-[12px] mt-2.5 leading-relaxed">
+                Push a target date out, or put in less this month:{' '}
+                <span className="num">{formatINR(plan.freeBeforeGoalsMinor)}</span> is genuinely free before they
+                are counted.
+              </p>
+            </>
+          ) : plan.overspent ? (
             <>
               <Money
                 minor={Math.abs(plan.freeMinor)}
@@ -105,38 +126,14 @@ export function SafeToSpend({ plan }: { plan: MonthlyPlan }) {
               <PlanLine label="Bills still due" minor={committed.committedDueMinor} sign="−" />
             )}
             {plan.savingsTargetMinor > 0 && (
-              <PlanLine label="Funds still need" minor={plan.savingsTargetMinor} sign="−" />
+              <PlanLine label="Goals still need" minor={plan.savingsTargetMinor} sign="−" />
             )}
             <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
               <PlanLine label="Free" minor={plan.freeMinor} strong tone={plan.overspent ? 'bad' : 'good'} />
             </div>
           </dl>
 
-          <div className="mt-4">
-            <div className="flex h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-              <span style={{ width: `${Math.min(100, spentShare * 100)}%`, background: 'var(--brass)' }} />
-              <span style={{ width: `${Math.min(100, investedShare * 100)}%`, background: 'var(--credit)' }} />
-              <span
-                style={{
-                  width: `${Math.min(100, dueShare * 100)}%`,
-                  background: 'var(--border-strong)',
-                }}
-              />
-            </div>
-            {/* A three-colour bar with a comma-separated caption underneath
-                asks the reader to match order to colour in their head. Swatches
-                do that job for them. */}
-            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-2.5">
-              <Key color="var(--brass)" label="Spent" />
-              <Key color="var(--credit)" label="Invested" />
-              <Key color="var(--border-strong)" label="Still due" />
-              {plan.savingsRatePct != null && (
-                <span className="micro ml-auto" style={{ color: 'var(--credit)' }}>
-                  Saving {Math.round(plan.savingsRatePct)}%
-                </span>
-              )}
-            </div>
-          </div>
+
         </div>
       </div>
     </Card>
@@ -362,7 +359,7 @@ export function SweepCard({ sweep, funds }: { sweep: Sweep; funds: Fund[] }) {
       )}
 
       <button className="btn btn-primary w-full sm:w-auto mt-4" onClick={sweepIt} disabled={busy || !target}>
-        {busy ? 'Moving…' : `Move it to ${open.find((f) => f.categoryId === target)?.name ?? 'a fund'}`}
+        {busy ? 'Moving…' : `Move it to ${open.find((f) => f.categoryId === target)?.name ?? 'a goal'}`}
       </button>
     </Card>
   );
@@ -431,6 +428,13 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
             <p className="label mb-1">Pace</p>
             {fund.paceDeltaMinor == null ? (
               <p className="text-[15px] font-semibold muted">No date set</p>
+            ) : !fund.paceConfident ? (
+              /* One deposit last week is not a pace. Saying so is better than
+                 a confident "₹6,857 ahead of plan" built out of nothing. */
+              <>
+                <p className="text-[15px] font-semibold muted">Just started</p>
+                <p className="muted text-[11px] mt-0.5">pace after a few weeks</p>
+              </>
             ) : (
               <>
                 <p
@@ -447,21 +451,319 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
         </div>
       )}
 
+      {/* Computed since this feature shipped and never once rendered. It is
+          the honest counterweight to the plan: what the plan asks for, and
+          where the money is actually heading. */}
+      {fund.projectedDate && !fund.isComplete && (
+        <p className="muted text-[12px] mt-3.5 leading-relaxed">
+          At the rate so far you get there around <strong>{dayLabel(fund.projectedDate)}</strong>
+          {fund.targetDate && (
+            <>
+              {' '}
+              — {fund.projectedDate <= fund.targetDate ? 'ahead of' : 'later than'} the {dayLabel(fund.targetDate)}{' '}
+              target.
+            </>
+          )}
+        </p>
+      )}
+
       {onAdd && !fund.isComplete && (
         <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
-          Add to this fund
+          Add to this goal
         </button>
       )}
     </Card>
   );
 }
 
-/** A colour swatch and its name — the legend for any stacked bar here. */
-function Key({ color, label }: { color: string; label: string }) {
+
+/* ------------------------------------------------------------------ *
+ * The tally
+ * ------------------------------------------------------------------ */
+
+/**
+ * WHAT THE MONTH CAME TO.
+ *
+ * Every other card here reports a slice: what you spent, what is safe to
+ * spend, how a goal is doing. None of them answered the question people open a
+ * money app to ask — *how much did I keep?* — and the figure existed in the
+ * plan payload the whole time without ever reaching a screen.
+ *
+ * The arithmetic is one subtraction and one split, and the bar draws exactly
+ * the same three numbers so the picture and the list can never disagree:
+ *
+ *     came in − spent = saved,   saved = invested + still in hand
+ *
+ * It runs on money that actually arrived. Safe-to-spend may lean on an
+ * estimate to be useful before payday; a figure captioned "saved" may not.
+ */
+export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: string }) {
+  const t = plan.tally;
+  if (!t.known) return null;
+
+  const short = plan.isCurrentMonth;
+  const overspent = t.savedMinor < 0;
+
+  // Shares of what came in. The bar is a picture of the same subtraction.
+  const pct = (v: number) => (t.inMinor > 0 ? Math.max(0, Math.min(100, (v / t.inMinor) * 100)) : 0);
+  const spentPct = pct(t.outMinor);
+  const investedPct = pct(t.investedMinor);
+  const inHandPct = Math.max(0, 100 - spentPct - investedPct);
+
   return (
-    <span className="micro inline-flex items-center gap-1.5">
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />
-      {label}
-    </span>
+    <Card className="!p-5 sm:!p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="label mb-0">
+          {overspent ? 'Overspent in' : 'Saved in'} {monthName}
+          {short && ' so far'}
+        </p>
+        <p className="muted text-[12px]">
+          <span className="num">{formatINR(t.inMinor)}</span> came in
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+        <Money
+          minor={Math.abs(t.savedMinor)}
+          className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
+          style={overspent ? { color: 'var(--rule-red)' } : undefined}
+        />
+        {t.ratePct != null && !overspent && (
+          <span className="text-[13px]" style={{ color: 'var(--credit)' }}>
+            <span className="num">{Math.round(t.ratePct)}%</span> of what came in
+          </span>
+        )}
+        {overspent && <span className="muted text-[13px]">more than came in</span>}
+      </div>
+
+      {/*
+        One bar, three segments, in the order the money leaves.
+
+        The colours are picked to survive both themes: --brass and --hi are the
+        same gold once the lights go out, so brass/credit/hi drew as gold,
+        green, gold with two identical legend dots. Neutral for money that is
+        gone, green for money moved on purpose, gold for money still sitting
+        there — all three stay distinct in Paper and Ink alike.
+      */}
+      <div className="mt-5">
+        <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+          <span style={{ width: `${spentPct}%`, background: 'var(--text-muted)' }} />
+          <span style={{ width: `${investedPct}%`, background: 'var(--credit)' }} />
+          <span style={{ width: `${inHandPct}%`, background: 'var(--hi)' }} />
+        </div>
+
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 mt-4">
+          <TallyLeg color="var(--text-muted)" label="Spent" minor={t.outMinor} />
+          <TallyLeg color="var(--credit)" label="Invested" minor={t.investedMinor} />
+          <TallyLeg
+            color="var(--hi)"
+            label={overspent ? 'Short by' : 'Still in hand'}
+            minor={Math.abs(t.inHandMinor)}
+            tone={overspent ? 'var(--rule-red)' : undefined}
+          />
+        </dl>
+      </div>
+
+      {/* Investing is not spending, and this is the one card where both sit
+          side by side — so it says which pile is which rather than leaving
+          "saved" to be read as "sitting in the bank". */}
+      {t.investedMinor > 0 && !overspent && (
+        <p className="muted text-[12px] mt-4 leading-relaxed">
+          Saved counts both: <span className="num">{formatINR(t.investedMinor)}</span> already moved into
+          investments, <span className="num">{formatINR(Math.max(0, t.inHandMinor))}</span> still in the account.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function TallyLeg({
+  color,
+  label,
+  minor,
+  tone,
+}: {
+  color: string;
+  label: string;
+  minor: number;
+  tone?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between sm:justify-start sm:flex-col gap-x-3 sm:gap-y-1">
+      <dt className="micro inline-flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />
+        {label}
+      </dt>
+      <dd className="num text-[15px] font-semibold" style={tone ? { color: tone } : undefined}>
+        {formatINR(minor)}
+      </dd>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Goals, where you will actually see them
+ * ------------------------------------------------------------------ */
+
+/**
+ * Goals were real, computed correctly, and parked at the bottom of a screen
+ * nobody opens daily — which made them indistinguishable from broken. A goal
+ * you cannot see is not a goal; it is a row in a table.
+ *
+ * This is the compact form: one line per fund on the screen you actually open,
+ * carrying the two things that change behaviour — how far along, and what it
+ * needs each month — with the full card a tap away.
+ */
+export function GoalsStrip({ funds }: { funds: Fund[] }) {
+  const open = funds.filter((f) => !f.isComplete);
+  const done = funds.filter((f) => f.isComplete);
+  if (!funds.length) return null;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3 mb-2.5">
+        <span className="label mb-0">Goals</span>
+        <Link href="/investments" className="micro micro-link" style={{ color: 'var(--accent)' }}>
+          All goals
+        </Link>
+      </div>
+
+      <Card className="!p-0 overflow-clip">
+        <ul>
+          {[...open, ...done].slice(0, 4).map((f, i) => (
+            <li key={f.categoryId} style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}>
+              <Link href="/investments" className="row block px-4 py-3.5">
+                <div className="flex items-center gap-3">
+                  <CategoryIcon icon={f.icon} color={f.color} size={30} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13.5px] font-semibold truncate">{f.name}</span>
+                      <span className="num text-[12px] shrink-0">
+                        {formatINR(f.savedMinor)}
+                        <span className="muted"> / {formatINR(f.targetMinor)}</span>
+                      </span>
+                    </div>
+
+                    <div className="mt-2">
+                      <ShareBar
+                        share={f.progress}
+                        color={f.isComplete ? 'var(--credit)' : f.color}
+                        height={5}
+                      />
+                    </div>
+
+                    <div className="flex items-baseline justify-between gap-3 mt-1.5">
+                      <span className="num text-[11px] muted">{Math.round(f.progress * 100)}%</span>
+                      <span className="text-[11px] muted">
+                        {f.isComplete ? (
+                          <span style={{ color: 'var(--credit)' }}>done</span>
+                        ) : f.requiredPerMonthMinor ? (
+                          <>
+                            <span className="num">{formatINR(f.requiredPerMonthMinor)}</span> a month
+                          </>
+                        ) : (
+                          <>
+                            <span className="num">{formatINR(f.remainingMinor)}</span> to go
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Saving, over time
+ * ------------------------------------------------------------------ */
+
+export type SavedMonthRow = {
+  month: string;
+  inMinor: number;
+  outMinor: number;
+  investedMinor: number;
+  savedMinor: number;
+  ratePct: number | null;
+};
+
+/**
+ * One month's savings rate is the easiest number in personal finance to
+ * explain away — a wedding, a flight, a bad week. Six in a column is not, and
+ * the shape of the column is the actual feedback: whether the habit is
+ * forming or the good month was the exception.
+ *
+ * Months where nothing came in are drawn as gaps rather than dropped, because
+ * a missing month is information and silently skipping it would flatter the
+ * average sitting underneath.
+ */
+export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
+  const withIncome = rows.filter((r) => r.ratePct != null);
+  if (withIncome.length === 0) return null;
+
+  const avg = withIncome.reduce((s, r) => s + (r.ratePct ?? 0), 0) / withIncome.length;
+
+  return (
+    <Card>
+      <h3 className="text-[15px] font-semibold mb-1">What you keep</h3>
+      <p className="muted text-[12px] mb-4">
+        Of everything that came in each month, the share that did not go back out.
+      </p>
+
+      <ul className="space-y-3">
+        {rows.map((r) => {
+          const negative = r.savedMinor < 0;
+          return (
+            <li key={r.month}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="micro">{monthName(r.month)}</span>
+                <span className="flex items-baseline gap-2.5 min-w-0">
+                  {r.ratePct != null && (
+                    <span
+                      className="num text-[12px] font-semibold"
+                      style={{ color: negative ? 'var(--rule-red)' : 'var(--credit)' }}
+                    >
+                      {negative ? '−' : ''}
+                      {Math.abs(Math.round(r.ratePct))}%
+                    </span>
+                  )}
+                  <span className="num text-[12px] muted">
+                    {negative && '−'}
+                    {formatINR(Math.abs(r.savedMinor))}
+                  </span>
+                </span>
+              </div>
+              <div className="mt-1.5">
+                {r.ratePct == null ? (
+                  /* No income logged. An empty track says "no record" where a
+                     0% bar would have said "you kept nothing". */
+                  <div
+                    className="h-1.5 rounded-full"
+                    style={{ background: 'var(--surface-2)' }}
+                    title="Nothing logged as income this month"
+                  />
+                ) : (
+                  <ShareBar
+                    share={Math.max(0, Math.min(1, r.ratePct / 100))}
+                    color={negative ? 'var(--rule-red)' : 'var(--credit)'}
+                    height={6}
+                  />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="muted text-[12px] mt-4 pt-3.5 border-t leading-relaxed" style={{ borderColor: 'var(--border)' }}>
+        Averaging <strong className="num">{Math.round(avg)}%</strong> kept across{' '}
+        {withIncome.length === 1 ? 'the one month' : `${withIncome.length} months`} with income logged.
+      </p>
+    </Card>
   );
 }

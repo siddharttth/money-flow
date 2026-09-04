@@ -31,7 +31,7 @@ import { BreakdownList } from '@/components/breakdown';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
-import { CommittedSplitCard, ComingUp, SafeToSpend, SweepCard } from '@/components/plan-cards';
+import { CommittedSplitCard, ComingUp, GoalsStrip, MonthTally, SafeToSpend, SweepCard } from '@/components/plan-cards';
 
 /**
  * The dashboard answers four questions, in this order, top to bottom:
@@ -158,8 +158,22 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* 1b — and the only figure that is about the future rather than the past. */}
+      {/*
+        1b — the bottom line.
+
+        Spending is only half a month. Until this card existed the app could
+        tell you ₹4,000 left and never that ₹46,000 stayed, which is the
+        figure anyone actually wants at the end of a month.
+      */}
+      {plan.data && <MonthTally plan={plan.data} monthName={monthLabel(month).split(' ')[0]} />}
+
+      {/* 1c — and the only figure that is about the future rather than the past. */}
       {plan.data?.isCurrentMonth && <SafeToSpend plan={plan.data} />}
+
+      {/* 1d — what the saving is for. These were computed correctly and shown
+          only at the bottom of Investments, which made working goals feel
+          like broken ones. */}
+      {plan.data && plan.data.funds.length > 0 && <GoalsStrip funds={plan.data.funds} />}
 
       {/* 2 — pace, at a glance. */}
       <StatStrip

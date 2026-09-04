@@ -127,6 +127,45 @@ export default function InvestmentsPage() {
         )}
       </Card>
 
+      {/*
+        Funds first. An investment category with a target is a goal, and a goal
+        with a date on it is the only thing on this screen that can be off
+        track — which makes it the thing worth seeing before any total.
+      */}
+      <div>
+        <SectionHead
+          label="Goals"
+          action={
+            <Link
+              href={funds.data?.items.length ? '/settings' : '/settings?add=investment'}
+              className="micro micro-link"
+              style={{ color: 'var(--accent)' }}
+            >
+              {funds.data?.items.length ? 'Manage' : 'New goal'}
+            </Link>
+          }
+        />
+        {funds.data?.items.length ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
+            {funds.data.items.map((f) => (
+              <FundCard key={f.categoryId} fund={f} onAdd={() => openAdd()} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <EmptyState
+              title="No goals yet"
+              hint="A goal is an investment category with a target on it — a bike, an emergency buffer, a trip. Give one a target and this screen works out the monthly pace you need to land it on time."
+              action={
+                <Link href="/settings?add=investment" className="btn btn-primary">
+                  Set a target
+                </Link>
+              }
+            />
+          </Card>
+        )}
+      </div>
+
       <StatStrip
         items={[
           { label: 'Lifetime', minor: data?.lifetimeMinor ?? 0 },
@@ -147,41 +186,6 @@ export default function InvestmentsPage() {
           },
         ]}
       />
-
-      {/*
-        Funds first. An investment category with a target is a goal, and a goal
-        with a date on it is the only thing on this screen that can be off
-        track — which makes it the thing worth seeing before any total.
-      */}
-      <div>
-        <SectionHead
-          label="Funds"
-          action={
-            <Link href="/settings" className="micro micro-link" style={{ color: 'var(--accent)' }}>
-              {funds.data?.items.length ? 'Manage' : 'Create one'}
-            </Link>
-          }
-        />
-        {funds.data?.items.length ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
-            {funds.data.items.map((f) => (
-              <FundCard key={f.categoryId} fund={f} onAdd={() => openAdd()} />
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <EmptyState
-              title="No funds yet"
-              hint="A fund is an investment category with a target on it — a bike, an emergency buffer, a trip. Give one a target in Settings and this screen starts tracking the pace you need."
-              action={
-                <Link href="/settings" className="btn btn-primary">
-                  Set a target
-                </Link>
-              }
-            />
-          </Card>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         <div>

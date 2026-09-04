@@ -50,9 +50,24 @@ export type Fund = {
   expectedByNowMinor: number | null;
   /** Positive is ahead of that line, negative is behind. */
   paceDeltaMinor: number | null;
+  /**
+   * Whether the pace figure has earned the right to be believed.
+   *
+   * A fund three days old with one deposit in it is arithmetically "₹6,857
+   * ahead of plan" and that sentence is worthless — it is one payment divided
+   * by a rounding error. Below the threshold the card says the fund has just
+   * started instead of dressing noise up as feedback.
+   */
+  paceConfident: boolean;
   /** At the rate money has actually gone in so far. Null if nothing has. */
   projectedDate: string | null;
 };
+
+/** Pace needs time on the line before it means anything. */
+const PACE_MIN_DAYS = 21;
+/** A projection needs a rate, and one deposit is not a rate. */
+const PROJECTION_MIN_DAYS = 30;
+const PROJECTION_MIN_CONTRIBUTIONS = 2;
 
 /** Months between two ISO dates, never below zero, counting a part month as one. */
 function monthsBetween(from: string, to: string): number {
@@ -105,6 +120,9 @@ export async function getFunds(userId: string, month: string): Promise<Fund[]> {
     const remainingMinor = Math.max(0, targetMinor - savedMinor);
     const firstDate = r.first ?? null;
 
+    const contributionCount = Number(r.count);
+    const daysRunning = firstDate ? daysApart(firstDate, today) : 0;
+
     let requiredPerMonthMinor: number | null = null;
     let monthsLeft: number | null = null;
     let expectedByNowMinor: number | null = null;
@@ -130,9 +148,19 @@ export async function getFunds(userId: string, month: string): Promise<Fund[]> {
       }
     }
 
-    // Where the current rate lands, which is often not where the plan says.
+    /*
+     * Where the current rate lands, which is often not where the plan says.
+     * Gated, because dividing one deposit by the three days since it was made
+     * projects a bike by next month and is pure fiction.
+     */
     let projectedDate: string | null = null;
-    if (firstDate && savedMinor > 0 && remainingMinor > 0) {
+    if (
+      firstDate &&
+      savedMinor > 0 &&
+      remainingMinor > 0 &&
+      contributionCount >= PROJECTION_MIN_CONTRIBUTIONS &&
+      daysRunning >= PROJECTION_MIN_DAYS
+    ) {
       const days = Math.max(1, daysApart(firstDate, today));
       const perDay = savedMinor / days;
       if (perDay > 0) {
@@ -155,12 +183,13 @@ export async function getFunds(userId: string, month: string): Promise<Fund[]> {
       progress: targetMinor > 0 ? Math.min(1, savedMinor / targetMinor) : 0,
       isComplete: targetMinor > 0 && savedMinor >= targetMinor,
       thisMonthMinor: sumToMinor(r.thisMonth),
-      contributionCount: Number(r.count),
+      contributionCount,
       firstDate,
       requiredPerMonthMinor,
       monthsLeft,
       expectedByNowMinor,
       paceDeltaMinor,
+      paceConfident: paceDeltaMinor != null && daysRunning >= PACE_MIN_DAYS,
       projectedDate,
     };
   });

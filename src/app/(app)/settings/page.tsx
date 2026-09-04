@@ -267,7 +267,7 @@ export default function SettingsPage() {
                           {c.kind === 'income'
                             ? 'Income · kept out of spending'
                             : c.targetMinor
-                              ? `Fund · ${formatINR(c.targetMinor)}${c.targetDate ? ` by ${dayLabel(c.targetDate)}` : ''}`
+                              ? `Goal · ${formatINR(c.targetMinor)}${c.targetDate ? ` by ${dayLabel(c.targetDate)}` : ''}`
                               : c.kind === 'investment'
                                 ? 'Investment · kept out of spending'
                                 : 'No monthly budget'}
@@ -602,24 +602,28 @@ function CategoryModal({
         */}
         {kind === 'investment' && (
           <div className="well px-3.5 py-3.5">
-            <p className="label mb-1">Make it a fund</p>
+            <p className="label mb-1">Make it a goal</p>
             <p className="muted text-[12px] mb-3 leading-relaxed">
-              Give it a target and everything logged here becomes progress towards it, with the monthly pace worked
-              out for you.
+              Give it a target and everything logged here becomes progress towards it — on the dashboard, with the
+              monthly pace worked out for you.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label" htmlFor="ctarget">
                   Target
                 </label>
-                <input
-                  id="ctarget"
-                  className="input num"
-                  inputMode="decimal"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
-                  placeholder="No goal"
-                />
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 muted">₹</span>
+                  <input
+                    id="ctarget"
+                    className="input num"
+                    inputMode="decimal"
+                    value={target}
+                    onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="80,000"
+                    style={{ paddingLeft: '1.9rem' }}
+                  />
+                </div>
               </div>
               <div>
                 <label className="label" htmlFor="ctargetdate">
@@ -635,6 +639,15 @@ function CategoryModal({
                 />
               </div>
             </div>
+            {/* A target with no date is a wish. The date is what turns it into
+                "₹10,286 a month", which is the only part you can act on. */}
+            <p className="muted text-[11px] mt-2.5 leading-relaxed">
+              {!target.trim()
+                ? 'A target turns this category into a goal.'
+                : targetDate
+                  ? 'Pace and progress will show on your dashboard.'
+                  : 'Add a date and the app works out what it needs each month. Without one you get progress, but no pace.'}
+            </p>
           </div>
         )}
 
