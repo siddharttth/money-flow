@@ -2,9 +2,8 @@ import { db } from '@/db';
 import { people } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { ApiError, ok, query, withAuth } from '@/lib/api';
-import { getPersonCategoryBreakdown } from '@/lib/analytics';
+import { getPersonCategoryBreakdown, listPersonExpenses } from '@/lib/analytics';
 import { getPeerLedger } from '@/lib/ledger';
-import { getTransactions } from '@/lib/transactions';
 import { currentMonth, monthRange } from '@/lib/dates';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -30,7 +29,12 @@ export const GET = withAuth<Ctx>(async (req, session, { params }) => {
     getPersonCategoryBreakdown({ userId: session.userId, personId: id }),
     getPersonCategoryBreakdown({ userId: session.userId, personId: id, start, end }),
     getPeerLedger(session.userId, id).catch(() => null),
-    getTransactions({ userId: session.userId, personIds: [id], kinds: ['expense'], limit: 60 }),
+    /*
+     * Shares, not the whole bills. The totals above are this person's share of
+     * what they were part of, so the rows underneath have to be the same thing
+     * or the list will not add up to the figure above it.
+     */
+    listPersonExpenses({ userId: session.userId, personId: id, limit: 60 }),
   ]);
 
   const sum = (rows: { totalMinor: number }[]) => rows.reduce((s, r) => s + r.totalMinor, 0);
@@ -51,7 +55,7 @@ export const GET = withAuth<Ctx>(async (req, session, { params }) => {
     balanceMinor: ledger?.balanceMinor ?? 0,
     lentMinor: ledger?.outMinor ?? 0,
     borrowedMinor: ledger?.inMinor ?? 0,
-    expenses: expenseFeed.items,
+    expenses: expenseFeed,
     ledger: ledger?.entries ?? [],
   });
 });

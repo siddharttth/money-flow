@@ -198,12 +198,15 @@ describe('multiple people on one expense', () => {
     const cats = await getCategoryBreakdown({ userId, ...AUG });
     expect(cats.reduce((s, c) => s + c.totalMinor, 0)).toBe(200000);
 
-    // Each person is associated with the full amount — that IS the semantic —
-    // which is why the association total (₹6,000) is reported separately.
-    const { people: ppl, grandTotalMinor } = await getPersonBreakdown({ userId, ...AUG });
+    /*
+     * And the other half of the rule: three people on one ₹2,000 dinner carry a
+     * third each, not ₹2,000 each. ₹2,000 does not divide by three, so the two
+     * spare paise go to two of them and the shares still sum to the bill.
+     */
+    const { people: ppl, grandTotalMinor, unassignedMinor } = await getPersonBreakdown({ userId, ...AUG });
     expect(ppl).toHaveLength(3);
-    expect(ppl.every((p) => p.totalMinor === 200000)).toBe(true);
-    expect(ppl.reduce((s, p) => s + p.totalMinor, 0)).toBe(600000);
+    expect(ppl.map((p) => p.totalMinor).sort((a, b) => b - a)).toEqual([66667, 66667, 66666]);
+    expect(ppl.reduce((s, p) => s + p.totalMinor, 0) + unassignedMinor).toBe(200000);
     expect(grandTotalMinor).toBe(200000);
   });
 

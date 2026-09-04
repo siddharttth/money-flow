@@ -334,9 +334,9 @@ function PeopleHub() {
       </div>
 
       <p className="muted text-[12px] leading-relaxed max-w-2xl">
-        Spend is an <em>association</em>: the full amount of any transaction tagged with this person. Two people on one
-        ₹800 dinner both show ₹800, and the month still counted ₹800 once. Balance is separate money — what is actually
-        owed, either way.
+        Spend is this person's <em>share</em>. An ₹800 dinner with two people puts ₹400 against each, so the column
+        adds up to the month rather than multiplying it — open anyone to see the working, row by row. Balance is
+        separate money entirely: what is actually owed, either way.
       </p>
 
       <Modal

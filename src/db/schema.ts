@@ -126,10 +126,17 @@ export const expenses = pgTable('expenses', {
 }));
 
 /**
- * Association only — NOT a split, and NOT money.
- * `shareAmountMinor` stays NULL in V1. When splitting ships, filling it in
- * turns the same row into a share without any migration of existing data.
- * Analytics NEVER sum this table to produce total spending.
+ * Who an expense was shared with, and for how much.
+ *
+ * `shareAmountMinor` stays NULL for an even split — the share is then derived
+ * as amount ÷ participants, with the remainder allocated to the paisa, so a
+ * ₹75 dinner with three people puts ₹25 against each. Filling the column in
+ * overrides that for an unequal split; nothing else has to change, which is
+ * why it has been here since the first migration.
+ *
+ * Analytics NEVER sum this table to produce total spending — the grand total
+ * comes from `expenses` alone. Shares partition that total; they do not
+ * create it.
  */
 export const expensePeople = pgTable('expense_people', {
   expenseId: uuid('expense_id').notNull().references(() => expenses.id, { onDelete: 'cascade' }),

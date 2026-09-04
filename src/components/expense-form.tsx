@@ -247,8 +247,8 @@ export function ExpenseForm({
 
         {personIds.length > 1 && (
           <p className="muted text-xs mt-2">
-            Still one ₹{amount || '0'} expense. Each person shows the full amount in their own view — totals are
-            never multiplied.
+            Still one ₹{amount || '0'} expense, split {personIds.length} ways — about ₹
+            {Math.round((Number(amount) || 0) / personIds.length).toLocaleString('en-IN')} against each of them.
           </p>
         )}
       </div>

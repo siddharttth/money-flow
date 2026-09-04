@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/lib/transactions';
+import type { PersonExpense } from '@/lib/analytics';
 import { Drawer } from './drawer';
 import { ListSkeleton, EmptyState, Money } from './ui';
 import { CategoryIcon, PersonMark } from './icons';
@@ -76,45 +77,48 @@ function Tabs({ tabs, active, onChange }: { tabs: string[]; active: string; onCh
   );
 }
 
-function TxRow({ tx, onCategory }: { tx: Transaction; onCategory?: (id: string) => void }) {
-  const signed = tx.kind === 'borrowed';
+/**
+ * One expense as it lands on one person: their share, with the whole bill and
+ * the number of ways it went shown beside it.
+ *
+ * Printing "₹25" alone would be a figure with no provenance — the row it came
+ * from says ₹75 everywhere else in the app. "₹75 ÷ 3" is the working, so the
+ * two numbers can be reconciled at a glance instead of looking like a bug.
+ */
+function ShareRow({
+  entry,
+  onCategory,
+}: {
+  entry: PersonExpense;
+  onCategory?: (id: string) => void;
+}) {
+  const split = entry.participants > 1;
   return (
     <div className="flex items-center gap-3 py-2.5">
-      {tx.category ? (
-        <CategoryIcon icon={tx.category.icon} color={tx.category.color} size={32} />
-      ) : (
-        <span
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
-          style={{
-            background: signed ? 'var(--credit-soft)' : 'var(--rule-red-soft)',
-            color: signed ? 'var(--credit)' : 'var(--rule-red)',
-          }}
-        >
-          {signed ? '↓' : '↑'}
-        </span>
-      )}
+      <CategoryIcon icon={entry.category.icon} color={entry.category.color} size={32} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate">
-          {tx.category ? (
-            onCategory ? (
-              <button className="hover:underline py-1.5 -my-1.5" onClick={() => onCategory(tx.category!.id)}>
-                {tx.category.name}
-              </button>
-            ) : (
-              tx.category.name
-            )
-          ) : tx.kind === 'lent' ? (
-            'I lent'
+          {onCategory ? (
+            <button className="hover:underline py-1.5 -my-1.5" onClick={() => onCategory(entry.category.id)}>
+              {entry.category.name}
+            </button>
           ) : (
-            'I borrowed'
+            entry.category.name
           )}
         </p>
         <p className="muted text-xs truncate">
-          {dayLabel(tx.date)}
-          {tx.note ? ` · ${tx.note}` : ''}
+          {dayLabel(entry.expenseDate)}
+          {entry.note ? ` · ${entry.note}` : ''}
         </p>
       </div>
-      <Money minor={tx.amountMinor} className="text-sm font-semibold shrink-0" />
+      <div className="shrink-0 text-right">
+        <Money minor={entry.shareMinor} className="text-sm font-semibold" />
+        {split && (
+          <p className="num text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {formatINR(entry.amountMinor)} ÷ {entry.participants}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -130,7 +134,7 @@ type PersonInsight = {
   lentMinor: number;
   borrowedMinor: number;
   categories: { categoryId: string; name: string; icon: string; color: string; totalMinor: number }[];
-  expenses: Transaction[];
+  expenses: PersonExpense[];
   ledger: { id: string; direction: 'out' | 'in'; amountMinor: number; entryDate: string; note: string | null }[];
 };
 
@@ -206,8 +210,8 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
           {tab === 'Expenses' ? (
             data.expenses.length ? (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {data.expenses.map((t) => (
-                  <TxRow key={t.id} tx={t} onCategory={openCategory} />
+                {data.expenses.map((e) => (
+                  <ShareRow key={e.id} entry={e} onCategory={openCategory} />
                 ))}
               </div>
             ) : (

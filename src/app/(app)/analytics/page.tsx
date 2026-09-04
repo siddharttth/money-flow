@@ -431,9 +431,9 @@ function AnalyticsInner() {
                 </div>
               )}
               <p className="muted text-[12px] mt-4 leading-relaxed">
-                An association view of the same{' '}
-                <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. Category and person are two
-                independent ways of slicing one month — never two things to add together.
+                Each person's share of the same{' '}
+                <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. Category and person are two ways
+                of slicing one month, and both partition it — a ₹75 dinner with three people puts ₹25 against each.
               </p>
             </>
           ) : (

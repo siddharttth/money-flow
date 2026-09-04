@@ -12,12 +12,15 @@ import { daysBetween, monthRange, shiftMonth, todayISO, weekRange } from './date
  * same rows. They are never added together, and the person dimension is
  * computed with a join that is always constrained to live expenses.
  *
- * A single expense tagged with 3 people contributes its full amount to each of
- * those 3 people's association totals — that is the intended "who was this
- * associated with" semantic — which is exactly why person totals can exceed
- * the grand total and must never be summed into it. Responses that carry a
- * person breakdown always ship `grandTotal` alongside so the UI has the real
- * number to display.
+ * A single expense tagged with 3 people is split three ways: each of them
+ * carries a third of it. "How much have I spent on this person" is a question
+ * about their share, not about the size of the bill they happened to be at —
+ * charging all three the full ₹75 answered a question nobody asked and made
+ * every person total meaningless.
+ *
+ * Shares are allocated exactly (see `personShareExpr`), so the person totals
+ * plus the untagged remainder equal the grand total to the paisa. Responses
+ * still ship `grandTotal` alongside, now as something the parts add up to.
  *
  * THE SECOND RULE: INVESTING IS NOT SPENDING
  * ------------------------------------------
@@ -55,6 +58,38 @@ export function kindPredicate(include: Filters['include']) {
     WHERE c.id = ${expenses.categoryId} AND c.kind ${test} 'investment'
   )`;
 }
+
+/**
+ * One person's share of one expense, in paise.
+ *
+ * Equal split, allocated exactly. Integer division alone loses the remainder —
+ * ₹100 three ways is 3333 + 3333 + 3333 = ₹99.99, and a ledger that quietly
+ * drops a paisa per split is not a ledger. The remainder is handed out one
+ * paisa at a time to the first participants by person id, which is arbitrary
+ * but stable: the same expense always splits the same way, and the shares
+ * always sum back to the amount.
+ *
+ * An explicit `share_amount_minor` overrides it. The column has been on the
+ * table since the beginning for exactly this, so an unequal split needs only
+ * a UI to write it — no migration, and no change here.
+ */
+export const personShareExpr = sql<string>`COALESCE(
+  ${expensePeople.shareAmountMinor},
+  ${expenses.amountMinor} / (SELECT COUNT(*) FROM ${expensePeople} epn WHERE epn.expense_id = ${expenses.id})
+  + CASE
+      WHEN (
+        SELECT COUNT(*) FROM ${expensePeople} epr
+        WHERE epr.expense_id = ${expenses.id} AND epr.person_id <= ${expensePeople.personId}
+      ) <= ${expenses.amountMinor} % (SELECT COUNT(*) FROM ${expensePeople} epm WHERE epm.expense_id = ${expenses.id})
+      THEN 1
+      ELSE 0
+    END
+)`;
+
+/** How many people an expense is shared between. */
+export const participantCountExpr = sql<string>`(
+  SELECT COUNT(*) FROM ${expensePeople} epc WHERE epc.expense_id = ${expenses.id}
+)`;
 
 /** Base predicate: this user, not soft-deleted, inside the date window. */
 function baseWhere(f: Filters) {
@@ -167,9 +202,10 @@ export type PersonStat = {
 };
 
 /**
- * Spending *associated with* each person.
- * COALESCE(share, amount) means the day splitting ships, filling in
- * share_amount_minor changes this number and nothing else.
+ * Each person's share of the spending they were part of.
+ *
+ * These now add up: every person's share, plus `unassignedMinor` for expenses
+ * with nobody tagged, equals `grandTotalMinor` exactly.
  */
 export async function getPersonBreakdown(
   f: Filters,
@@ -182,7 +218,7 @@ export async function getPersonBreakdown(
       color: people.color,
       relationshipType: people.relationshipType,
       isSelf: people.isSelf,
-      total: sql<string>`COALESCE(SUM(COALESCE(${expensePeople.shareAmountMinor}, ${expenses.amountMinor})), 0)`,
+      total: sql<string>`COALESCE(SUM(${personShareExpr}), 0)`,
       count: sql<string>`COUNT(${expenses.id})`,
     })
     .from(expensePeople)
@@ -190,7 +226,7 @@ export async function getPersonBreakdown(
     .innerJoin(people, eq(people.id, expensePeople.personId))
     .where(whereAll(f))
     .groupBy(people.id, people.name, people.avatar, people.color, people.relationshipType, people.isSelf)
-    .orderBy(desc(sql`SUM(COALESCE(${expensePeople.shareAmountMinor}, ${expenses.amountMinor}))`));
+    .orderBy(desc(sql`SUM(${personShareExpr})`));
 
   // Expenses with nobody attached — reported separately, never folded into a person.
   const [unassigned] = await db
@@ -233,7 +269,7 @@ export async function getPersonCategoryBreakdown(f: Filters & { personId: string
       name: categories.name,
       icon: categories.icon,
       color: categories.color,
-      total: sql<string>`COALESCE(SUM(COALESCE(${expensePeople.shareAmountMinor}, ${expenses.amountMinor})), 0)`,
+      total: sql<string>`COALESCE(SUM(${personShareExpr}), 0)`,
       count: sql<string>`COUNT(${expenses.id})`,
     })
     .from(expensePeople)
@@ -241,7 +277,7 @@ export async function getPersonCategoryBreakdown(f: Filters & { personId: string
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .where(and(whereAll(f), eq(expensePeople.personId, f.personId)))
     .groupBy(categories.id, categories.name, categories.icon, categories.color)
-    .orderBy(desc(sql`SUM(COALESCE(${expensePeople.shareAmountMinor}, ${expenses.amountMinor}))`));
+    .orderBy(desc(sql`SUM(${personShareExpr})`));
 
   return rows.map((r) => ({
     categoryId: r.categoryId,
@@ -250,6 +286,58 @@ export async function getPersonCategoryBreakdown(f: Filters & { personId: string
     color: r.color,
     totalMinor: sumToMinor(r.total),
     count: Number(r.count),
+  }));
+}
+
+export type PersonExpense = {
+  id: string;
+  /** What this person carries — amount ÷ participants, unless overridden. */
+  shareMinor: number;
+  /** The whole bill, so the UI can show "₹75 ÷ 3". */
+  amountMinor: number;
+  participants: number;
+  expenseDate: string;
+  note: string | null;
+  category: { id: string; name: string; icon: string; color: string };
+};
+
+/**
+ * One person's expenses, each carrying their share and the size of the bill it
+ * came out of.
+ *
+ * The share is computed by the same SQL as the totals above rather than by
+ * dividing in the client — two implementations of the remainder rule is one
+ * too many, and the drawer's rows have to add up to the drawer's total.
+ */
+export async function listPersonExpenses(f: Filters & { personId: string; limit?: number }): Promise<PersonExpense[]> {
+  const rows = await db
+    .select({
+      id: expenses.id,
+      share: personShareExpr,
+      amountMinor: expenses.amountMinor,
+      participants: participantCountExpr,
+      expenseDate: expenses.expenseDate,
+      note: expenses.note,
+      categoryId: categories.id,
+      categoryName: categories.name,
+      icon: categories.icon,
+      color: categories.color,
+    })
+    .from(expensePeople)
+    .innerJoin(expenses, eq(expenses.id, expensePeople.expenseId))
+    .innerJoin(categories, eq(categories.id, expenses.categoryId))
+    .where(and(whereAll(f), eq(expensePeople.personId, f.personId)))
+    .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt))
+    .limit(Math.min(f.limit ?? 100, 300));
+
+  return rows.map((r) => ({
+    id: r.id,
+    shareMinor: sumToMinor(r.share),
+    amountMinor: r.amountMinor,
+    participants: Number(r.participants),
+    expenseDate: r.expenseDate,
+    note: r.note,
+    category: { id: r.categoryId, name: r.categoryName, icon: r.icon, color: r.color },
   }));
 }
 

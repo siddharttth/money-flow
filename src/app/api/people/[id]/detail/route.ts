@@ -2,8 +2,7 @@ import { db } from '@/db';
 import { people } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { ApiError, ok, query, withAuth } from '@/lib/api';
-import { getPersonCategoryBreakdown } from '@/lib/analytics';
-import { listExpenses } from '@/lib/expenses';
+import { getPersonCategoryBreakdown, listPersonExpenses } from '@/lib/analytics';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,16 +22,16 @@ export const GET = withAuth<Ctx>(async (req, session, { params }) => {
 
   const [categories, expenses] = await Promise.all([
     getPersonCategoryBreakdown({ userId: session.userId, start, end, personId: id }),
-    listExpenses({ userId: session.userId, start, end, personIds: [id], limit: 100 }),
+    listPersonExpenses({ userId: session.userId, start, end, personId: id, limit: 100 }),
   ]);
 
   return ok({
     person,
-    // The person's association total, derived from their category rows — this
-    // is a dimension of spending, never something to add to the grand total.
+    // This person's share of what they were part of. The rows below carry the
+    // same shares, so the list adds up to this figure.
     totalMinor: categories.reduce((s, c) => s + c.totalMinor, 0),
-    transactionCount: expenses.total,
+    transactionCount: expenses.length,
     categories,
-    expenses: expenses.items,
+    expenses,
   });
 });

@@ -244,10 +244,9 @@ export default function DashboardPage() {
                 onPick={openPerson}
               />
               <p className="muted text-[12px] mt-4 leading-relaxed">
-                An association view of the same{' '}
-                <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. One transaction tagged with three
-                people counts once in the month and once against each of them — so these never add up to the total,
-                and are not meant to.
+                Each person's share of the same{' '}
+                <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. A transaction tagged with three
+                people is split three ways, so these add up to the month rather than multiplying it.
               </p>
             </>
           ) : (
