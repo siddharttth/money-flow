@@ -305,7 +305,10 @@ export default function DashboardPage() {
                   <span className="num">{formatINR(f.tickets.smallTotalMinor)}</span>.
                 </Insight>
               )}
-              {f.cadence.longestQuietRun >= 2 && (
+              {/* A quiet run only means something against days that were not
+                  quiet. On a month with nothing in it, "5 days with no
+                  spending" sat directly above "nothing to read here". */}
+              {f.cadence.spendDays > 0 && f.cadence.longestQuietRun >= 2 && (
                 <Insight tone="good">
                   <span className="num">{f.cadence.quietDays}</span> days with no spending at all, the longest run{' '}
                   <span className="num">{f.cadence.longestQuietRun}</span> days.
