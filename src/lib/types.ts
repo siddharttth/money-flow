@@ -8,6 +8,11 @@ export type Category = {
   isActive: boolean;
   sortOrder: number;
   usageCount?: number;
+  /* The API has always returned these three; the type simply did not say so,
+     which meant every consumer re-declared them. */
+  monthlyBudgetMinor?: number | null;
+  targetMinor?: number | null;
+  targetDate?: string | null;
 };
 
 export type Person = {

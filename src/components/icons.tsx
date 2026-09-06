@@ -127,9 +127,16 @@ export function PersonMark({ name, color, size = 36 }: { name: string; color: st
  * the user and render in a category's colour, these are fixed furniture and
  * always render in currentColor at a single weight.
  */
-export type NavIconKey = 'dashboard' | 'ledger' | 'people' | 'analytics' | 'invest' | 'settings' | 'more' | 'plus';
+export type NavIconKey =
+  | 'dashboard' | 'ledger' | 'people' | 'analytics' | 'invest'
+  | 'cash' | 'target'
+  | 'settings' | 'more' | 'plus';
 
 const NAV_PATHS: Record<NavIconKey, React.ReactNode> = {
+  /* Income: a note, because money arriving is the one flow that is not a chart. */
+  cash: <><rect {...P} x="2.5" y="6" width="19" height="12" rx="2" /><circle {...P} cx="12" cy="12" r="2.75" /><path {...P} d="M6 9.5v.01M18 14.5v.01" /></>,
+  /* Goals: a target, which is what a goal literally is here. */
+  target: <><circle {...P} cx="12" cy="12" r="8.5" /><circle {...P} cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /></>,
   dashboard: <><rect {...P} x="3.5" y="3.5" width="7" height="9" rx="1.5" /><rect {...P} x="3.5" y="15.5" width="7" height="5" rx="1.5" /><rect {...P} x="13.5" y="3.5" width="7" height="5" rx="1.5" /><rect {...P} x="13.5" y="11.5" width="7" height="9" rx="1.5" /></>,
   ledger: <><path {...P} d="M4 4.5h16v15H4z" /><path {...P} d="M8 4.5v15M11.5 9h5M11.5 13h5" /></>,
   people: <><circle {...P} cx="9" cy="8.5" r="3.5" /><path {...P} d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" /><path {...P} d="M16 5.6a3.5 3.5 0 010 5.8M17.5 14.9c2 .8 3.5 2.6 3.5 5.1" /></>,

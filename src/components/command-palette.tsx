@@ -44,8 +44,11 @@ export function CommandPalette({ onAdd }: { onAdd: () => void }) {
       { id: 'n-add', label: 'Add transaction', hint: 'N', run: onAdd },
       { id: 'n-dash', label: 'Dashboard', hint: 'Go', run: () => router.push('/dashboard') },
       { id: 'n-tx', label: 'Transactions', hint: 'Go', run: () => router.push('/expenses') },
+      { id: 'n-income', label: 'Income', hint: 'Go', run: () => router.push('/income') },
       { id: 'n-people', label: 'People & Ledger', hint: 'Go', run: () => router.push('/people') },
-      { id: 'n-analytics', label: 'Analytics', hint: 'Go', run: () => router.push('/analytics') },
+      { id: 'n-goals', label: 'Goals & investing', hint: 'Go', run: () => router.push('/goals') },
+      { id: 'n-month', label: 'This month', hint: 'Go', run: () => router.push('/analytics/month') },
+      { id: 'n-lifetime', label: 'Lifetime', hint: 'Go', run: () => router.push('/analytics/lifetime') },
       { id: 'n-settings', label: 'Settings', hint: 'Go', run: () => router.push('/settings') },
     ];
     const p: Item[] = (people?.items ?? []).map((x) => ({

@@ -442,6 +442,81 @@ h1, h2, h3 {
     margin-block: -0.75rem;
   }
 
+  /*
+   * MOTION
+   * ------
+   * One vocabulary, so an animation never means two things:
+   *
+   *   numbers count up · bars grow · drawers slide · rows settle
+   *   and nothing spins except a genuine network wait.
+   *
+   * Anything that does not map to one of those does not ship. That rule is
+   * what keeps "premium" from turning into "busy".
+   *
+   * Every duration below collapses to zero under prefers-reduced-motion — the
+   * feedback stays, the movement goes. See the block at the end of this layer.
+   */
+
+  /* A section arriving for the first time. Never on a data refresh. */
+  @keyframes mf-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* A row that was just created, or restored by an undo. */
+  @keyframes mf-wash {
+    0%   { background: color-mix(in oklab, var(--accent) 16%, transparent); }
+    100% { background: transparent; }
+  }
+
+  @keyframes mf-shimmer {
+    from { background-position: -120% 0; }
+    to   { background-position: 220% 0; }
+  }
+
+  .rise { animation: mf-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .wash { animation: mf-wash 900ms ease-out both; }
+
+  /* Attention rows arrive in sequence, so the list reads rather than lands. */
+  .attention-row { animation: mf-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .attention-row:nth-child(2) { animation-delay: 45ms; }
+  .attention-row:nth-child(3) { animation-delay: 90ms; }
+  .attention-row:nth-child(4) { animation-delay: 135ms; }
+  .attention-row:nth-child(n + 5) { animation-delay: 180ms; }
+
+  /*
+   * Month switching. The column slides in the direction of travel, which is
+   * the cheapest possible way to say "this is a different month" — and removes
+   * any chance of reading August's figure as September's.
+   */
+  @keyframes mf-slide-back  { from { opacity: 0; transform: translateX(8px);  } }
+  @keyframes mf-slide-fwd   { from { opacity: 0; transform: translateX(-8px); } }
+  .month-back { animation: mf-slide-back 200ms ease-out both; }
+  .month-fwd  { animation: mf-slide-fwd  200ms ease-out both; }
+
+  /*
+   * A bar or progress fill animates its own width. Applied by the component,
+   * not globally, so a chart redrawing on a refresh does not re-animate.
+   */
+  .grow { transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+  /* Goals and budgets overshoot ~2%. It reads as effort, which is the right
+     feeling for a bar that just moved forward. */
+  .grow-spring { transition: width 560ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise,
+    .wash,
+    .attention-row,
+    .month-back,
+    .month-fwd {
+      animation: none !important;
+    }
+    .grow,
+    .grow-spring {
+      transition: none !important;
+    }
+  }
+
   /* Anything in a list that can be opened. 150ms ease-out everywhere. */
   .row {
     transition: background 150ms ease-out;

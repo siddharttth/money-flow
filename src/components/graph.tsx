@@ -493,7 +493,22 @@ export function Sparkline({
  * ShareBar — proportion, in a list row.
  * ------------------------------------------------------------------ */
 
-export function ShareBar({ share, color, height = 4 }: { share: number; color?: string; height?: number }) {
+export function ShareBar({
+  share,
+  color,
+  height = 4,
+  /**
+   * Goal and budget bars overshoot by a hair on the way to their new value.
+   * It reads as effort — the right feeling for a bar that has just moved
+   * forward — and would be noise on a static breakdown, so it is opt-in.
+   */
+  spring = false,
+}: {
+  share: number;
+  color?: string;
+  height?: number;
+  spring?: boolean;
+}) {
   return (
     <div
       className="rounded-full overflow-hidden w-full"
@@ -501,11 +516,10 @@ export function ShareBar({ share, color, height = 4 }: { share: number; color?: 
       role="presentation"
     >
       <div
-        className="h-full rounded-full"
+        className={`h-full rounded-full ${spring ? 'grow-spring' : 'grow'}`}
         style={{
           width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
           background: color ?? 'var(--brass)',
-          transition: 'width 260ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       />
     </div>

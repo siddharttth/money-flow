@@ -114,106 +114,33 @@ export default function SettingsPage() {
     <div className="space-y-7">
       <PageHeader eyebrow="Settings" title="Preferences" sub="Categories, budgets, appearance and data." />
 
-      {/* ---------- Income ---------- */}
+      {/*
+        Income used to live here in full — a configuration screen holding an
+        activity you perform every month. It has its own page now; this is the
+        signpost, not the section.
+      */}
       <section>
-        <SectionHead
-          label="Income"
-          action={
-            <button className="tag" onClick={() => setCreating('income')}>
-              + Source
-            </button>
-          }
-        />
-        {incomeCats.length ? (
-          <div className="card overflow-clip">
-            <div
-              className="flex items-baseline justify-between gap-3 px-3.5 sm:px-4 py-3 border-b"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
-            >
-              <span className="label mb-0">{monthLabel(currentMonth()).split(' ')[0]} so far</span>
-              <span className="flex items-baseline gap-3">
-                <Money
-                  minor={incomeThis.data?.grandTotalMinor ?? 0}
-                  className="text-[15px] font-semibold"
-                  style={{ color: 'var(--credit)' }}
-                />
-                <span className="micro">
-                  {monthLabel(shiftMonth(currentMonth(), -1)).split(' ')[0]}{' '}
-                  {formatINR(incomeLast.data?.grandTotalMinor ?? 0)}
-                </span>
-              </span>
+        <SectionHead label="Income" />
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-semibold">
+                {incomeCats.length
+                  ? `${incomeCats.length} ${incomeCats.length === 1 ? 'source' : 'sources'}`
+                  : 'No sources yet'}
+              </p>
+              <p className="muted text-[12px] mt-0.5">
+                {incomeCats.length
+                  ? `${formatINR(incomeThis.data?.grandTotalMinor ?? 0)} received this month.`
+                  : 'Without one the app can say what leaves and never what you keep.'}
+              </p>
             </div>
-
-            <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {incomeCats.map((c) => {
-                const got = incomeThis.data?.items.find((i) => i.categoryId === c.id)?.totalMinor ?? 0;
-                return (
-                  <li
-                    key={c.id}
-                    className="row flex items-center gap-3 px-3.5 sm:px-4 py-3"
-                    onClick={() => setEditing(c)}
-                  >
-                    <CategoryIcon icon={c.icon} color={c.color} size={34} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-semibold truncate">{c.name}</p>
-                      <p className="muted text-[11px] mt-0.5">
-                        {got > 0 ? 'received this month' : 'nothing yet this month'}
-                      </p>
-                    </div>
-                    <Money
-                      minor={got}
-                      className="num text-[13px] font-semibold shrink-0"
-                      style={got > 0 ? { color: 'var(--credit)' } : undefined}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-
-            <p className="muted text-[12px] leading-relaxed px-3.5 sm:px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
-              Pay is logged like anything else — <strong>Add transaction → Income</strong> — so a month that pays
-              differently just gets a different figure. Until this month&rsquo;s lands, the plan works from the median
-              of the last three.
-            </p>
+            <Link href="/income" className="btn btn-ghost shrink-0">
+              {incomeCats.length ? 'Open Income' : 'Set income up'}
+            </Link>
           </div>
-        ) : (
-          <Card>
-            <EmptyState
-              title="No income recorded"
-              hint="Add a source — Salary, Freelance, whatever pays you — then log each payment under it. Without one the app can only say what leaves, never what is safe to spend."
-              action={
-                <button className="btn btn-primary" onClick={() => setCreating('income')}>
-                  Add an income source
-                </button>
-              }
-            />
-          </Card>
-        )}
+        </Card>
       </section>
-
-      {/* ---------- Budgets ---------- */}
-      {budgetTotal > 0 && (
-        <section>
-          <SectionHead label={`Budget · ${monthLabel(currentMonth()).split(' ')[0]}`} />
-          <Card>
-            <div className="flex items-baseline justify-between gap-3 mb-2.5">
-              <Money minor={budgetSpent} className="text-2xl font-semibold" />
-              <span className="num text-[13px] muted">of {formatINR(budgetTotal)}</span>
-            </div>
-            <ShareBar
-              share={budgetSpent / budgetTotal}
-              color={budgetSpent > budgetTotal ? 'var(--rule-red)' : 'var(--brass)'}
-              height={6}
-            />
-            <p className="muted text-[12px] mt-2.5">
-              Across {budgeted.length} budgeted {budgeted.length === 1 ? 'category' : 'categories'}
-              {budgetSpent > budgetTotal
-                ? ` — over by ${formatINR(budgetSpent - budgetTotal)}.`
-                : ` — ${formatINR(budgetTotal - budgetSpent)} left.`}
-            </p>
-          </Card>
-        </section>
-      )}
 
       {/* ---------- Categories ---------- */}
       <section>

@@ -32,7 +32,10 @@ export function MonthPicker({
       <button
         className="w-10 h-10 flex items-center justify-center rounded-full text-lg leading-none"
         style={{ color: 'var(--text-muted)' }}
-        onClick={() => onChange(shiftMonth(month, -1))}
+        onClick={() => {
+          document.documentElement.dataset.monthDir = 'back';
+          onChange(shiftMonth(month, -1));
+        }}
         aria-label="Previous month"
       >
         ‹
@@ -41,7 +44,10 @@ export function MonthPicker({
       <button
         className="w-10 h-10 flex items-center justify-center rounded-full text-lg leading-none disabled:opacity-30"
         style={{ color: 'var(--text-muted)' }}
-        onClick={() => onChange(shiftMonth(month, 1))}
+        onClick={() => {
+          document.documentElement.dataset.monthDir = 'fwd';
+          onChange(shiftMonth(month, 1));
+        }}
         disabled={isCurrent}
         aria-label="Next month"
       >

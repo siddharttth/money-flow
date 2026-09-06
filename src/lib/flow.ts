@@ -72,6 +72,8 @@ export type Flow = {
     elapsedDays: number;
     monthDays: number;
     spentMinor: number;
+    /** Of that, what has actually happened. Differs only if you date forward. */
+    spentToDateMinor: number;
     /** Previous month's total at the same day-of-month — the honest comparison. */
     prevSameDayMinor: number;
     prevFullMinor: number;
@@ -198,12 +200,24 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
   }
 
   const spentMinor = thisDaily.reduce((s, d) => s + d.totalMinor, 0);
+  /*
+   * Nothing stops a transaction being dated in the future, and one that is
+   * must not be divided by the days that have actually elapsed — ₹900 logged
+   * for the 20th, on the 6th, would report a daily rate that includes money
+   * not yet spent, and project the month from it.
+   *
+   * The total stays inclusive, because the entry is real and belongs to the
+   * month. Only the RATE is restricted to what has happened.
+   */
+  const spentToDateMinor = isCurrentMonth
+    ? thisDaily.filter((d) => d.date <= today).reduce((s, d) => s + d.totalMinor, 0)
+    : spentMinor;
   const prevFullMinor = prevDaily.reduce((s, d) => s + d.totalMinor, 0);
   const prevSameDayMinor = prevDaily
     .filter((d) => Number(d.date.slice(8, 10)) <= elapsedDays)
     .reduce((s, d) => s + d.totalMinor, 0);
 
-  const perDayMinor = elapsedDays > 0 ? Math.round(spentMinor / elapsedDays) : 0;
+  const perDayMinor = elapsedDays > 0 ? Math.round(spentToDateMinor / elapsedDays) : 0;
 
   const grand = catRows.reduce((s, c) => s + c.totalMinor, 0);
   const shares = grand > 0 ? catRows.map((c) => c.totalMinor / grand) : [];
@@ -277,10 +291,15 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
       elapsedDays,
       monthDays,
       spentMinor,
+      spentToDateMinor,
       prevSameDayMinor,
       prevFullMinor,
       perDayMinor,
-      projectedMinor: elapsedDays > 0 ? Math.round((spentMinor / elapsedDays) * monthDays) : 0,
+      // Rate × month, plus anything already dated later in the month.
+      projectedMinor:
+        elapsedDays > 0
+          ? Math.round((spentToDateMinor / elapsedDays) * monthDays) + (spentMinor - spentToDateMinor)
+          : spentMinor,
       deltaPct: prevSameDayMinor > 0 ? ((spentMinor - prevSameDayMinor) / prevSameDayMinor) * 100 : null,
     },
     cumulative,

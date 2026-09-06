@@ -365,3 +365,21 @@ describe('repeats', () => {
     expect(f.repeats[0]).toMatchObject({ label: 'chai', categoryName: 'Food', count: 3, totalMinor: 37_000 });
   });
 });
+
+describe('a transaction dated in the future', () => {
+  it('counts in the month total but not in the daily rate', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-05-06T10:00:00Z'));
+    await add(600, 'Food', '2026-05-02');
+    // Dated a fortnight out. Real, and not yet spent.
+    await add(3000, 'Food', '2026-05-20');
+
+    const f = await getFlow(userId, '2026-05');
+
+    expect(f.pace.spentMinor).toBe(360_000);
+    expect(f.pace.spentToDateMinor).toBe(60_000);
+    // ₹600 over six elapsed days — not ₹3,600 over six days.
+    expect(f.pace.perDayMinor).toBe(10_000);
+    // The projection extrapolates the rate and adds back what is already dated.
+    expect(f.pace.projectedMinor).toBe(10_000 * 31 + 300_000);
+  });
+});

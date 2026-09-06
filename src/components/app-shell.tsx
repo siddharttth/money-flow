@@ -18,17 +18,45 @@ import type { Expense } from '@/lib/types';
  * People — a person and a peer were always the same entity, so two screens
  * meant two places to look for one contact.
  */
-const NAV: { href: string; label: string; short: string; icon: NavIconKey }[] = [
+/*
+ * NAVIGATION, SORTED BY TIME HORIZON
+ * ----------------------------------
+ * The old list was named after things — transactions, investments, analytics —
+ * but nobody opens a money app thinking "I would like to look at some
+ * analytics". They arrive with a question, and the questions sort by horizon:
+ * now, this month, all time, ahead.
+ *
+ * Two groups: what you RECORD, and what you UNDERSTAND. The labels do real
+ * work — they are the only place the app says out loud that it has an in-side
+ * and an out-side.
+ */
+type NavItem = { href: string; label: string; short: string; icon: NavIconKey; group?: string };
+
+const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', short: 'Home', icon: 'dashboard' },
-  { href: '/expenses', label: 'Transactions', short: 'Ledger', icon: 'ledger' },
-  { href: '/investments', label: 'Investments', short: 'Invest', icon: 'invest' },
+
+  { href: '/expenses', label: 'Transactions', short: 'Ledger', icon: 'ledger', group: 'Record' },
+  { href: '/income', label: 'Income', short: 'Income', icon: 'cash' },
   { href: '/people', label: 'People', short: 'People', icon: 'people' },
-  { href: '/analytics', label: 'Analytics', short: 'Insights', icon: 'analytics' },
-  { href: '/settings', label: 'Settings', short: 'Settings', icon: 'settings' },
+
+  { href: '/analytics/month', label: 'This month', short: 'Month', icon: 'analytics', group: 'Understand' },
+  { href: '/analytics/lifetime', label: 'Lifetime', short: 'Lifetime', icon: 'invest' },
+  { href: '/goals', label: 'Goals', short: 'Goals', icon: 'target' },
 ];
 
-/** Everything except Settings, which lives in the header. */
-const MOBILE_TABS = ['/dashboard', '/expenses', '/investments', '/people', '/analytics'];
+/*
+ * Five slots, eight destinations. Monthly and Lifetime fold into one Insights
+ * tab with a segmented control at the top of the page — no new navigation
+ * idea, just the segmented switch the app already teaches on the add sheet.
+ * Income and Settings live in the mobile header.
+ */
+const MOBILE_TABS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', short: 'Home', icon: 'dashboard' },
+  { href: '/expenses', label: 'Transactions', short: 'Ledger', icon: 'ledger' },
+  { href: '/analytics/month', label: 'Insights', short: 'Insights', icon: 'analytics' },
+  { href: '/goals', label: 'Goals', short: 'Goals', icon: 'target' },
+  { href: '/people', label: 'People', short: 'People', icon: 'people' },
+];
 
 type ShellCtx = {
   openAdd: (existing?: Expense) => void;
@@ -124,21 +152,37 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
 
             <nav className="flex flex-col gap-0.5">
               {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive(item.href) ? 'page' : undefined}
-                  className="flex items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] font-semibold transition-colors"
-                  style={
-                    isActive(item.href)
-                      ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-                      : { color: 'var(--text-muted)' }
-                  }
-                >
-                  <NavIcon name={item.icon} size={18} />
-                  {item.label}
-                </Link>
+                <div key={item.href}>
+                  {item.group && <p className="micro px-3 pt-4 pb-1.5">{item.group}</p>}
+                  <Link
+                    href={item.href}
+                    aria-current={isActive(item.href) ? 'page' : undefined}
+                    className="flex items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] font-semibold transition-colors"
+                    style={
+                      isActive(item.href)
+                        ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                        : { color: 'var(--text-muted)' }
+                    }
+                  >
+                    <NavIcon name={item.icon} size={18} />
+                    {item.label}
+                  </Link>
+                </div>
               ))}
+
+              <Link
+                href="/settings"
+                aria-current={isActive('/settings') ? 'page' : undefined}
+                className="flex items-center gap-3 px-3 h-10 mt-4 rounded-lg text-[13.5px] font-semibold transition-colors"
+                style={
+                  isActive('/settings')
+                    ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                    : { color: 'var(--text-muted)' }
+                }
+              >
+                <NavIcon name="settings" size={18} />
+                Settings
+              </Link>
             </nav>
 
             <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
@@ -212,10 +256,15 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
             style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
           >
             <div className="grid grid-cols-5 items-center max-w-lg mx-auto">
-              {MOBILE_TABS.map((href) => {
-                const item = NAV.find((n) => n.href === href)!;
-                return <MobileTab key={href} {...item} active={isActive(href)} />;
-              })}
+              {MOBILE_TABS.map((item) => (
+                <MobileTab
+                  key={item.href}
+                  {...item}
+                  /* Insights covers both analytics routes, so the tab lights up
+                     for either — the segmented control inside says which. */
+                  active={item.href === '/analytics/month' ? isActive('/analytics') : isActive(item.href)}
+                />
+              ))}
             </div>
           </nav>
 

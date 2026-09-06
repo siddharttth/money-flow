@@ -186,7 +186,7 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
       </div>
 
       <div className="mt-4">
-        <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} />
+        <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} spring />
         <div className="flex items-baseline justify-between gap-3 mt-2">
           <span className="num text-[12px] font-semibold">{Math.round(fund.progress * 100)}%</span>
           {!fund.isComplete && (
@@ -543,6 +543,7 @@ export function GoalsStrip({ funds }: { funds: Fund[] }) {
                         share={f.progress}
                         color={f.isComplete ? 'var(--credit)' : f.color}
                         height={5}
+                        spring
                       />
                     </div>
 
@@ -767,6 +768,66 @@ export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
           )}
         </div>
       </div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Every goal, together
+ * ------------------------------------------------------------------ */
+
+/**
+ * The number the goals page never had.
+ *
+ * Individually each goal looks reasonable. Added up they can ask for more per
+ * month than anyone earns, and nothing said so — you had to sum the cards in
+ * your head. This is also the honest home for the "goals ask for more than the
+ * month has left" message, which used to interrupt the dashboard.
+ */
+export function GoalsRollup({ funds }: { funds: Fund[] }) {
+  const open = funds.filter((f) => !f.isComplete);
+  const done = funds.filter((f) => f.isComplete);
+  if (!funds.length) return null;
+
+  const targetMinor = open.reduce((s, f) => s + f.targetMinor, 0);
+  const savedMinor = open.reduce((s, f) => s + f.savedMinor, 0);
+  const perMonthMinor = open.reduce((s, f) => s + (f.requiredPerMonthMinor ?? 0), 0);
+  const behind = open.filter((f) => f.paceConfident && (f.paceDeltaMinor ?? 0) < 0).length;
+
+  return (
+    <Card className="!p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="label mb-0">All goals together</p>
+        {done.length > 0 && (
+          <span className="micro" style={{ color: 'var(--credit)' }}>
+            {done.length} finished
+          </span>
+        )}
+      </div>
+
+      <p className="text-[15px] mt-2.5 leading-relaxed">
+        <strong className="num">{formatINR(savedMinor)}</strong> saved of{' '}
+        <span className="num">{formatINR(targetMinor)}</span> across {open.length}{' '}
+        {open.length === 1 ? 'goal' : 'goals'}
+        {perMonthMinor > 0 && (
+          <>
+            {' '}
+            — <strong className="num">{formatINR(perMonthMinor)}</strong> a month to land them all on time
+          </>
+        )}
+        .
+      </p>
+
+      <div className="mt-3.5">
+        <ShareBar share={targetMinor > 0 ? savedMinor / targetMinor : 0} color="var(--credit)" height={6} />
+      </div>
+
+      {behind > 0 && (
+        <p className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--rule-red)' }}>
+          {behind} {behind === 1 ? 'goal is' : 'goals are'} behind pace. Pushing a target date out is a decision;
+          missing it quietly is not.
+        </p>
+      )}
     </Card>
   );
 }
