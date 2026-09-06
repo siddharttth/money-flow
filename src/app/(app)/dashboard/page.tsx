@@ -128,10 +128,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 2 — what needs doing. Usually short, often empty, and empty is a result. */}
-      <AttentionList items={attention} month={month} />
-
-      {/* 3 — the month at a glance. Detail lives one tap away. */}
+      {/* 2 — the month at a glance. Detail lives one tap away. */}
       <Card className="!p-5 sm:!p-6">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
           <div>
@@ -222,8 +219,17 @@ export default function DashboardPage() {
         ]}
       />
 
-      {/* 4 — what the saving is for. */}
+      {/* 3 — what the saving is for. */}
       {(funds.data?.items.length ?? 0) > 0 && <GoalsStrip funds={funds.data!.items} />}
+
+      {/*
+        4 — what needs doing.
+        Below the figures rather than above them: the tally and the goals are
+        what you came for, and a list of six chores between the headline and
+        the month buries the thing the page exists to say. Usually short, often
+        empty, and empty is itself a result.
+      */}
+      <AttentionList items={attention} month={month} />
 
       {/* 5 — what just happened. */}
       <div>

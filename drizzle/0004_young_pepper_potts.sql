@@ -1,0 +1,1 @@
+ALTER TABLE "categories" ALTER COLUMN "color" SET DEFAULT '#4b8454';

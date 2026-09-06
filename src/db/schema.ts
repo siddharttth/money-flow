@@ -54,7 +54,10 @@ export const categories = pgTable('categories', {
   name: text('name').notNull(),
   slug: text('slug').notNull(),
   icon: text('icon').notNull().default('💸'),
-  color: text('color').notNull().default('#6366f1'),
+  /* Forest, from PALETTE. The old default was an indigo from the palette that
+     preceded Paper and Ink — the API always supplies a colour, so it never
+     showed, but it was one skipped insert away from doing so. */
+  color: text('color').notNull().default('#4b8454'),
   kind: text('kind').notNull().default('expense'), // 'expense' | 'investment' | 'income'
   /** Optional monthly cap, in paise. Null means the category is untracked. */
   monthlyBudgetMinor: integer('monthly_budget_minor'),

@@ -373,9 +373,17 @@ h1, h2, h3 {
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
   .btn-primary { background: var(--brass); color: var(--on-brass); }
+  /*
+   * The lift on hover is tinted with the button's own colour.
+   *
+   * This was `rgba(64, 86, 244, 0.5)` — an electric blue from the palette that
+   * came before Paper and Ink, hardcoded and so never carried across when the
+   * tokens changed. Forest green and gold buttons were casting a violet glow,
+   * which is the one colour in the app that belongs to neither theme.
+   */
   @media (hover: hover) { .btn-primary:hover:not(:disabled) {
     background: var(--brass-bright);
-    box-shadow: 0 14px 30px -12px rgba(64, 86, 244, 0.5);
+    box-shadow: 0 14px 30px -12px color-mix(in oklab, var(--brass) 55%, transparent);
   } }
   .btn-primary:active:not(:disabled) { background: var(--brass-bright); }
 
