@@ -1,8 +1,24 @@
 # Money Flow — what is on every screen, and what it does
 
-A page-by-page inventory of the app: every element on each of the six screens,
-and the functionality it provides. Written from the source, not from memory —
-`src/app/(app)/*/page.tsx` plus the shared components each one mounts.
+A page-by-page inventory of the app: every element on each of the eight
+screens, and the functionality it provides. Written from the source, not from
+memory — `src/app/(app)/*/page.tsx` plus the shared components each one mounts.
+
+> **Restructured.** The app was six screens sorted by noun; it is now eight
+> sorted by time horizon — see `docs/REDESIGN.md` for the argument and the
+> eleven calculation bugs that came out of writing it. Old routes redirect:
+> `/analytics` → `/analytics/month`, `/investments` → `/goals`.
+
+| Page | Route | Horizon |
+| --- | --- | --- |
+| Dashboard | `/dashboard` | now |
+| Transactions | `/expenses` | a point |
+| Income | `/income` | recurring |
+| People | `/people` | running balance |
+| This month | `/analytics/month` | this month |
+| Lifetime | `/analytics/lifetime` | all time |
+| Goals & investing | `/goals` | ahead |
+| Settings | `/settings` | — |
 
 Two rules run through everything below and explain most of the design:
 
@@ -17,16 +33,16 @@ Two rules run through everything below and explain most of the design:
 
 ---
 
-## Shared shell — present on all six screens
+## Shared shell — present on all eight screens
 
 | Element | Where | What it does |
 | --- | --- | --- |
-| **Sidebar nav** | Desktop, fixed left | Dashboard, Transactions, Investments, People, Analytics, Settings. Active item is highlighted. |
-| **Bottom tab bar** | Mobile, fixed | Five tabs: Home, Ledger, Invest, People, Insights. Settings lives in the mobile header instead. |
+| **Sidebar nav** | Desktop, fixed left | Dashboard, then two labelled groups — **Record** (Transactions, Income, People) and **Understand** (This month, Lifetime, Goals) — then Settings. The labels are the only place the app says out loud that it has an in-side and an out-side. |
+| **Bottom tab bar** | Mobile, fixed | Five tabs: Home, Ledger, Insights, Goals, People. **Insights** covers both analytics pages, with a segmented Month/Lifetime control at the top of the page. Income and Settings live in the mobile header. |
 | **Add transaction** | Sidebar button (desktop) / floating **+** (mobile) | Opens the add sheet. Keyboard shortcut: `n`. |
 | **Search** | Sidebar field / mobile header icon | Opens the command palette. Shortcut: `⌘K`. |
 | **Command palette** | `⌘K` | Fuzzy search over people, categories and screens. Jumps to any screen, opens any person/category inspector, or triggers Add transaction. |
-| **Month picker** | Header of Dashboard, Transactions, Investments, People, Analytics | `‹ Aug ›`. Steps one month at a time; forward is disabled past the current month. Shows the year when it is not this one. |
+| **Month picker** | Header of Transactions, Income, People, Goals, This month. **Not on Dashboard** — Home is always the current month, which is what stops "Today" appearing under an August heading. | `‹ Aug ›`. Steps one month at a time; forward is disabled past the current month. Shows the year when it is not this one. |
 | **Toasts** | Bottom of screen | Confirmations after any save/delete. Delete toasts carry an **Undo** action (soft delete + restore). |
 | **User block** | Bottom of sidebar | Name, email, **Sign out**. |
 
@@ -54,63 +70,49 @@ Opened from almost any name in the app.
 
 ## 1. Dashboard — `/dashboard`
 
-> Answers, top to bottom: how much left this month, what the month came to, what you have kept overall, what it is for, and what actually happened.
+> One question: **is this month going well, and is there anything I should do
+> about it?** No month picker — Home is *now*. Five blocks; everything cut from
+> the old nine went to a page that exists to hold it.
 
 ### Sweep card *(only after an underspent month)*
-- Shows how much less you spent than the month before.
-- Goal chips to pick a destination, then **Move it to `<goal>`** — one tap turns an invisible underspend into progress on a goal.
-- **Not now** dismisses it.
+How much less you spent than the month before — **day-count normalised**, so a
+28-day month cannot flatter itself against a 31-day one. Goal chips pick a
+destination, then **Move it to `<goal>`**. **Not now** dismisses it.
 
-### Hero card — "Spent in `<month>`"
-| Element | Function |
+### 1 — Month tally: "Left in hand · `<month>`" / "Down in `<month>`"
+`came in − spent − invested`, negative in red. A stacked bar scaled to the
+larger of money-in and money-out, with a red mark where income ran out.
+Three legs: Spent · Invested · Left in hand / Taken from savings. The caption
+carries the textbook savings rate, qualified. Built from income that actually
+arrived, never the estimate.
+
+### 2 — Needs your attention *(new)*
+A rules list, each entry firing only on evidence, each dismissible for the
+month. Every rule reads a figure the app already computed:
+
+| Rule | Fires when |
 | --- | --- |
-| Big figure | Total **spending** for the month (investments and income excluded). |
-| Delta chip | % against the same point last month; "no change" under 0.05%. |
-| Note line | Either transaction count over active days, or the comparison figure. |
-| **Projected month end** | Current month only. Extrapolated total, with the daily rate and "day N of M". |
-| **Invested, separately →** | Only if you invested this month. Links to Investments. |
-| **Flow curve** | Cumulative spend across the month; dashed line is last month at the same point. Needs two days of data. |
+| Pay not logged | A source is past its usual day ± its usual variance, with nothing recorded |
+| Goal behind | Behind the line by more than one month's contribution, and pace is confident |
+| Over budget | A category has passed its limit |
+| Budget on course to break | Past the 5th, and the rate projects past the limit — names the day it crosses |
+| Debt gone stale | Someone has owed you 30+ days |
+| Running hot | 40%+ above the same point last month |
+| On track | Nothing else fired, past the 10th, in hand and positive |
 
-### Month tally — "Left in hand · `<month>`" / "Down in `<month>`"
-The bottom line for the month, in cash.
-- **Headline** = `came in − spent − invested`. Goes negative and shows the minus in red.
-- **Stacked bar** scaled to the larger of money-in and money-out, with a red mark where income ran out — anything past it was paid for out of your existing balance.
-- **Three legs**: Spent · Invested · Left in hand / Taken from savings. The Invested leg is hidden when it is zero.
-- **Caption** carries the textbook savings rate (`income − spending`), qualified so it can't be mistaken for cash.
-- Built from income that *actually arrived* — never the estimate.
-- Hidden entirely when no income has ever been recorded.
+### 3 — The month at a glance
+Spent hero with the same-day delta, projected month end, **Invested separately →**,
+and the cumulative flow curve against last month's dashed line. Then a stat
+strip: Today · This week · Typical entry · Net with people.
 
-### Lifetime in hand
-- `Σ(came in − spent − invested)` across every month there is.
-- **Does not change when you switch months** — fetched without a month in the key.
-- Right-hand column spells out the subtraction: everything in, everything spent, everything invested, in hand.
-- Explains that investments are subtracted because this is cash, not net worth.
-- **With no income yet**, this card becomes the onboarding prompt: *Tell the app what comes in* → **Add an income source**.
+### 4 — Goals strip *(when goals exist)*
+One row per goal: progress bar, %, and the monthly pace needed. **All goals →**
 
-### Goals strip *(only when goals exist)*
-- One compact row per goal: icon, name, `saved / target`, progress bar, % and **₹X a month** (the pace needed).
-- Completed goals show *done*.
-- **All goals** link → Investments.
+### 5 — Recent activity
+Last five transactions. **View all →**
 
-### Stat strip (4 figures)
-Today · This week · Typical entry (median, with the month's entry count) · Net with people (colour-coded; "all settled" / "owed to you" / "you owe").
-
-### Where it went / Who it was with
-A segmented toggle switches the same card between two dimensions.
-- **Category**: donut + top 6 categories with share bars. Tap any row → category inspector.
-- **Person**: top 8 people by share, with a note explaining that shares add up to the month rather than multiplying it. Tap → person inspector.
-
-### Signals *(with a **More** link to Analytics)*
-Derived one-liners, each shown only when it applies:
-- Heaviest day and its total
-- Biggest single entry, its category, and its % of the month
-- Count and total of entries under the small-ticket threshold
-- Quiet days and the longest quiet run
-- Lent out vs came back in, if the ledger moved
-- **Every day this month** — a bar per calendar day underneath.
-
-### Recent activity
-Last 6 transactions with date, category, people tags, and amount. Income rows are green and badged `income`; investment rows badged `invested`. **View all** → Transactions.
+### Footer
+One line — *"Kept across N months ₹X →"* — linking to Lifetime.
 
 ---
 
@@ -146,9 +148,58 @@ Search notes · Category chips (multi-select) · People chips (multi-select) · 
 
 ---
 
-## 3. Investments — `/investments`
+## 3. Income — `/income`
 
-> Where the money that is not spending goes. Reports contributions, not returns — the app has no price data.
+> Everything about money arriving. Lifted out of Settings and given room to
+> answer what a settings row never could.
+
+### Hero — "Received in `<month>`"
+Total, with an **inverted** delta against last month (up is good here), and a
+note comparing against your *median* rather than your last figure — one good
+month should not reset what normal means.
+
+### When it landed
+The month as a row of dots, filled on the days income actually arrived. For a
+salary that is one confident dot; for freelance it shows the real shape, which
+an average actively hides. *(Current month only.)*
+
+### Month by month
+Up to 12 months of income as bars, with the average as a dashed reference line.
+Tap a bar to open that month.
+
+### Stat strip
+Typical month (median of N) · Best month · Leanest month · Lifetime.
+
+### How steady is it *(needs 3+ months)*
+One sentence, and only one of two:
+- Swinging more than ~35% of the median → *"Your income swings by ₹X between
+  your best and leanest month. Budget against ₹Y — your median — rather than
+  your last figure."*
+- Otherwise → *"Steady: ₹X between best and leanest. Planning against ₹Y is safe."*
+
+### Where it comes from
+One row per source: icon, name, this month's amount, when it last landed, what
+it usually is, and a 12-month sparkline. Tapping opens the category inspector.
+
+**Reliability, per source** *(needs 4+ payments)* — either *"Lands within 2 days
+of the 1st, going by the last 6"* or *"Timing moves — around the 5th, give or
+take 9 days."* This feeds the Home rule for unlogged pay.
+
+### Footnote
+Says a payment is logged like anything else, and that this is what feeds
+**Left in hand** on the dashboard.
+
+---
+
+## 4. Goals & investing — `/goals`
+
+> Goals first, then the contributions behind them. Reports what you put in,
+> not what it is worth — the app has no price data.
+
+### All goals together *(new)*
+One line: `₹X saved of ₹Y across N goals — ₹Z a month to land them all on
+time`, with a combined progress bar, and a red note counting how many are
+behind pace. The figure you previously had to sum in your head.
 
 ### Hero card — "Put in during `<month>`"
 - Month total, with a delta against last month (**inverted** — up is good here, unlike everywhere else).
@@ -181,7 +232,7 @@ Explains that none of this counts as spending anywhere in the app, and that the 
 
 ---
 
-## 4. People — `/people`
+## 5. People — `/people`
 
 > A contact you spend with and a contact you lend to are the same person. This screen merges both, and never adds the two figures together.
 
@@ -214,9 +265,17 @@ Name · Relationship (family / friend / other) · Colour, with a live avatar pre
 
 ---
 
-## 5. Analytics — `/analytics`
+## 6. This month — `/analytics/month`
 
-> Everything the month can be asked, in the order the questions occur.
+> Everything time-boxed to one month, in the order the questions occur. This
+> page owns the month picker.
+
+### Budgets *(moved here from Settings)*
+Total spent of total budgeted with a bar that turns red when over, then one row
+per budgeted category: icon, name, `spent / budget`, a bar that goes gold when
+ahead of pace and red when over, and **a pace marker** showing where an even
+burn would put you today. A bar at 60% on the 10th is a different story from
+the same bar on the 28th, and the marker is what says which.
 
 ### Hero card
 Total spent, delta, transaction count and daily rate. Beneath it: last month by today (or the month before), projected month end, first half vs second half. Right side: the flow curve with an explanation of the dashed line.
@@ -248,27 +307,65 @@ Put in this month · Lifetime · Share of outgoings. Plus the explanation of why
 ### Lending, separately *(when the ledger moved)*
 Lent out · Received · Net movement (out of / into pocket), with the reasoning for keeping it out of spending totals.
 
-### The long view
-- **What you spend** — up to 12 months of spending as bars. Tap a bar to open that month.
-- **What you keep** — up to 6 months of savings rate, one row each with a bar, the % and the amount. Months with no income are drawn as **gaps rather than zeroes**. Footer gives the average across months with income logged.
+### The longer view
+A pointer, not a section — twelve months of bars and six months of savings rate
+were never month-scoped, and stranding them under a month picker made the
+picker look broken. **Open Lifetime →**
 
 ### Category drill-down modal
 Opened by tapping a category. Shows the total, the transaction count and its % of the month, then every transaction — click one to open it for editing.
 
 ---
 
-## 6. Settings — `/settings`
+## 7. Lifetime — `/analytics/lifetime`
+
+> The whole arc, and deliberately no month picker. Nothing here moves when you
+> change the month elsewhere.
+
+### Net position *(new)*
+`cash + invested + owed to you − you owe`, with each line spelled out and
+linking to the screen that owns it. Investments are **added back** here — this
+is net worth, and the card says so, where the card below it is the cash half of
+the same arithmetic. The figure no screen previously answered.
+
+### Lifetime in hand
+`Σ(came in − spent − invested − lent + borrowed)` across every month, with the
+subtraction spelled out. The ledger is in it now: money handed to a friend has
+left the account.
+
+### Stat strip
+Months tracked · Ever invested · Best month kept · Longest positive streak.
+
+### Over time
+- **What you spend** — up to 24 months of bars; tap to open that month.
+- **What you keep** — savings rate per month, gaps for months with no income,
+  and a **pooled** footer (`Σsaved ÷ Σincome`, not the mean of the rates).
+
+### What it has all gone on *(new)*
+Every category by lifetime total. The monthly view answers what is moving; this
+answers what it has cost.
+
+### Lending, all time *(new)*
+Owed to you · You owe · Net. The ledger previously only ever appeared as a
+current balance.
+
+### Year on year *(new, gated at 2+ years)*
+In, out and kept per calendar year, as paired bars. Withheld below two years
+rather than drawn from a fragment.
+
+---
+
+## 8. Settings — `/settings`
 
 > Configuration, not a daily destination. A stack of labelled sections, one card each.
 
 ### Income
-- Header strip: **`<month>` so far** with the total received, and last month's figure alongside.
-- One row per income source: icon, name, "received this month" / "nothing yet this month", and the amount.
-- **+ Source** → the income sheet.
-- Footnote explaining that pay is logged like anything else, and that the plan falls back to a 3-month median until this month's lands.
+A signpost, not a section — source count, this month's total, and **Open Income →**.
+Income moved to its own page: a configuration screen is somewhere you go once,
+and income is something you record every month.
 
-### Budget · `<month>` *(only when budgets are set)*
-Spent of total, a bar that turns red when over, and how much is left or over across N budgeted categories.
+*(Budget progress moved to This month. Setting a limit is still here, on the
+category sheet — watching a bar fill against it is not configuration.)*
 
 ### Categories
 - One row per active category: icon, name, spend this month, and either `spent / budget` with a pace bar, or a subtitle — `Income · kept out of spending`, `Goal · ₹X by <date>`, `Investment · kept out of spending`, or `No monthly budget`.
@@ -302,7 +399,7 @@ Three theme cards, each with a painted miniature of the actual theme: **System**
 
 ---
 
-## 6b. Import — `/settings/import`
+## 8b. Import — `/settings/import`
 
 A three-step wizard, reachable from Settings → Data.
 
@@ -318,7 +415,9 @@ A three-step wizard, reachable from Settings → Data.
 | --- | --- |
 | **Soft delete + Undo** | Deleting a transaction or ledger entry sets `deleted_at` and raises a toast with **Undo**. Nothing is lost. |
 | **Clear lending history** | Per person, from their inspector. Hides every entry from the UI but keeps the rows for analytics. Two-step confirm. |
-| **Month persistence** | Every screen keeps its own month selection; the lifetime card is the one figure that ignores it. |
+| **Month persistence** | Every month-scoped screen keeps its own selection. Dashboard and Lifetime have no picker at all — one is always now, the other is always everything. |
+| **Attention dismissals** | Per rule, per month, stored locally. A rule you have acknowledged stops nagging for the month and comes back next month if it is still true. |
+| **Motion** | One vocabulary: numbers count up, bars grow, drawers slide, rows settle, and nothing spins except a genuine network wait. Goal and budget bars overshoot ~2% on the way up; everything collapses to zero duration under `prefers-reduced-motion`. |
 | **Stale-while-revalidate** | Switching months keeps the previous figures on screen while the next load runs, rather than blanking to skeletons. |
 | **Empty states** | Every list and card has one, and each offers the action that would fill it. |
 | **Theme** | Paper (cream/forest) and Ink (near-black/gold), or follow the system. Every colour is defined for both. |
