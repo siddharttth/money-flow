@@ -8,8 +8,11 @@ import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
 import type { Transaction } from '@/lib/transactions';
 import type { PersonExpense } from '@/lib/analytics';
+import type { Expense } from '@/lib/types';
 import { Drawer } from './drawer';
 import { ListSkeleton, EmptyState, Money } from './ui';
+import { ShareBar } from './graph';
+import { useShell } from './app-shell';
 import { CategoryIcon, PersonMark } from './icons';
 import { useToast } from './toast';
 
@@ -19,11 +22,24 @@ import { useToast } from './toast';
  * were on. One provider owns the open entity so no screen has to wire it up.
  */
 
-type Entity = { type: 'person'; id: string } | { type: 'category'; id: string } | null;
+/**
+ * A category drawer answers a different question depending on where it was
+ * opened from. On a month-scoped screen it is "what did this cost in
+ * September, and can I fix a row"; on the Lifetime page it is "what has this
+ * cost me, month after month". Listing September's transactions on a page
+ * whose whole premise is that nothing is month-scoped was the wrong answer,
+ * and on a quiet category an empty one.
+ */
+export type CategoryScope = 'month' | 'lifetime';
+
+type Entity =
+  | { type: 'person'; id: string }
+  | { type: 'category'; id: string; scope: CategoryScope }
+  | null;
 
 const Ctx = createContext<{
   openPerson: (id: string) => void;
-  openCategory: (id: string) => void;
+  openCategory: (id: string, scope?: CategoryScope) => void;
   close: () => void;
 }>({ openPerson: () => {}, openCategory: () => {}, close: () => {} });
 
@@ -33,14 +49,19 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
   const [entity, setEntity] = useState<Entity>(null);
 
   const openPerson = useCallback((id: string) => setEntity({ type: 'person', id }), []);
-  const openCategory = useCallback((id: string) => setEntity({ type: 'category', id }), []);
+  const openCategory = useCallback(
+    (id: string, scope: CategoryScope = 'month') => setEntity({ type: 'category', id, scope }),
+    [],
+  );
   const close = useCallback(() => setEntity(null), []);
 
   return (
     <Ctx.Provider value={{ openPerson, openCategory, close }}>
       {children}
       {entity?.type === 'person' && <PersonInspector id={entity.id} onClose={close} />}
-      {entity?.type === 'category' && <CategoryInspector id={entity.id} onClose={close} />}
+      {entity?.type === 'category' && (
+        <CategoryInspector id={entity.id} scope={entity.scope} onClose={close} />
+      )}
     </Ctx.Provider>
   );
 }
@@ -328,16 +349,31 @@ type CategoryInsight = {
   monthMinor: number;
   monthCount: number;
   lifetimeMinor: number;
+  lifetimeCount: number;
   avgTransactionMinor: number;
   pacedBudgetMinor: number | null;
   projectedMinor: number | null;
   projectionBasis: 'rate' | 'too-lumpy' | 'past-month';
+  scope: 'month' | 'lifetime';
+  series: { month: string; totalMinor: number; count: number }[];
   transactions: Transaction[];
 };
 
-function CategoryInspector({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data, isLoading } = useSWR<CategoryInsight>(`/api/insights/category/${id}`);
+function CategoryInspector({
+  id,
+  scope,
+  onClose,
+}: {
+  id: string;
+  scope: CategoryScope;
+  onClose: () => void;
+}) {
+  const { data, isLoading } = useSWR<CategoryInsight>(
+    `/api/insights/category/${id}${scope === 'lifetime' ? '?scope=lifetime' : ''}`,
+  );
   const { openPerson } = useInspector();
+  const { openAdd } = useShell();
+  const lifetime = scope === 'lifetime';
 
   const budget = data?.category.monthlyBudgetMinor ?? null;
   const pct = budget ? Math.min((data!.monthMinor / budget) * 100, 100) : 0;
@@ -353,7 +389,7 @@ function CategoryInspector({ id, onClose }: { id: string; onClose: () => void })
             <CategoryIcon icon={data.category.icon} color={data.category.color} size={40} />
             <div className="min-w-0">
               <h2 className="text-base font-semibold truncate">{data.category.name}</h2>
-              <span className="micro">{monthLabel(data.month)}</span>
+              <span className="micro">{lifetime ? 'All time' : monthLabel(data.month)}</span>
             </div>
           </div>
         ) : (
@@ -366,17 +402,34 @@ function CategoryInspector({ id, onClose }: { id: string; onClose: () => void })
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 mb-4">
-            <Kpi label="This month">{formatINR(data.monthMinor)}</Kpi>
-            <Kpi label="Avg transaction">{formatINR(data.avgTransactionMinor)}</Kpi>
-            <Kpi label="Transactions">{String(data.monthCount)}</Kpi>
-            {/* Null for a past month, and for a category too lumpy to have a
-                rate — a projection built from one rent charge is fiction. */}
-            <Kpi label={data.projectedMinor == null ? 'Lifetime' : 'Projected'}>
-              {data.projectedMinor == null ? formatINR(data.lifetimeMinor) : formatINR(data.projectedMinor)}
-            </Kpi>
+            {lifetime ? (
+              <>
+                <Kpi label="Lifetime">{formatINR(data.lifetimeMinor)}</Kpi>
+                <Kpi label="Transactions">{String(data.lifetimeCount)}</Kpi>
+                <Kpi label="Months seen">{String(data.series.length)}</Kpi>
+                <Kpi label="Busiest month">
+                  {data.series.length
+                    ? formatINR(Math.max(...data.series.map((m) => m.totalMinor)))
+                    : formatINR(0)}
+                </Kpi>
+              </>
+            ) : (
+              <>
+                <Kpi label="This month">{formatINR(data.monthMinor)}</Kpi>
+                <Kpi label="Avg transaction">{formatINR(data.avgTransactionMinor)}</Kpi>
+                <Kpi label="Transactions">{String(data.monthCount)}</Kpi>
+                {/* Null for a past month, and for a category too lumpy to have
+                    a rate — a projection built from one rent charge is fiction. */}
+                <Kpi label={data.projectedMinor == null ? 'Lifetime' : 'Projected'}>
+                  {data.projectedMinor == null
+                    ? formatINR(data.lifetimeMinor)
+                    : formatINR(data.projectedMinor)}
+                </Kpi>
+              </>
+            )}
           </div>
 
-          {budget ? (
+          {lifetime ? null : budget ? (
             <div className="mb-5">
               <div className="flex items-baseline justify-between mb-1.5">
                 <span className="micro">Monthly budget</span>
@@ -418,31 +471,120 @@ function CategoryInspector({ id, onClose }: { id: string; onClose: () => void })
             </p>
           )}
 
-          <p className="micro mb-2">Transactions</p>
-          {data.transactions.length ? (
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {data.transactions.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{t.note || data.category.name}</p>
-                    <p className="muted text-xs truncate flex items-center gap-1.5">
-                      {dayLabel(t.date)}
-                      {t.people.map((p) => (
-                        <button key={p.id} className="tag !py-0" onClick={() => openPerson(p.id)}>
-                          {p.name}
-                        </button>
-                      ))}
-                    </p>
-                  </div>
-                  <Money minor={t.amountMinor} className="text-sm font-semibold shrink-0" />
-                </div>
-              ))}
-            </div>
+          {lifetime ? (
+            /*
+             * MONTH BY MONTH — the bird's-eye view this page was asking for.
+             * Transaction-level detail is what the monthly drawer is for, and
+             * duplicating it here just made a lifetime page answer a monthly
+             * question.
+             */
+            <>
+              <p className="micro mb-2">Month by month</p>
+              {data.series.length ? (
+                <>
+                  <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                    {data.series.map((m) => (
+                      <li key={m.month} className="py-2.5">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-sm font-medium">{longMonth(m.month)}</span>
+                          <span className="flex items-baseline gap-2.5 shrink-0">
+                            <span className="micro">×{m.count}</span>
+                            <Money minor={m.totalMinor} className="text-sm font-semibold" />
+                          </span>
+                        </div>
+                        <div className="mt-1.5">
+                          <ShareBar
+                            share={m.totalMinor / Math.max(...data.series.map((x) => x.totalMinor), 1)}
+                            color={data.category.color}
+                            height={4}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="muted text-xs mt-4 leading-relaxed">
+                    Every month this category has appeared in. Open a month from{' '}
+                    <strong>This month</strong> to see the entries behind one.
+                  </p>
+                </>
+              ) : (
+                <EmptyState title="Nothing recorded yet" />
+              )}
+            </>
           ) : (
-            <EmptyState title="Nothing this month" />
+            <>
+              <p className="micro mb-2">Transactions</p>
+              {data.transactions.length ? (
+                <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                  {data.transactions.map((t) => (
+                    /*
+                     * The row opens the edit sheet. Finding a miscategorised
+                     * entry here and having to go and find it again in the
+                     * ledger was the drawer stopping one step short.
+                     */
+                    <button
+                      key={t.id}
+                      className="row w-full text-left flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-lg"
+                      onClick={async () => {
+                        try {
+                          const full = await api.get<Expense>(`/api/expenses/${t.id}`);
+                          onClose();
+                          openAdd(full);
+                        } catch {
+                          /* the row simply does not open */
+                        }
+                      }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{t.note || data.category.name}</p>
+                        <p className="muted text-xs truncate flex items-center gap-1.5">
+                          {dayLabel(t.date)}
+                          {t.people.map((p) => (
+                            <span
+                              key={p.id}
+                              role="button"
+                              tabIndex={0}
+                              className="tag !py-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPerson(p.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.stopPropagation();
+                                  openPerson(p.id);
+                                }
+                              }}
+                            >
+                              {p.name}
+                            </span>
+                          ))}
+                        </p>
+                      </div>
+                      <Money minor={t.amountMinor} className="text-sm font-semibold shrink-0" />
+                      <span className="micro reveal shrink-0" style={{ color: 'var(--accent)' }}>
+                        edit
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="Nothing this month" />
+              )}
+            </>
           )}
         </>
       )}
     </Drawer>
   );
+}
+
+/** '2026-08' → 'August 2026'. Spelled out, because this list spans years. */
+function longMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }

@@ -203,7 +203,8 @@ export default function LifetimePage() {
                   totalMinor: c.totalMinor,
                   count: c.count,
                 }))}
-                onPick={openCategory}
+                /* Lifetime scope: month-by-month totals, not September's rows. */
+                onPick={(id) => openCategory(id, 'lifetime')}
               />
               <p className="muted text-[12px] mt-4 leading-relaxed">
                 Every category, every month, since you started. The monthly view

@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { categories } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { categories, expenses } from '@/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 import { ApiError, ok, query, withAuth } from '@/lib/api';
 import { getTotal } from '@/lib/analytics';
 import { getTransactions } from '@/lib/transactions';
@@ -28,11 +28,23 @@ export const GET = withAuth<Ctx>(async (req, session, { params }) => {
      extrapolate at all — see the projection note below. */
   const trailing = monthRange(shiftMonth(month, -3));
 
-  const [monthTotal, lifetime, feed, recent] = await Promise.all([
+  /*
+   * `?scope=lifetime` answers a different question with the same category.
+   *
+   * Opened from the Lifetime page, the drawer used to list this month's
+   * transactions — which on a page whose whole premise is "nothing here is
+   * month-scoped" is the wrong answer, and often an empty one. It returns a
+   * month-by-month series instead: the bird's-eye view. The transaction-level
+   * detail is what the monthly drawer is for.
+   */
+  const wantSeries = query(req).get('scope') === 'lifetime';
+
+  const [monthTotal, lifetime, feed, recent, series] = await Promise.all([
     getTotal({ userId: session.userId, categoryIds: [id], start, end }),
     getTotal({ userId: session.userId, categoryIds: [id] }),
     getTransactions({ userId: session.userId, categoryIds: [id], start, end, kinds: ['expense'], limit: 60 }),
     getTotal({ userId: session.userId, categoryIds: [id], start: trailing.start, end }),
+    wantSeries ? monthlySeries(session.userId, id) : Promise.resolve([]),
   ]);
 
   const today = todayISO();
@@ -80,6 +92,33 @@ export const GET = withAuth<Ctx>(async (req, session, { params }) => {
       !isCurrent ? ('past-month' as const)
       : recent.count >= PROJECTION_MIN_TXNS ? ('rate' as const)
       : ('too-lumpy' as const),
-    transactions: feed.items,
+    /* Empty in lifetime scope — the series below is the answer there. */
+    transactions: wantSeries ? [] : feed.items,
+    scope: wantSeries ? ('lifetime' as const) : ('month' as const),
+    series,
   });
 });
+
+/** Every month this category has ever seen, newest first. */
+async function monthlySeries(userId: string, categoryId: string) {
+  const rows = await db
+    .select({
+      month: sql<string>`to_char(${expenses.expenseDate}, 'YYYY-MM')`,
+      total: sql<string>`COALESCE(SUM(${expenses.amountMinor}), 0)`,
+      count: sql<string>`COUNT(*)`,
+    })
+    .from(expenses)
+    .where(
+      sql`${expenses.userId} = ${userId}
+          AND ${expenses.categoryId} = ${categoryId}::uuid
+          AND ${expenses.deletedAt} IS NULL`,
+    )
+    .groupBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${expenses.expenseDate}, 'YYYY-MM') DESC`);
+
+  return rows.map((r) => ({
+    month: r.month,
+    totalMinor: Number(r.total),
+    count: Number(r.count),
+  }));
+}
