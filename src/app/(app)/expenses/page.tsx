@@ -7,7 +7,7 @@ import { api, qs } from '@/lib/client';
 import { currentMonth, dayLabel, fullDayLabel, monthLabel, monthRange, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, Person } from '@/lib/types';
-import type { Transaction, TxKind } from '@/lib/transactions';
+import type { FeedTotals, Transaction, TxKind } from '@/lib/transactions';
 import { clusterTransactions, type TxCluster } from '@/lib/cluster';
 import {
   Card,
@@ -68,7 +68,7 @@ function Transactions() {
   const people = useSWR<{ items: Person[] }>('/api/people');
 
   const key = `/api/transactions${qs({ start, end, categoryIds, personIds, kinds, search: search.trim(), limit })}`;
-  const { data, error, isLoading } = useSWR<{ items: Transaction[]; hasMore: boolean }>(key);
+  const { data, error, isLoading } = useSWR<{ items: Transaction[]; hasMore: boolean; totals: FeedTotals }>(key);
 
   /*
    * Grouped by day, then folded within the day: three identical cigarette runs
@@ -89,27 +89,24 @@ function Transactions() {
     }));
   }, [data]);
 
-  /**
+  /*
    * Four figures that never mix. Spending, lending, borrowing — and investing,
    * which looks like an expense in this list because it is one row in the same
    * table, but is not money spent. See the note at the top of analytics.ts.
+   *
+   * These come from the server, aggregated over the WHOLE filter. They used to
+   * be summed from `data.items`, which is capped at 150 rows — so a month with
+   * 200 transactions showed a total missing fifty of them that quietly
+   * corrected itself when you pressed Load more.
    */
-  const totals = useMemo(() => {
-    const items = data?.items ?? [];
-    const sum = (rows: Transaction[]) => rows.reduce((s, t) => s + t.amountMinor, 0);
-    const of = (kind: TxKind) => sum(items.filter((t) => t.kind === kind));
-    const expenseRows = items.filter((t) => t.kind === 'expense');
-    // Spending is the kind that is actually spending — an income row and a
-    // contribution both live in this feed and neither belongs in the total.
-    return {
-      spent: sum(expenseRows.filter((t) => t.category?.kind === 'expense')),
-      invested: sum(expenseRows.filter((t) => t.category?.kind === 'investment')),
-      income: sum(expenseRows.filter((t) => t.category?.kind === 'income')),
-      lent: of('lent'),
-      borrowed: of('borrowed'),
-      count: items.length,
-    };
-  }, [data]);
+  const totals = data?.totals ?? {
+    spentMinor: 0,
+    investedMinor: 0,
+    incomeMinor: 0,
+    lentMinor: 0,
+    borrowedMinor: 0,
+    count: 0,
+  };
 
   const activeFilters = categoryIds.length + personIds.length + kinds.length + (search ? 1 : 0);
   const today = todayISO();
@@ -172,15 +169,19 @@ function Transactions() {
       <StatStrip
         cols={4}
         items={[
-          { label: 'Spent', minor: totals.spent, sub: `${totals.count} shown` },
           {
-            label: totals.income > 0 ? 'Income' : 'Invested',
-            minor: totals.income > 0 ? totals.income : totals.invested,
-            tone: 'var(--credit)',
-            sub: totals.income > 0 ? 'came in' : totals.invested ? 'not spending' : undefined,
+            label: 'Spent',
+            minor: totals.spentMinor,
+            sub: `${totals.count} ${totals.count === 1 ? 'entry' : 'entries'}`,
           },
-          { label: 'Lent out', minor: totals.lent, tone: totals.lent ? 'var(--rule-red)' : undefined },
-          { label: 'Borrowed', minor: totals.borrowed, tone: totals.borrowed ? 'var(--credit)' : undefined },
+          {
+            label: totals.incomeMinor > 0 ? 'Income' : 'Invested',
+            minor: totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor,
+            tone: 'var(--credit)',
+            sub: totals.incomeMinor > 0 ? 'came in' : totals.investedMinor ? 'not spending' : undefined,
+          },
+          { label: 'Lent out', minor: totals.lentMinor, tone: totals.lentMinor ? 'var(--rule-red)' : undefined },
+          { label: 'Borrowed', minor: totals.borrowedMinor, tone: totals.borrowedMinor ? 'var(--credit)' : undefined },
         ]}
       />
 

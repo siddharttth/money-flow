@@ -600,7 +600,17 @@ export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
   const withIncome = rows.filter((r) => r.ratePct != null);
   if (withIncome.length === 0) return null;
 
-  const avg = withIncome.reduce((s, r) => s + (r.ratePct ?? 0), 0) / withIncome.length;
+  /*
+   * POOLED, NOT AVERAGED.
+   *
+   * This was the unweighted mean of the monthly rates, so a ₹5,000 month at
+   * 90% counted exactly as much as a ₹50,000 month at 20% — and the footer
+   * then reported 55% for someone who had actually kept 26% of their money.
+   * The rate of the sums, never the mean of the rates.
+   */
+  const pooledIn = withIncome.reduce((s, r) => s + r.inMinor, 0);
+  const pooledSaved = withIncome.reduce((s, r) => s + r.savedMinor, 0);
+  const avg = pooledIn > 0 ? (pooledSaved / pooledIn) * 100 : 0;
 
   return (
     <Card>

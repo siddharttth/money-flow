@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { categories, expenses } from '@/db/schema';
+import { categories, expenses, ledgerEntries } from '@/db/schema';
 import { sumToMinor } from './money';
 import { getTotal } from './analytics';
 import { getFunds, requiredSavingsMinor, type Fund } from './funds';
@@ -203,8 +203,15 @@ export type Sweep = {
   previousMonth: string;
   spentMinor: number;
   previousSpentMinor: number;
-  /** How much less was spent. Zero when the month was not cheaper. */
+  /**
+   * How much less was spent, once the two months are put on the same footing.
+   * Zero when the month was not actually cheaper. See `getSweep`.
+   */
   savedMinor: number;
+  /** The raw difference, before the day-count correction. For the caption. */
+  rawDeltaMinor: number;
+  /** Whether the two months were different lengths, which is why this exists. */
+  normalised: boolean;
 };
 
 /**
@@ -223,17 +230,43 @@ export async function getSweep(userId: string, month: string): Promise<Sweep> {
   const lastMonth = shiftMonth(month, -1);
   const monthBefore = shiftMonth(month, -2);
 
+  const rangeA = monthRange(lastMonth);
+  const rangeB = monthRange(monthBefore);
+
   const [a, b] = await Promise.all([
-    getTotal({ userId, ...monthRange(lastMonth) }),
-    getTotal({ userId, ...monthRange(monthBefore) }),
+    getTotal({ userId, ...rangeA }),
+    getTotal({ userId, ...rangeB }),
   ]);
+
+  /*
+   * PUT THE TWO MONTHS ON THE SAME FOOTING FIRST.
+   *
+   * Subtracting raw totals makes February look thrifty and March look
+   * spendthrift for no reason but the calendar — three days is 10% of a month.
+   * The comparison is made on daily rates and scaled back up to the length of
+   * the month being praised, so "you underspent" means a change in behaviour
+   * rather than a change in the number of days available to spend on.
+   *
+   * The figure OFFERED to sweep is the raw difference, because that is the
+   * cash that actually exists. Only the claim needs correcting, not the
+   * transfer.
+   */
+  const daysA = daysBetween(rangeA.start, rangeA.end);
+  const daysB = daysBetween(rangeB.start, rangeB.end);
+  const rateA = daysA > 0 ? a.totalMinor / daysA : 0;
+  const rateB = daysB > 0 ? b.totalMinor / daysB : 0;
+  const normalisedDelta = Math.round((rateB - rateA) * daysA);
+  const rawDelta = b.totalMinor - a.totalMinor;
 
   return {
     month: lastMonth,
     previousMonth: monthBefore,
     spentMinor: a.totalMinor,
     previousSpentMinor: b.totalMinor,
-    savedMinor: Math.max(0, b.totalMinor - a.totalMinor),
+    // Only claim an underspend when both readings agree there was one.
+    savedMinor: normalisedDelta > 0 && rawDelta > 0 ? Math.min(rawDelta, normalisedDelta) : 0,
+    rawDeltaMinor: rawDelta,
+    normalised: daysA !== daysB,
   };
 }
 
@@ -344,7 +377,14 @@ export type LifetimeTally = {
   inMinor: number;
   outMinor: number;
   investedMinor: number;
-  /** in − out − invested. What every month put together actually left behind. */
+  /** Money handed to someone else. Gone from the account, still owed to you. */
+  lentMinor: number;
+  /** Money someone handed you. In the account, and owed back. */
+  borrowedMinor: number;
+  /**
+   * in − out − invested − lent + borrowed. Cash, and the ledger is part of
+   * cash: money you lent has genuinely left the account.
+   */
   inHandMinor: number;
   /** Distinct months with anything in them, for context under the figure. */
   months: number;
@@ -368,6 +408,47 @@ export type LifetimeTally = {
  * this is one query rather than one per month.
  */
 export async function getLifetimeTally(userId: string): Promise<LifetimeTally> {
+  const [row, ledger] = await Promise.all([lifetimeFlows(userId), lifetimeLedger(userId)]);
+
+  const inMinor = sumToMinor(row?.income ?? 0);
+  const outMinor = sumToMinor(row?.spent ?? 0);
+  const investedMinor = sumToMinor(row?.invested ?? 0);
+
+  return {
+    known: inMinor > 0,
+    inMinor,
+    outMinor,
+    investedMinor,
+    lentMinor: ledger.lentMinor,
+    borrowedMinor: ledger.borrowedMinor,
+    /*
+     * The ledger belongs in this subtraction.
+     *
+     * This card subtracts investments and explains that it is reporting cash
+     * rather than net worth — and then ignored `ledger_entries` entirely, so
+     * ₹12,350 handed to a friend was still counted as sitting in your pocket.
+     * Either the arithmetic includes the ledger or the caption is false.
+     */
+    inHandMinor: inMinor - outMinor - investedMinor - ledger.lentMinor + ledger.borrowedMinor,
+    months: Number(row?.months ?? 0),
+    firstMonth: row?.first ?? null,
+  };
+}
+
+/** Everything ever lent out and taken in, live entries only. */
+async function lifetimeLedger(userId: string) {
+  const [row] = await db
+    .select({
+      lent: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'out'), 0)`,
+      borrowed: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'in'), 0)`,
+    })
+    .from(ledgerEntries)
+    .where(sql`${ledgerEntries.userId} = ${userId} AND ${ledgerEntries.deletedAt} IS NULL`);
+
+  return { lentMinor: sumToMinor(row?.lent ?? 0), borrowedMinor: sumToMinor(row?.borrowed ?? 0) };
+}
+
+async function lifetimeFlows(userId: string) {
   const [row] = await db
     .select({
       income: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${categories.kind} = 'income'), 0)`,
@@ -380,17 +461,5 @@ export async function getLifetimeTally(userId: string): Promise<LifetimeTally> {
     .innerJoin(categories, sql`${categories.id} = ${expenses.categoryId}`)
     .where(sql`${expenses.userId} = ${userId} AND ${expenses.deletedAt} IS NULL`);
 
-  const inMinor = sumToMinor(row?.income ?? 0);
-  const outMinor = sumToMinor(row?.spent ?? 0);
-  const investedMinor = sumToMinor(row?.invested ?? 0);
-
-  return {
-    known: inMinor > 0,
-    inMinor,
-    outMinor,
-    investedMinor,
-    inHandMinor: inMinor - outMinor - investedMinor,
-    months: Number(row?.months ?? 0),
-    firstMonth: row?.first ?? null,
-  };
+  return row;
 }

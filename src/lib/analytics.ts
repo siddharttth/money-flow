@@ -406,11 +406,21 @@ export async function getSummary(userId: string, month: string) {
   const today = todayISO();
   const week = weekRange(today);
 
+  const monthIsCurrent = month === today.slice(0, 7);
+
+  /*
+   * "Today" and "this week" are facts about the real calendar, not about the
+   * month being viewed. Browsing to August used to print September's figures
+   * under an August heading — so on any month but the current one they are
+   * null, and the screen shows something month-appropriate instead.
+   */
   const [thisMonth, lastMonth, todayTotal, weekTotal, daily, catStats] = await Promise.all([
     getTotal({ userId, start, end }),
     getTotal({ userId, start: prev.start, end: prev.end }),
-    getTotal({ userId, start: today, end: today }),
-    getTotal({ userId, start: week.start, end: week.end }),
+    monthIsCurrent ? getTotal({ userId, start: today, end: today }) : Promise.resolve({ totalMinor: 0, count: 0 }),
+    monthIsCurrent
+      ? getTotal({ userId, start: week.start, end: week.end })
+      : Promise.resolve({ totalMinor: 0, count: 0 }),
     getDailyTotals({ userId, start, end }),
     getCategoryBreakdown({ userId, start, end }),
   ]);
@@ -421,14 +431,27 @@ export async function getSummary(userId: string, month: string) {
   );
 
   // Average across elapsed days for the current month, full length for past months.
-  const monthIsCurrent = month === today.slice(0, 7);
   const elapsed = monthIsCurrent ? daysBetween(start, today) : daysBetween(start, end);
   const avgDailyMinor = elapsed > 0 ? Math.round(thisMonth.totalMinor / elapsed) : 0;
 
+  /*
+   * A PARTIAL PERIOD IS ONLY EVER COMPARED TO THE SAME PARTIAL PERIOD.
+   *
+   * This used to divide month-to-date by the WHOLE of last month, while the
+   * flow hero on the same screen compared like for like. On the 5th one said
+   * "+12% against this day last month" and the other "−82% vs last month",
+   * both on screen at once, and the second was wrong every day but the last.
+   *
+   * `comparedTo` travels with the number so no caller has to guess the basis.
+   */
+  const prevBasisMinor = monthIsCurrent
+    ? (await getDailyTotals({ userId, start: prev.start, end: prev.end }))
+        .filter((d) => Number(d.date.slice(8, 10)) <= elapsed)
+        .reduce((sum, d) => sum + d.totalMinor, 0)
+    : lastMonth.totalMinor;
+
   const changePct =
-    lastMonth.totalMinor > 0
-      ? ((thisMonth.totalMinor - lastMonth.totalMinor) / lastMonth.totalMinor) * 100
-      : null;
+    prevBasisMinor > 0 ? ((thisMonth.totalMinor - prevBasisMinor) / prevBasisMinor) * 100 : null;
 
   return {
     month,
@@ -438,7 +461,11 @@ export async function getSummary(userId: string, month: string) {
     weekMinor: weekTotal.totalMinor,
     avgDailyMinor,
     previousMonth: { month: shiftMonth(month, -1), totalMinor: lastMonth.totalMinor },
+    /** What `changePct` was measured against — the same days, or the full month. */
+    previousBasisMinor: prevBasisMinor,
+    comparedTo: monthIsCurrent ? ('same-days' as const) : ('full-month' as const),
     changePct,
+    isCurrentMonth: monthIsCurrent,
     topCategory: catStats[0] ?? null,
     topDay,
     daysWithSpending: daily.length,

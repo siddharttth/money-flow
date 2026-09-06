@@ -125,8 +125,8 @@ describe('cumulative curve', () => {
 });
 
 describe('weekday rhythm', () => {
-  it('averages over the days that actually saw spending, not over every calendar day', async () => {
-    // 2026-05-02 and 2026-05-09 are both Saturdays.
+  it('averages over the Saturdays that happened, not the ones you spent on', async () => {
+    // 2026-05-02 and 2026-05-09 are Saturdays; May 2026 has five of them.
     await add(300, 'Food', '2026-05-02');
     await add(100, 'Food', '2026-05-02');
     await add(400, 'Food', '2026-05-09');
@@ -136,11 +136,32 @@ describe('weekday rhythm', () => {
 
     expect(sat.totalMinor).toBe(80_000);
     expect(sat.count).toBe(3);
-    // Two Saturdays with spending → ₹400 a Saturday, not ₹800 / 5 Saturdays.
-    expect(sat.avgMinor).toBe(40_000);
+    expect(sat.occurredDays).toBe(5);
+    expect(sat.spentDays).toBe(2);
+
+    /*
+     * ₹800 over the five Saturdays in the month is ₹160.
+     *
+     * This used to divide by the two Saturdays that saw spending and report
+     * ₹400 — which answers "what does a Saturday cost when I spend on one",
+     * not "what does a Saturday cost", which is what the chart is captioned
+     * and what the insight beneath it compares against every other day.
+     */
+    expect(sat.avgMinor).toBe(16_000);
 
     expect(f.weekday).toHaveLength(7);
     expect(f.weekday.find((w) => w.label === 'Mon')!.totalMinor).toBe(0);
+  });
+
+  it('counts only the weekdays that have happened so far in a live month', async () => {
+    // 1 May 2026 is a Friday, so 7 May is the month's FIRST Thursday — one has
+    // occurred, not the four the month will eventually hold.
+    vi.useFakeTimers().setSystemTime(new Date('2026-05-07T10:00:00Z'));
+    await add(600, 'Food', '2026-05-07');
+
+    const thu = (await getFlow(userId, '2026-05')).weekday.find((w) => w.label === 'Thu')!;
+    expect(thu.occurredDays).toBe(1);
+    expect(thu.avgMinor).toBe(60_000);
   });
 });
 
@@ -219,6 +240,9 @@ describe('category momentum', () => {
   });
 
   it('keeps a category that stopped being used, so a drop to zero is visible', async () => {
+    // Three months of rent, then nothing — enough history to call it a drop.
+    await add(900, 'Rent', '2026-02-01');
+    await add(900, 'Rent', '2026-03-01');
     await add(900, 'Rent', '2026-04-01');
     await add(100, 'Food', '2026-05-01');
 
@@ -226,8 +250,41 @@ describe('category momentum', () => {
     const rent = f.momentum.find((m) => m.name === 'Rent')!;
 
     expect(rent.thisMinor).toBe(0);
-    expect(rent.baselineMinor).toBe(30_000);
-    expect(rent.deltaMinor).toBe(-30_000);
+    expect(rent.eligibleMonths).toBe(3);
+    expect(rent.baselineMinor).toBe(90_000);
+    expect(rent.deltaMinor).toBe(-90_000);
+    expect(rent.isNew).toBe(false);
+  });
+
+  /*
+   * The two biases momentum used to carry, each with its own test — they pull
+   * in opposite directions and one could easily mask the other.
+   */
+  it('holds a part-month against the same part of the usual month, not the whole of it', async () => {
+    // Day 10 of a 31-day May: the baseline must be pro-rated to 10/31.
+    vi.useFakeTimers().setSystemTime(new Date('2026-05-10T10:00:00Z'));
+    for (const m of ['02', '03', '04']) await add(3100, 'Food', `2026-${m}-15`);
+    await add(1000, 'Food', '2026-05-05');
+
+    const food = (await getFlow(userId, '2026-05')).momentum.find((m) => m.name === 'Food')!;
+
+    // ₹3,100 a month × 10/31 = ₹1,000 — exactly what was spent, so: no change.
+    expect(food.baselineMinor).toBe(100_000);
+    expect(food.deltaMinor).toBe(0);
+  });
+
+  it('does not judge a category younger than the window it would be judged against', async () => {
+    // Born in April. Two of the three baseline months predate it entirely, and
+    // dividing its one real month by three used to read as "heating up".
+    await add(900, 'Rent', '2026-04-01');
+    await add(900, 'Rent', '2026-05-01');
+
+    const rent = (await getFlow(userId, '2026-05')).momentum.find((m) => m.name === 'Rent')!;
+
+    expect(rent.eligibleMonths).toBe(1);
+    expect(rent.isNew).toBe(true);
+    expect(rent.deltaMinor).toBe(0);
+    expect(rent.deltaPct).toBeNull();
   });
 });
 

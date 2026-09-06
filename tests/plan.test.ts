@@ -4,7 +4,7 @@ import { makeTestDb } from './helpers/db';
 const testDb = await makeTestDb();
 vi.mock('@/db', () => ({ db: testDb }));
 
-const { users, categories, people, expenses, expensePeople } = await import('@/db/schema');
+const { users, categories, people, expenses, expensePeople, ledgerEntries } = await import('@/db/schema');
 const { createExpense } = await import('@/lib/expenses');
 const { getTotal } = await import('@/lib/analytics');
 const { getRecurringCharges, splitCommitted } = await import('@/lib/recurring');
@@ -25,6 +25,7 @@ async function makeCategory(name: string, kind = 'expense', extra: Record<string
 }
 
 async function seed() {
+  await testDb.delete(ledgerEntries);
   await testDb.delete(expensePeople);
   await testDb.delete(expenses);
   await testDb.delete(people);
@@ -686,5 +687,76 @@ describe('lifetime in hand', () => {
     await add(500, 'Outside Food', '2026-08-05');
     const life = await getLifetimeTally(userId);
     expect(life.known).toBe(false);
+  });
+});
+
+describe('lifetime in hand counts the ledger', () => {
+  it('subtracts money lent out — it has left the account', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    await add(10000, 'Outside Food', '2026-08-10');
+
+    const before = await getLifetimeTally(userId);
+    expect(before.inHandMinor).toBe(4_000_000);
+
+    const [friend] = await testDb.insert(people).values({ userId, name: 'Sankalp', sortOrder: 0 }).returning();
+    await testDb.insert(ledgerEntries).values({
+      userId,
+      personId: friend.id,
+      direction: 'out',
+      amountMinor: 1_235_000,
+      entryDate: '2026-08-12',
+    });
+
+    const after = await getLifetimeTally(userId);
+    expect(after.lentMinor).toBe(1_235_000);
+    // The card says "this is cash, not net worth". ₹12,350 handed over is not cash.
+    expect(after.inHandMinor).toBe(4_000_000 - 1_235_000);
+  });
+
+  it('adds money borrowed — it is in the account, and owed back', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    await add(50000, 'Salary', '2026-08-01');
+    const [friend] = await testDb.insert(people).values({ userId, name: 'Aarav', sortOrder: 0 }).returning();
+    await testDb.insert(ledgerEntries).values({
+      userId,
+      personId: friend.id,
+      direction: 'in',
+      amountMinor: 500_000,
+      entryDate: '2026-08-12',
+    });
+
+    const life = await getLifetimeTally(userId);
+    expect(life.borrowedMinor).toBe(500_000);
+    expect(life.inHandMinor).toBe(5_500_000);
+  });
+});
+
+describe('the sweep puts two months on the same footing', () => {
+  /** Same daily rate in a 28-day and a 31-day month is not an underspend. */
+  it('reports nothing when the daily rate did not move', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-04-05T10:00:00Z'));
+    // ₹100 a day through February (28 days) and March (31 days).
+    for (let d = 1; d <= 28; d++) await add(100, 'Outside Food', `2026-02-${String(d).padStart(2, '0')}`);
+    for (let d = 1; d <= 31; d++) await add(100, 'Outside Food', `2026-03-${String(d).padStart(2, '0')}`);
+
+    const sweep = await getSweep(userId, '2026-04');
+    expect(sweep.month).toBe('2026-03');
+    // Raw arithmetic says March spent ₹300 MORE, which is true and irrelevant.
+    expect(sweep.rawDeltaMinor).toBe(-30_000);
+    expect(sweep.savedMinor).toBe(0);
+    expect(sweep.normalised).toBe(true);
+  });
+
+  it('still reports a real underspend, and offers the cash that exists', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-04-05T10:00:00Z'));
+    for (let d = 1; d <= 28; d++) await add(200, 'Outside Food', `2026-02-${String(d).padStart(2, '0')}`);
+    for (let d = 1; d <= 31; d++) await add(100, 'Outside Food', `2026-03-${String(d).padStart(2, '0')}`);
+
+    const sweep = await getSweep(userId, '2026-04');
+    // ₹5,600 vs ₹3,100 — genuinely half the daily rate.
+    expect(sweep.savedMinor).toBeGreaterThan(0);
+    // Never offers more than the cash difference actually is.
+    expect(sweep.savedMinor).toBeLessThanOrEqual(sweep.rawDeltaMinor);
   });
 });

@@ -330,7 +330,8 @@ type CategoryInsight = {
   lifetimeMinor: number;
   avgTransactionMinor: number;
   pacedBudgetMinor: number | null;
-  projectedMinor: number;
+  projectedMinor: number | null;
+  projectionBasis: 'rate' | 'too-lumpy' | 'past-month';
   transactions: Transaction[];
 };
 
@@ -368,7 +369,11 @@ function CategoryInspector({ id, onClose }: { id: string; onClose: () => void })
             <Kpi label="This month">{formatINR(data.monthMinor)}</Kpi>
             <Kpi label="Avg transaction">{formatINR(data.avgTransactionMinor)}</Kpi>
             <Kpi label="Transactions">{String(data.monthCount)}</Kpi>
-            <Kpi label="Projected">{formatINR(data.projectedMinor)}</Kpi>
+            {/* Null for a past month, and for a category too lumpy to have a
+                rate — a projection built from one rent charge is fiction. */}
+            <Kpi label={data.projectedMinor == null ? 'Lifetime' : 'Projected'}>
+              {data.projectedMinor == null ? formatINR(data.lifetimeMinor) : formatINR(data.projectedMinor)}
+            </Kpi>
           </div>
 
           {budget ? (

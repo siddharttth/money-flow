@@ -492,3 +492,51 @@ describe('validation at the service layer', () => {
     await expect(deleteExpense(other.id, e.id)).rejects.toThrow(/not found/);
   });
 });
+
+describe('a partial month is only ever compared to the same partial month', () => {
+  const add = (amount: number, category: string, date: string) =>
+    createExpense(userId, { amount, categoryId: cat[category], expenseDate: date, note: null, personIds: [] });
+
+  it('measures change against the same days of last month, not the whole of it', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-05T10:00:00Z'));
+    // Last month: ₹1,000 in the first five days, ₹9,000 after.
+    await add(1000, 'Outside Food', '2026-07-03');
+    await add(9000, 'Outside Food', '2026-07-20');
+    // This month, to the 5th: ₹1,200.
+    await add(1200, 'Outside Food', '2026-08-04');
+
+    const s = await getSummary(userId, '2026-08');
+
+    expect(s.comparedTo).toBe('same-days');
+    expect(s.previousBasisMinor).toBe(100_000);
+    // +20% against the same five days — NOT −88% against the whole of July.
+    expect(Math.round(s.changePct!)).toBe(20);
+  });
+
+  it('uses the full month once the month is over', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-15T10:00:00Z'));
+    await add(1000, 'Outside Food', '2026-07-03');
+    await add(9000, 'Outside Food', '2026-07-20');
+    await add(5000, 'Outside Food', '2026-08-04');
+
+    const s = await getSummary(userId, '2026-08');
+    expect(s.comparedTo).toBe('full-month');
+    expect(s.previousBasisMinor).toBe(1_000_000);
+    expect(Math.round(s.changePct!)).toBe(-50);
+  });
+
+  it('does not report today or this week on a month that is not the current one', async () => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-09-05T10:00:00Z'));
+    await add(71, 'Outside Food', '2026-09-05');
+    await add(5000, 'Outside Food', '2026-08-04');
+
+    // Browsing August must not print September's "today" under an August heading.
+    const aug = await getSummary(userId, '2026-08');
+    expect(aug.isCurrentMonth).toBe(false);
+    expect(aug.todayMinor).toBe(0);
+    expect(aug.weekMinor).toBe(0);
+
+    const sep = await getSummary(userId, '2026-09');
+    expect(sep.todayMinor).toBe(7_100);
+  });
+});

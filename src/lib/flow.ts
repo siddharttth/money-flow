@@ -28,7 +28,10 @@ import { daysBetween, monthRange, shiftMonth, todayISO } from './dates';
  */
 
 /** Anything at or below this is a "small ticket" — the thousand-cuts bucket. */
-export const SMALL_TICKET_MINOR = 20_000; // ₹200
+export const SMALL_TICKET_MINOR = 20_000; // ₹200, the cold-start fallback
+
+/** Months a category must have existed for before momentum will judge it. */
+const MOMENTUM_MIN_MONTHS = 2;
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -47,11 +50,17 @@ export type FlowMomentum = {
   icon: string;
   color: string;
   thisMinor: number;
-  /** Mean of the three months before this one. */
+  /**
+   * What this category usually costs by this point in a month — the mean of
+   * the months it actually existed for, pro-rated to the elapsed fraction of
+   * the current month so a part-month is never held against a full one.
+   */
   baselineMinor: number;
+  /** How many of the three prior months the category was alive for. */
+  eligibleMonths: number;
   deltaMinor: number;
   deltaPct: number | null;
-  /** True when the category has no history to compare against. */
+  /** True when there is not enough history to judge it. No delta is offered. */
   isNew: boolean;
 };
 
@@ -74,7 +83,17 @@ export type Flow = {
 
   cumulative: FlowCumulativePoint[];
 
-  weekday: { dow: number; label: string; totalMinor: number; count: number; avgMinor: number }[];
+  weekday: {
+    dow: number;
+    label: string;
+    totalMinor: number;
+    count: number;
+    /** How many of that weekday have occurred in the window. The denominator. */
+    occurredDays: number;
+    /** How many of them saw any spending. Context, not the denominator. */
+    spentDays: number;
+    avgMinor: number;
+  }[];
 
   tickets: {
     count: number;
@@ -133,12 +152,14 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
   // A past month is fully elapsed; the current one only as far as today.
   const elapsedDays = isCurrentMonth ? Math.min(daysBetween(start, today), monthDays) : monthDays;
 
+  const smallThresholdMinor = await smallTicketThreshold(userId, end);
+
   const [thisDaily, prevDaily, weekdayRows, ticketRow, largestRow, catRows, baselineRows, ledgerRow, repeatRows] =
     await Promise.all([
       dailyTotals(userId, start, end),
       dailyTotals(userId, prev.start, prev.end),
       weekdayTotals(userId, start, end),
-      ticketStats(userId, start, end),
+      ticketStats(userId, start, end, smallThresholdMinor),
       largestExpense(userId, start, end),
       categoryTotals(userId, start, end),
       // Three months of history, ending the month before this one.
@@ -146,6 +167,8 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
       ledgerFlow(userId, start, end),
       repeatedNotes(userId, start, end),
     ]);
+
+  const existsFrom = await categoryExistsFrom(userId);
 
   const byDayThis = new Map(thisDaily.map((d) => [Number(d.date.slice(8, 10)), d.totalMinor]));
   const byDayPrev = new Map(prevDaily.map((d) => [Number(d.date.slice(8, 10)), d.totalMinor]));
@@ -156,10 +179,14 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
    * 31st would read as "I stopped spending", not "it hasn't happened yet".
    */
   const lastDay = isCurrentMonth ? elapsedDays : monthDays;
+  /** How many Mondays, Tuesdays… have actually happened in the window so far. */
+  const weekdayOccurrences = new Map<number, number>();
   const cumulative: FlowCumulativePoint[] = [];
   let runThis = 0;
   let runPrev = 0;
   for (let day = 1; day <= lastDay; day++) {
+    const dow = new Date(`${start.slice(0, 8)}${String(day).padStart(2, '0')}T00:00:00Z`).getUTCDay();
+    weekdayOccurrences.set(dow, (weekdayOccurrences.get(dow) ?? 0) + 1);
     runThis += byDayThis.get(day) ?? 0;
     runPrev += byDayPrev.get(day) ?? 0;
     cumulative.push({
@@ -185,14 +212,41 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
   const seenCategories = new Set([...catRows.map((c) => c.categoryId), ...baselineRows.map((c) => c.categoryId)]);
   const metaById = new Map([...baselineRows, ...catRows].map((c) => [c.categoryId, c]));
 
+  /*
+   * MOMENTUM, WITH TWO BIASES REMOVED
+   * ---------------------------------
+   * The baseline is the trailing three months, averaged, and it used to be
+   * divided by a flat 3 and compared against a running month-to-date figure.
+   * Both halves of that were wrong, in the same direction on different cards:
+   *
+   *   1. A part-month against full months. On the 5th of a 30-day month, every
+   *      category read as 83% "cooling down" — an artefact of the calendar,
+   *      drawn as a red bar. The baseline is now pro-rated to the same fraction
+   *      of a month that has actually elapsed.
+   *
+   *   2. Three months for a category that has not existed for three months. A
+   *      five-week-old category had its one real month divided by three, so it
+   *      read as "heating up" every month until its third birthday. `isNew`
+   *      never caught it, because that only fires on a baseline of exactly
+   *      zero. The divisor is now the months the category was actually alive.
+   *
+   * Below MOMENTUM_MIN_MONTHS of history there is no honest comparison to make,
+   * so it reports `new` rather than a delta computed from one observation.
+   */
+  const baselineMonths = [1, 2, 3].map((back) => shiftMonth(month, -back));
+  const elapsedFraction = isCurrentMonth && monthDays > 0 ? elapsedDays / monthDays : 1;
+
   const momentum: FlowMomentum[] = [...seenCategories]
     .map((id) => {
       const meta = metaById.get(id)!;
       const thisMinor = catRows.find((c) => c.categoryId === id)?.totalMinor ?? 0;
-      // Trailing three months, averaged. Months with no spend still count as
-      // zero — a category used once in three months has a low baseline, and
-      // that is the truth, not a missing value.
-      const baselineMinor = Math.round((baselineById.get(id) ?? 0) / 3);
+
+      const bornIn = existsFrom.get(id) ?? baselineMonths[baselineMonths.length - 1];
+      const eligibleMonths = baselineMonths.filter((m) => m >= bornIn).length;
+      const fullMonthBaseline = eligibleMonths > 0 ? (baselineById.get(id) ?? 0) / eligibleMonths : 0;
+      const baselineMinor = Math.round(fullMonthBaseline * elapsedFraction);
+
+      const tooNew = eligibleMonths < MOMENTUM_MIN_MONTHS;
       return {
         categoryId: id,
         name: meta.name,
@@ -200,9 +254,10 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
         color: meta.color,
         thisMinor,
         baselineMinor,
-        deltaMinor: thisMinor - baselineMinor,
-        deltaPct: baselineMinor > 0 ? ((thisMinor - baselineMinor) / baselineMinor) * 100 : null,
-        isNew: baselineMinor === 0 && thisMinor > 0,
+        eligibleMonths,
+        deltaMinor: tooNew ? 0 : thisMinor - baselineMinor,
+        deltaPct: tooNew || baselineMinor <= 0 ? null : ((thisMinor - baselineMinor) / baselineMinor) * 100,
+        isNew: tooNew || (baselineMinor === 0 && thisMinor > 0),
       };
     })
     .filter((m) => m.thisMinor > 0 || m.baselineMinor > 0)
@@ -229,14 +284,27 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
       deltaPct: prevSameDayMinor > 0 ? ((spentMinor - prevSameDayMinor) / prevSameDayMinor) * 100 : null,
     },
     cumulative,
+    /*
+     * `avgMinor` divides by the number of that weekday that has OCCURRED, not
+     * by the number that saw spending.
+     *
+     * Dividing by days-with-spending answers "what does a Thursday cost, on the
+     * Thursdays I spend" — but the chart is captioned "what a weekday costs",
+     * and the insight built on it compares one weekday against the others. With
+     * bursty spending the old denominator inflated exactly the weekday you use
+     * least, which is the opposite of the truth it was claiming to tell.
+     */
     weekday: WEEKDAY_LABELS.map((label, dow) => {
       const row = weekdayRows.find((w) => w.dow === dow);
+      const occurred = weekdayOccurrences.get(dow) ?? 0;
       return {
         dow,
         label,
         totalMinor: row?.totalMinor ?? 0,
         count: row?.count ?? 0,
-        avgMinor: row && row.days > 0 ? Math.round(row.totalMinor / row.days) : 0,
+        occurredDays: occurred,
+        spentDays: row?.days ?? 0,
+        avgMinor: occurred > 0 ? Math.round((row?.totalMinor ?? 0) / occurred) : 0,
       };
     }),
     tickets: {
@@ -244,7 +312,7 @@ export async function getFlow(userId: string, month: string): Promise<Flow> {
       medianMinor: ticketRow.medianMinor,
       averageMinor: ticketRow.count > 0 ? Math.round(spentMinor / ticketRow.count) : 0,
       largest: largestRow,
-      smallThresholdMinor: SMALL_TICKET_MINOR,
+      smallThresholdMinor,
       smallCount: ticketRow.smallCount,
       smallTotalMinor: ticketRow.smallTotalMinor,
     },
@@ -341,13 +409,38 @@ async function weekdayTotals(userId: string, start: string, end: string) {
   }));
 }
 
-async function ticketStats(userId: string, start: string, end: string) {
+/**
+ * What counts as a small purchase, for this person.
+ *
+ * A flat ₹200 is pocket change for one household and the median transaction
+ * for another, so the threshold is the 25th percentile of the trailing three
+ * months rather than a constant. Below MIN_HISTORY entries there is not enough
+ * to take a percentile from and the constant stands in.
+ */
+const SMALL_TICKET_MIN_HISTORY = 20;
+
+async function smallTicketThreshold(userId: string, end: string): Promise<number> {
+  const from = monthRange(shiftMonth(end.slice(0, 7), -2)).start;
+  const [row] = await db
+    .select({
+      n: sql<string>`COUNT(*)`,
+      p25: sql<string | null>`PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY ${expenses.amountMinor})`,
+    })
+    .from(expenses)
+    .where(inWindow(userId, from, end));
+
+  if (Number(row?.n ?? 0) < SMALL_TICKET_MIN_HISTORY || row?.p25 == null) return SMALL_TICKET_MINOR;
+  // Rounded to the nearest ₹10 so the label reads as a threshold, not a sample.
+  return Math.max(1000, Math.round(Number(row.p25) / 1000) * 1000);
+}
+
+async function ticketStats(userId: string, start: string, end: string, threshold: number) {
   const [row] = await db
     .select({
       count: sql<string>`COUNT(*)`,
       median: sql<string | null>`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${expenses.amountMinor})`,
-      smallCount: sql<string>`COUNT(*) FILTER (WHERE ${expenses.amountMinor} <= ${SMALL_TICKET_MINOR})`,
-      smallTotal: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${expenses.amountMinor} <= ${SMALL_TICKET_MINOR}), 0)`,
+      smallCount: sql<string>`COUNT(*) FILTER (WHERE ${expenses.amountMinor} <= ${threshold})`,
+      smallTotal: sql<string>`COALESCE(SUM(${expenses.amountMinor}) FILTER (WHERE ${expenses.amountMinor} <= ${threshold}), 0)`,
     })
     .from(expenses)
     .where(inWindow(userId, start, end));
@@ -375,6 +468,38 @@ async function largestExpense(userId: string, start: string, end: string) {
     .limit(1);
 
   return row ?? null;
+}
+
+/**
+ * The month each category can first be said to have existed.
+ *
+ * `created_at` alone is not enough: importing two years of history creates the
+ * categories today, so every one of them would look younger than the data
+ * inside it and momentum would refuse to judge any of them. The earlier of the
+ * two signals is the honest one.
+ */
+async function categoryExistsFrom(userId: string): Promise<Map<string, string>> {
+  const rows = await db
+    .select({
+      categoryId: categories.id,
+      createdAt: categories.createdAt,
+      firstTx: sql<string | null>`MIN(${expenses.expenseDate})`,
+    })
+    .from(categories)
+    .leftJoin(
+      expenses,
+      sql`${expenses.categoryId} = ${categories.id} AND ${expenses.deletedAt} IS NULL`,
+    )
+    .where(eq(categories.userId, userId))
+    .groupBy(categories.id, categories.createdAt);
+
+  return new Map(
+    rows.map((r) => {
+      const created = r.createdAt.toISOString().slice(0, 7);
+      const first = r.firstTx?.slice(0, 7);
+      return [r.categoryId, first && first < created ? first : created];
+    }),
+  );
 }
 
 async function categoryTotals(userId: string, start: string, end: string) {
