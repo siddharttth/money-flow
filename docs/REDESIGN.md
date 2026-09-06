@@ -1,6 +1,6 @@
 # Money Flow — architecture and experience review
 
-A end-to-end review of the app as it stands, and a proposal for what it should
+An end-to-end review of the app as it stands, and a proposal for what it should
 become. Written against `docs/SCREENS.md` and verified against the source, not
 taken on trust — several figures the app prints today are wrong, and two of
 them contradict each other on the same screen.
@@ -8,6 +8,13 @@ them contradict each other on the same screen.
 Nothing here removes a feature. Nothing here changes the palette, the type, or
 the Paper/Ink identity. This is the same product, better organised and
 honestly calculated.
+
+**Second pass.** This version merges a second redesign spec written against the
+same source document. Where that spec found something I missed, it is folded in
+and credited in place (1.3.8–1.3.10 are all its finds, and the mobile
+navigation in 2.2 is its solution, which is better than mine was). Where the
+two specs disagree, I have not quietly picked one — **Part 8** lays out each
+disagreement and argues the call, so you can overrule it.
 
 ---
 
@@ -162,14 +169,58 @@ rates. A ₹5,000 month at 90% counts exactly as much as a ₹50,000 month at 20
 **Fix:** pool it — `Σsaved ÷ Σincome` — and label it "across N months with
 income logged". Keep the per-month rates as they are; only the footer is wrong.
 
-### 1.3.8 Definitions that are defensible but unlabelled
+### 1.3.8 The sweep compares months of different length — **bug**
+
+`getSweep` subtracts one month's raw total from another's. February has 28
+days and March has 31, so a March that was genuinely 10% lighter per day can
+report a *smaller* underspend than a flat February — purely arithmetic on the
+calendar, presented as a behaviour change.
+
+**Fix:** normalise the comparison by day count —
+`(prevTotal / prevDays) − (thisTotal / thisDays)` scaled back up — for the
+*framing*. Keep the raw rupee figure as the amount offered to sweep, because
+that is the cash that actually exists. Only the "you underspent" claim needs
+the correction, not the transfer.
+
+### 1.3.9 Momentum penalises categories younger than its own window — **bug**
+
+Separate from 1.3.2, and both are live.
+
+`baselineMinor = trailing3MonthTotal / 3`. A category created five weeks ago
+has at most two months inside that window, so its baseline is divided by three
+regardless — roughly a third of its true typical spend. The card then reports
+it as heating up, every month, until the category is three months old.
+
+The `isNew` flag does not catch this: it only fires when the baseline is
+exactly zero, and a five-week-old category has a non-zero one.
+
+**Fix:** divide by the number of months the category actually existed and was
+active inside the window. `categories.created_at` is already on the table
+(`src/db/schema.ts`), so this needs no migration. Below two eligible months,
+fall back to the `new` label the card already has rather than computing a delta
+from thin evidence.
+
+### 1.3.10 Category projection extrapolates lumpy categories — **bug**
+
+`src/app/api/insights/category/[id]/route.ts` projects a category's month-end
+as `(monthTotal / daysElapsed) × daysInMonth`, flat, with no gate.
+
+For rent — one ₹18,000 charge on the 1st — that reads ₹5,58,000 on day 1,
+₹2,79,000 on day 2, and keeps falling all month. It is never once right.
+
+**Fix:** apply the honesty gate the app already uses for goal pace. Below four
+transactions in the trailing three months, show no projection and say why.
+Above it, weight by that category's own day-of-month distribution rather than
+assuming an even burn.
+
+### 1.3.11 Definitions that are defensible but unlabelled
 
 Not bugs, but each will be read wrongly at least once:
 
 | Figure | What it actually is | What to do |
 | --- | --- | --- |
 | Investments **"Monthly average"** | Lifetime ÷ *months that had a contribution*. Skipping three months does not lower it. | Label it "per active month", or show both. |
-| **"Under ₹200"** small-ticket total | A hardcoded constant (`SMALL_TICKET_MINOR`), not derived from your data. | Derive it — the 25th percentile of your entries — or say "under ₹200" plainly, which it already does. Prefer deriving. |
+| **"Under ₹200"** small-ticket total | A hardcoded constant (`SMALL_TICKET_MINOR`), not derived from your data. ₹200 is pocket change for one household and the median transaction for another. | Derive it per user — the 25th percentile of the trailing three months — with the constant as the cold-start fallback, and allow an override in Settings. |
 | **First half / second half** | Splits at `ceil(monthDays/2)` regardless of today. On the 8th, the second half is always ₹0. | Hide in the current month until the midpoint passes. |
 | **Projected month end** | Straight-line extrapolation of the daily rate. | Fine, but it ignores that rent lands on the 1st. Once recurring detection is trustworthy, project `spent + remaining recurring + (discretionary rate × days left)`. |
 | Person **"share"** | Correct and well documented — shares partition the month. | Nothing. This one is genuinely right, and it is the best idea in the app. |
@@ -242,19 +293,39 @@ it belongs on the more specific one, with a link from the other.
 The group labels do real work: they tell a new user that the app has an *in*
 side and an *out* side, which is the one thing the current flat list hides.
 
-**Mobile — five tabs, and a deliberate cut:**
+**Mobile — five tabs:**
 
 ```
-  Home   Ledger   Month   Goals   People
+  Home   Ledger   Goals   Insights ▾   People
 ```
 
-Eight destinations do not fit in five slots, so: **Income and Lifetime are
-full pages, reachable from Home, not bottom-bar tabs.** That is the right cut
-because both are *monthly-or-rarer* visits, and both already have a prominent
-card on Home that links to them. Settings stays in the header where it is.
+Eight destinations, five slots. My first cut dropped Lifetime out of the bar
+entirely; **the second spec's solution is better and is the one adopted here**
+— *Insights* is one tab holding both analytics pages, with a segmented control
+at the top switching Month / Lifetime.
 
-If you would rather have Income in the bar, the honest trade is People out of
-it — People is reachable from every person tag in the app, so it loses least.
+That works because it introduces no new navigation idea. The app already
+teaches segmented switching on the dashboard's Category/Person toggle and on
+the add sheet's four kinds. Two routes, one tab, a control the user has already
+learned.
+
+**Income** stays out of the bar and lives in the mobile header beside Settings
+— it is a monthly-or-rarer visit, and Home carries a card that links to it.
+
+**Routes** keep the analytics namespace, which makes the pairing legible in the
+URL and in the file tree:
+
+| Page | Route |
+| --- | --- |
+| Dashboard | `/dashboard` |
+| Income | `/income` |
+| Ledger | `/expenses` *(kept — renaming a working route buys nothing)* |
+| Goals & Investments | `/goals` |
+| Monthly analytics | `/analytics/month` |
+| Lifetime analytics | `/analytics/lifetime` |
+| People | `/people` |
+| Settings | `/settings` |
+| Import | `/settings/import` *(sub-flow, not nav)* |
 
 **Rules for the shell:**
 - **Home has no month picker.** Home is now. This is what kills 1.3.4.
@@ -328,6 +399,11 @@ A compact strip, then the flow curve:
 plus the cumulative curve against last month's dashed line.
 **Open This month →**
 
+**Added — "vs a typical week".** A chip beside *This week* reading
+`18% above your typical week`, computed as `thisWeek ÷ median(last 8 weeks)`.
+It turns a raw number into a judgement without a trip to Analytics, which is
+exactly what a glance screen is for. *(From the second spec.)*
+
 ### 4. Goals
 Top three by urgency (behind pace first, then nearest deadline), one row each.
 **All goals →**
@@ -377,16 +453,17 @@ Analytics being an undifferentiated scroll.
 
 | Section | Content | Change from today |
 | --- | --- | --- |
-| **Pace** | Spent hero, corrected delta, projection, flow curve, first/second half | Delta unified (1.3.1); halves hidden pre-midpoint (1.3.8) |
+| **Pace** | Spent hero, corrected delta, projection, flow curve, first/second half | Delta unified (1.3.1); halves hidden pre-midpoint (1.3.11) |
 | **Budgets** | Per-category budget bars with pace markers, and the roll-up | **Moved here from Settings.** This is the actionable part of a month. |
 | **Where it went** | Donut, full breakdown, person filter chips, concentration insight, drill-down | Unchanged |
 | **Who it was with** | Person shares, "nobody tagged", the partition note | Unchanged |
 | **Rhythm** | Weekday costs, day-by-day bars, spend/quiet days | Weekday denominator fixed (1.3.3) |
 | **Momentum** | Heating up / cooling down | Baseline pro-rated (1.3.2) |
-| **Tickets** | Typical, largest, small-ticket share, repeats | Threshold derived (1.3.8) |
+| **Tickets** | Typical, largest, small-ticket share, repeats | Threshold derived (1.3.11) |
 | **Signals** | The six derived one-liners | **Moved here from Dashboard** |
 | **Not spending** | Investing separately, Lending separately | Unchanged |
 | **Close the month** — *new* | Appears from the 1st–5th for the month just ended: what you kept, best and worst category, the sweep offer, and a one-tap "looks right" | New |
+| **This month's one thing** — *new* | A single auto-picked headline directly under the hero: the biggest mover, `argmax(|categoryDelta|)` across categories with 2+ eligible comparison months. Leads with a conclusion instead of asking the reader to find it. *(From the second spec.)* | New |
 
 **Month close** deserves its own note. A monthly review is the single habit
 that makes budgeting work, and no app prompts it. Five days, one card, three
@@ -433,13 +510,32 @@ Which categories are growing and shrinking over 6–12 months, as small
 sparklines. Momentum answers "this month"; this answers "this year", and they
 are different questions.
 
-### 7. Milestones — *new*
+### 7. Category totals, all time — *new*
+Every category ranked by lifetime spend. Sits beside the trends above: one
+answers "what is growing", this one answers "what has this cost me, ever".
+*(From the second spec.)*
+
+### 8. Milestones — *new*
 Best saving month · longest streak of positive months · first entry ·
 total transactions · biggest single month. Cheap to compute, and the only
 place the app ever congratulates anyone.
 
-### 8. People, lifetime
-Lifetime share per person. Currently only available a month at a time.
+### 9. People, lifetime
+Lifetime share per person, plus the all-time ledger picture the app has never
+shown anywhere: total ever lent, total ever received back, and the net across
+everyone. Today the ledger is only ever visible as a *current* balance.
+*(From the second spec.)*
+
+### 10. Year over year — *new, gated at 12 months*
+Spend, income and saved per calendar year, side by side. Withheld below twelve
+months of history rather than drawn from a fragment — the same gate the app
+applies to goal pace. The one horizon nothing currently shows.
+*(From the second spec.)*
+
+**A caching note.** Nothing on this page is month-filtered, so unlike Monthly
+it has no skeleton-racing-a-filter problem: the whole page can be fetched once
+and cached hard, and after the first visit should skip the loading state
+entirely.
 
 ## 3.5 Goals — `/goals`
 
@@ -469,9 +565,16 @@ The whole existing Investments content, below the goals it explains: month
 total, contributions-by-month bars, lifetime, where-it-is-going, every
 contribution, and the "what you put in, not what it is worth" footnote.
 
+**Added — the category behind it.** Every goal is an investment category with
+a target; the app knows this and never says so. Each card gains a quiet
+`via <category>` tag, which makes the link legible without opening the category
+sheet — and explains why a contribution logged against that category moves the
+goal. *(From the second spec.)*
+
 ### 4. Completed goals
-Archived, collapsed, with the date each was hit. Currently a finished goal
-just sits in the list marked *done*.
+Archived, collapsed, with the date each was hit and **how long it took**
+(`completedDate − firstContribution`). Currently a finished goal just sits in
+the live list marked *done*, which is both clutter and a missed moment.
 
 ## 3.6 Income — `/income`
 
@@ -496,9 +599,31 @@ English read — *"Your income varies by about ₹18,000 month to month. Budget
 against ₹42,000 — your median — rather than your best month."* This is
 genuinely useful advice and the app has the data for it already.
 
-### 5. Expected next — *new*
+### 5. When it lands — *new*
+A compact month strip marking the days income actually arrived. For salaried
+income it is a single confident dot; for freelance it shows the real shape,
+which an average actively hides. *(From the second spec.)*
+
+### 6. Reliability, per source — *new*
+Shown only at 4+ months of history, and only one of two sentences:
+
+- Low variance in day-of-month → *"Salary has landed within 2 days of the 1st
+  for the last five months."*
+- High variance → *"Freelance varies month to month — plan against the median,
+  ₹42,000, not the last figure."*
+
+The second sentence is the most useful thing this app could say to anyone with
+irregular income, and every input for it already exists. *(From the second
+spec, merged with my stability block.)*
+
+### 7. Expected next — *new*
 Per source, the next expected date, learned from the last few payments. Feeds
 the Home attention rule for unlogged pay.
+
+### 8. Where this goes
+One line: *"This is what feeds 'Left in hand' on your Dashboard"* — because the
+relationship between logging pay here and a number moving there is currently
+invisible.
 
 ## 3.7 People — `/people`
 
@@ -508,6 +633,12 @@ the Home attention rule for unlogged pay.
 shares and balances, settle, the person inspector, clear-history, the footnote.
 
 **Added:**
+- **An inline "your share" tag** on every per-person spend figure. The
+  shares-not-copies rule is the best idea in the app and it is explained in a
+  footnote people skim. The moment it needs explaining is when someone taps a
+  person and the figure looks *too low* next to their memory of a big group
+  dinner — so the explainer belongs on the figure, as a tappable ⓘ, not at the
+  bottom of the page. *(From the second spec.)*
 - **Ageing.** "Owed since 3 August · 34 days" on each balance, and an amber
   tint past 30 days. A balance with no age is a balance nobody chases.
 - **Per-person timeline** in the inspector: expenses and ledger entries on one
@@ -560,6 +691,31 @@ rather than removing the feedback.
 - **Deltas** slide in from the direction of travel.
 - **Bars and donuts** draw from zero on mount over 400ms, staggered 30ms.
   Never on a data refresh — only when the section first appears.
+- **Sparklines** draw along their own path over 800ms, and **only on
+  scroll-into-view, never on page load** — the Income page renders one per
+  source, and animating eight at once on first paint is a jank generator rather
+  than a flourish. *(From the second spec.)*
+- **Progress bars** (goals, budgets) use a spring with a ≤3% overshoot. The
+  overshoot is the point: it reads as effort, which is the correct feeling for
+  a goal moving forward.
+
+**The whole vocabulary, in one table** — so motion never means two things:
+
+| Motion | Duration / easing | Used for |
+| --- | --- | --- |
+| Count-up | 450–700ms ease-out, digits only | Any headline figure on mount or real change |
+| Bar grow | 400ms ease-out, 30ms stagger | Bar charts, share bars, day bars — first render only |
+| Progress fill | 600ms spring, ≤3% overshoot | Goal and budget bars |
+| Sparkline draw | 800ms path-length, on scroll into view | Inline trends |
+| Cross-fade + 8px slide | 200ms | Month switches over existing data |
+| Drawer slide | 280ms ease-out — right on desktop, bottom on mobile | Every inspector and sheet |
+| Row expand | 220ms height | Cluster popups, drill-down rows |
+| Skeleton shimmer | 1.2s loop | Cold load only |
+| Toast | 250ms in · 4.5s hold · 200ms out | All confirmations |
+
+The rule of thumb: **numbers count up, bars grow, drawers slide, and nothing
+spins except a genuine network wait.** A motion that does not map to a row
+above does not ship — that is what keeps "premium" from becoming "busy".
 
 ## 4.3 Month switching
 
@@ -632,6 +788,13 @@ app rather than a generic fintech checkbox.
 | 11 | **Saved views** (3.2) | Repeated filter combinations, retyped every time. | S |
 | 12 | **Category trends** (3.4) | Momentum is monthly; drift is yearly. | M |
 | 13 | **Milestones** (3.4) | The app never once acknowledges progress. | S |
+| 14 | **"This month's one thing"** (3.3) | A page of data with no conclusion at the top. | S |
+| 15 | **Income calendar + reliability note** (3.6) | An average actively hides the shape of irregular income. | S |
+| 16 | **Inline "your share" tag** (3.7) | The best idea in the app is explained in a footnote. | XS |
+| 17 | **`via <category>` on goal cards** (3.5) | The goal↔category link exists in the data and nowhere in the UI. | XS |
+| 18 | **Year over year** (3.4) | The one horizon nothing shows. Gate at 12 months. | S |
+| 19 | **All-time category totals** (3.4) | "What has this cost me, ever" is unanswerable. | S |
+| 20 | **Lifetime with people** (3.4) | The ledger only ever appears as a current balance. | S |
 
 **Deliberately not proposing:** bank sync, SMS/UPI parsing (you have ruled this
 out and you are right — the manual log is the product's discipline), receipt
@@ -721,6 +884,12 @@ Every fix in 1.3 should land with a test that would have caught it:
   for the same filter with `limit=1000`. (1.3.5)
 - Lifetime in hand changes when a ledger entry is added. (1.3.6)
 - Pooled savings rate over `{₹5k @ 90%, ₹50k @ 20%}` is 26%, not 55%. (1.3.7)
+- The sweep between a 28-day month and a 31-day month at an identical daily
+  rate reports no underspend. (1.3.8)
+- A category created inside the baseline window is measured against the months
+  it existed for, not three. (1.3.9)
+- A category with one transaction in three months returns a null projection.
+  (1.3.10)
 
 ---
 
@@ -762,13 +931,122 @@ checks a number and finds it right.
 
 ---
 
+# Part 8 — Where the two specs disagree
+
+Both documents were written against the same `SCREENS.md`. They agree on the
+big move — split Analytics by time horizon, lift Income out of Settings, fuse
+Goals and Investments — and on most of the detail. Four real disagreements
+remain. I have taken a side in each and given the reasoning; overrule any of
+them and the rest still stands.
+
+### 8.1 How much comes off the Dashboard
+
+**The other spec keeps everything** — sweep, hero, projection, tally, lifetime
+card, goals, stat strip, donut, person split, Signals, recent activity — and
+adds two more. That is eleven blocks, described as "lighter".
+
+**I cut it to five** and move Signals, the donut and the person split to
+Monthly, and the lifetime card to Lifetime.
+
+**My call: cut.** The dashboard and Analytics are already ~60% the same
+content, which is the core structural finding of Part 1. Adding two blocks to
+the longer of the two does not resolve that; it deepens it. A daily check-in
+that needs scrolling has failed at being a check-in. Everything cut is one tap
+away on a page that exists to hold it.
+
+### 8.2 Whether the savings rate should be hidden behind a tap
+
+**The other spec** argues the textbook rate sitting under the cash figure
+invites "where did the rest go", and moves it to tap-to-reveal.
+
+**My call: keep it visible.** The diagnosis is right and the treatment is
+backwards. That caption is not decoration — it is the *reconciliation between
+the two numbers*, and it already names the gap explicitly:
+
+> Income less spending is ₹7,767 — a 23% savings rate, but ₹10,000 of it went
+> into investments — ₹2,233 more than the month produced, so the difference
+> came out of money you already had.
+
+Hiding the reconciliation behind an interaction on the one card whose job is to
+reconcile is a trust regression. A reader who skims it is no worse off than one
+who never opens a tooltip; a reader who wants it should not have to hunt.
+Where a tooltip *is* right is the other spec's own 2.7 — the per-person share
+tag — because that explainer sits on a figure whose card is not about
+explaining itself. Adopted there, declined here.
+
+### 8.3 Where budget progress lives
+
+**The other spec** keeps the budget card in Settings, "exactly as-is".
+
+**My call: move it to Monthly.** Setting a limit is configuration. Watching a
+bar fill against it is the most actionable monthly analytic in the app, and it
+is currently three taps from the dashboard, on a screen nobody opens except to
+change something. The limit stays in the category sheet; the progress moves.
+
+### 8.4 Whether the recurring nudge can go straight to the Dashboard
+
+**The other spec** adds an "upcoming recurring expense" line to the Dashboard,
+detecting same-category, ±10% amount, same 3-day window, 3+ consecutive months.
+
+**My call: not without a confirmation step.** That is a stricter rule than the
+one currently in `recurring.ts` (2 months, ±30%), and stricter is better — but
+the reason "Still to come" came off the dashboard was not that the threshold
+was slightly loose. It was that **no threshold is trustworthy on a short
+history**, and a card that confidently names next week's bills has to be right.
+
+So: the detector gets a home in Settings where you **confirm or reject** each
+candidate (3.8). Confirmed bills are then trustworthy by construction, and the
+Dashboard nudge becomes safe to ship — as an attention rule (3.1), which is
+where a dated, dismissible, one-line prompt belongs anyway. Same feature,
+one gate in front of it.
+
+### 8.5 Where the other spec was more careful than me
+
+Credit where it is due, since three of its finds are now bugs 1.3.8–1.3.10:
+
+- **The sweep's day-count bias** (1.3.8) I did not spot at all.
+- **Momentum penalising young categories** (1.3.9) is a second, independent
+  bug in the same function I had already flagged — I found the part-month
+  problem and stopped looking.
+- **Category projection on lumpy categories** (1.3.10) I had only as a generic
+  line in a table of "definitions to label"; it is a concrete bug that renders
+  a number which is never once correct.
+- **The mobile Insights tab** (2.2) is a straightforwardly better answer than
+  the cut I proposed.
+
+### 8.6 Where I was more careful than it
+
+Worth stating only because these are bugs that survive its redesign:
+
+- It documents the **weekday average** as `Σ ÷ count of that weekday this
+  month` and marks it *Kept*. That formula is the correct one — but it is not
+  what the code does (1.3.3), so the fix is described as if it were current
+  behaviour and would not get written.
+- Its Dashboard **keeps the month picker alongside Today / This week**, so
+  1.3.4 — September figures on an August page — survives intact.
+- Its Lifetime page **restates `Σ(income − spent − invested)`** as the
+  definition of lifetime in hand, preserving 1.3.6. It then adds "Lifetime with
+  people" as a *separate* card, which places the correct ledger figures
+  directly beside a cash figure that is wrong by exactly that amount.
+- **The Ledger stat strip totalling the loaded page** (1.3.5) and **the
+  savings-rate footer averaging percentages** (1.3.7) are unmentioned.
+
+The lesson for whoever builds this: the two specs were written from the same
+document, and the document was accurate. Every one of these was only findable
+in the source. **Do not implement a metric from either spec without reading the
+function it replaces.**
+
+---
+
 ## Suggested sequence
 
 If this is built incrementally, this order gets value out earliest and keeps
 the app shippable at every step:
 
-1. **The calculation fixes** (1.3). They are small, they are bugs, and
-   everything below inherits them.
+1. **The calculation fixes** (1.3, all eleven). They are small, they are bugs,
+   and everything below inherits them. Start with 1.3.1 and 1.3.6 — a screen
+   that contradicts itself and a card that overstates your cash are the two
+   that cost trust.
 2. **Move income out of Settings; move budgets to Month.** Pure relocation, no
    new UI, immediately better.
 3. **Split Analytics into Month and Lifetime.** Also mostly relocation.
