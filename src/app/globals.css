@@ -563,6 +563,23 @@ h1, h2, h3 {
     color: var(--accent);
   }
 
+  /** A small solid action pill — the row-level Settle / Remind buttons. */
+  .btn-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    border: none;
+    cursor: pointer;
+    transition: filter 150ms ease-out, transform 60ms ease-out;
+  }
+  .btn-pill:hover { filter: brightness(1.08); }
+  .btn-pill:active { transform: scale(0.96); }
+
   /** A compact delta badge sitting opposite the icon tile. */
   .badge {
     display: inline-flex;
@@ -580,27 +597,56 @@ h1, h2, h3 {
   .badge-good { background: var(--accent-soft); color: var(--accent); }
   .badge-neutral { background: var(--surface-2); color: var(--text-muted); }
 
-  /**
-   * The ambient bloom in a hero card's top-right corner. A radial that fades
-   * to nothing by 65% — it lifts the card without lighting the whole thing.
+  /*
+   * AMBIENT BLOOM
+   * -------------
+   * A soft disc of colour bleeding in from a card's top-right corner. This is
+   * where the light in the whole design comes from: on a near-black canvas a
+   * flat card reads as a rectangle, and the bloom is what makes it read as a
+   * surface with something behind it.
+   *
+   * `--bloom` is the tint, so a card can glow in the colour of what it is
+   * about — lime for money kept, green for money moved on purpose, coral for
+   * a limit broken, neutral where the card is only structure.
    */
-  .glow-card { position: relative; overflow: hidden; }
+  .glow-card {
+    position: relative;
+    overflow: hidden;
+    --bloom: var(--accent);
+    --bloom-strength: 14%;
+    --bloom-size: 13rem;
+  }
   .glow-card::before {
     content: '';
     position: absolute;
-    top: -3rem;
-    right: -3rem;
-    width: 12rem;
-    height: 12rem;
+    top: calc(var(--bloom-size) / -2.6);
+    right: calc(var(--bloom-size) / -2.6);
+    width: var(--bloom-size);
+    height: var(--bloom-size);
     border-radius: 9999px;
-    background: color-mix(in oklab, var(--accent) 16%, transparent);
-    filter: blur(48px);
+    background: color-mix(in oklab, var(--bloom) var(--bloom-strength), transparent);
+    filter: blur(52px);
     pointer-events: none;
-    transition: background 400ms ease-out;
+    transition: background 500ms ease-out;
   }
   @media (hover: hover) {
-    .glow-card:hover::before { background: color-mix(in oklab, var(--accent) 24%, transparent); }
+    .glow-card:hover::before {
+      background: color-mix(in oklab, var(--bloom) calc(var(--bloom-strength) + 7%), transparent);
+    }
   }
+
+  .bloom-credit { --bloom: var(--credit); }
+  .bloom-danger { --bloom: var(--rule-red); }
+  .bloom-quiet  { --bloom: var(--text-muted); --bloom-strength: 20%; }
+  .bloom-sm     { --bloom-size: 8rem; }
+  .bloom-lg     { --bloom-size: 20rem; --bloom-strength: 11%; }
+
+  /*
+   * A pill or tile that emits its own light. The reference spends this on
+   * exactly the elements it wants pressed — never on a whole card.
+   */
+  .lit { box-shadow: 0 0 20px -4px color-mix(in oklab, var(--accent) 45%, transparent); }
+  .lit-strong { box-shadow: 0 0 24px -2px color-mix(in oklab, var(--accent) 60%, transparent); }
 
   /** An enclosed tray for segmented controls, one tier below its buttons. */
   .tray {

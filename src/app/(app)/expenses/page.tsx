@@ -22,7 +22,8 @@ import {
 import { MonthPicker } from '@/components/month-picker';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
-import { CategoryIcon, PersonMark } from '@/components/icons';
+import { CategoryIcon, NavIcon, PersonMark } from '@/components/icons';
+import { Badge, MetricCard } from '@/components/plan-cards';
 import { LedgerForm, type LedgerEntry } from '@/components/ledger-form';
 
 const KINDS: { key: TxKind; label: string }[] = [
@@ -101,14 +102,29 @@ function Transactions() {
    * 200 transactions showed a total missing fifty of them that quietly
    * corrected itself when you pressed Load more.
    */
-  const totals = data?.totals ?? {
+  const totals: FeedTotals = data?.totals ?? {
     spentMinor: 0,
     investedMinor: 0,
     incomeMinor: 0,
     lentMinor: 0,
     borrowedMinor: 0,
     count: 0,
+    spentCount: 0,
+    lentCount: 0,
+    borrowedCount: 0,
+    lentPeople: 0,
+    borrowedPeople: 0,
   };
+
+  /* Over the days of the month that have happened, not the days that had
+     spending — the same denominator rule the weekday chart follows. */
+  const dailyAverageMinor = useMemo(() => {
+    const isCurrent = month === todayISO().slice(0, 7);
+    const days = isCurrent
+      ? Number(todayISO().slice(8, 10))
+      : Number(monthRange(month).end.slice(8, 10));
+    return days > 0 ? Math.round(totals.spentMinor / days) : 0;
+  }, [totals.spentMinor, month]);
 
   const activeFilters = categoryIds.length + personIds.length + kinds.length + (search ? 1 : 0);
   const today = todayISO();
@@ -147,50 +163,128 @@ function Transactions() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="Ledger"
-        title={monthLabel(month)}
-        actions={
-          <>
-            <MonthPicker month={month} onChange={setMonth} />
-            <button className="btn btn-ghost relative max-sm:flex-1" onClick={() => setFiltersOpen(true)}>
-              Filters
-              {activeFilters > 0 && (
-                <span
-                  className="num absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
-                  style={{ background: 'var(--brass)', color: 'var(--on-brass)' }}
-                >
-                  {activeFilters}
-                </span>
-              )}
-            </button>
-          </>
-        }
-      />
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-2 h-2 rounded-full pulse-dot" style={{ background: 'var(--accent)' }} aria-hidden />
+            <span className="micro">Master ledger</span>
+          </div>
+          <h1 className="text-[28px] font-bold tracking-tight leading-tight">
+            Ledger <span className="muted font-normal">·</span> {monthLabel(month)}
+          </h1>
+        </div>
 
-      <StatStrip
-        cols={4}
-        items={[
-          {
-            label: 'Spent',
-            minor: totals.spentMinor,
-            sub: `${totals.count} ${totals.count === 1 ? 'entry' : 'entries'}`,
-          },
-          {
-            label: totals.incomeMinor > 0 ? 'Income' : 'Invested',
-            minor: totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor,
-            tone: 'var(--credit)',
-            sub: totals.incomeMinor > 0 ? 'came in' : totals.investedMinor ? 'not spending' : undefined,
-          },
-          { label: 'Lent out', minor: totals.lentMinor, tone: totals.lentMinor ? 'var(--rule-red)' : undefined },
-          { label: 'Borrowed', minor: totals.borrowedMinor, tone: totals.borrowedMinor ? 'var(--credit)' : undefined },
-        ]}
-      />
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <MonthPicker month={month} onChange={setMonth} />
+          <button className="btn btn-ghost relative" onClick={() => setFiltersOpen(true)}>
+            Filters
+            {activeFilters > 0 && (
+              <span
+                className="num min-w-[1.25rem] h-5 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
+                style={{ background: 'var(--brass)', color: 'var(--on-brass)' }}
+              >
+                {activeFilters}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/*
+        FOUR CARDS, NOT A STRIP.
+        The reference gives each figure an icon tile, a badge and a line of
+        context — a bare four-column strip could not say "3 people" or "daily
+        average ₹720" beside the number it qualifies.
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <MetricCard
+          bloom="quiet"
+          icon={<NavIcon name="ledger" size={20} />}
+          label="Total spent"
+          badge={<Badge tone="neutral">{totals.spentCount} entries</Badge>}
+          note={
+            dailyAverageMinor > 0 ? (
+              <>
+                Daily average <span className="num">{formatINR(dailyAverageMinor)}</span>
+              </>
+            ) : undefined
+          }
+        >
+          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
+            {formatINR(totals.spentMinor)}
+          </span>
+        </MetricCard>
+
+        <MetricCard
+          glow={totals.incomeMinor > 0}
+          bloom="credit"
+          icon={<NavIcon name="cash" size={20} />}
+          label={totals.incomeMinor > 0 ? 'Income received' : 'Invested'}
+          badge={totals.incomeMinor > 0 ? <Badge tone="good">came in</Badge> : <Badge tone="neutral">not spending</Badge>}
+          note={totals.incomeMinor > 0 && totals.investedMinor > 0 ? (
+            <>
+              <span className="num">{formatINR(totals.investedMinor)}</span> also went into investments
+            </>
+          ) : undefined}
+        >
+          <span
+            className="num text-[1.9rem] font-bold leading-none tracking-tight"
+            style={{ color: totals.incomeMinor > 0 ? 'var(--hi)' : undefined }}
+          >
+            {formatINR(totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor)}
+          </span>
+        </MetricCard>
+
+        <MetricCard
+          bloom="danger"
+          icon={<span className="text-[17px] font-bold">↑</span>}
+          label="Lent out"
+          badge={
+            totals.lentPeople > 0 ? (
+              <Badge tone="neutral">
+                {totals.lentPeople} {totals.lentPeople === 1 ? 'person' : 'people'}
+              </Badge>
+            ) : undefined
+          }
+          note="receivable"
+        >
+          <span
+            className="num text-[1.9rem] font-bold leading-none tracking-tight"
+            style={totals.lentMinor ? { color: 'var(--rule-red)' } : undefined}
+          >
+            {formatINR(totals.lentMinor)}
+          </span>
+        </MetricCard>
+
+        <MetricCard
+          bloom="credit"
+          icon={<span className="text-[17px] font-bold">↓</span>}
+          label="Borrowed"
+          badge={
+            totals.borrowedPeople > 0 ? (
+              <Badge tone="neutral">
+                {totals.borrowedPeople} {totals.borrowedPeople === 1 ? 'person' : 'people'}
+              </Badge>
+            ) : undefined
+          }
+          note="payable"
+        >
+          <span
+            className="num text-[1.9rem] font-bold leading-none tracking-tight"
+            style={totals.borrowedMinor ? { color: 'var(--credit)' } : undefined}
+          >
+            {formatINR(totals.borrowedMinor)}
+          </span>
+        </MetricCard>
+      </div>
 
       {/* The filter people reach for most is one tap, not one sheet. */}
       <div className="scroll-x flex items-center gap-2 -mx-1 px-1 pb-1">
+        {/* Each chip says how much it would show. A filter you cannot
+            predict the result of is a filter you press twice. */}
         <button className="chip shrink-0" data-selected={kinds.length === 0} onClick={() => setKinds([])}>
           Everything
+          <span className="micro ml-1">{totals.spentCount + totals.lentCount + totals.borrowedCount}</span>
         </button>
         {KINDS.map((k) => (
           <button
@@ -200,6 +294,9 @@ function Transactions() {
             onClick={() => setKinds((v) => (v.includes(k.key) ? v.filter((x) => x !== k.key) : [...v, k.key]))}
           >
             {k.label}
+            <span className="micro ml-1">
+              {k.key === 'expense' ? totals.spentCount : k.key === 'lent' ? totals.lentCount : totals.borrowedCount}
+            </span>
           </button>
         ))}
         {activeFilters > 0 && (
@@ -263,9 +360,18 @@ function Transactions() {
                   }}
                 >
                   <span className="text-[12px] font-semibold tracking-wide">{dayLabelFor(date)}</span>
-                  <span className="flex items-baseline gap-2">
-                    <span className="micro">{items.length}</span>
-                    {spent > 0 && <Money minor={spent} className="text-[12px] font-semibold" />}
+                  <span className="flex items-center gap-2.5">
+                    <span className="micro">
+                      {items.length} {items.length === 1 ? 'entry' : 'entries'}
+                    </span>
+                    {spent > 0 && (
+                      <span
+                        className="num text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--surface-2)' }}
+                      >
+                        Subtotal {formatINR(spent)}
+                      </span>
+                    )}
                   </span>
                 </h2>
                 <div className="divide-y" style={{ borderColor: 'var(--border)' }}>

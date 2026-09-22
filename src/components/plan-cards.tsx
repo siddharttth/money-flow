@@ -10,7 +10,7 @@ import type { MonthlyPlan, Sweep } from '@/lib/plan';
 import type { Fund } from '@/lib/funds';
 import { Card, Money } from './ui';
 import { ShareBar } from './graph';
-import { CategoryIcon } from './icons';
+import { CategoryIcon, NavIcon } from './icons';
 import { useToast } from './toast';
 
 function PlanLine({
@@ -562,42 +562,121 @@ export function GoalsRollup({ funds }: { funds: Fund[] }) {
   const savedMinor = open.reduce((s, f) => s + f.savedMinor, 0);
   const perMonthMinor = open.reduce((s, f) => s + (f.requiredPerMonthMinor ?? 0), 0);
   const behind = open.filter((f) => f.paceConfident && (f.paceDeltaMinor ?? 0) < 0).length;
+  const progress = targetMinor > 0 ? savedMinor / targetMinor : 0;
+
+  /*
+   * One word for the whole plan. Behind-pace goals decide it, because a plan
+   * can be 60% funded and still failing — and 3% funded and perfectly on
+   * schedule, which is what a bare percentage cannot say.
+   */
+  const health = behind === 0 ? 'On track' : behind === open.length ? 'Off track' : 'Slipping';
+  const healthTone =
+    behind === 0 ? 'var(--accent)' : behind === open.length ? 'var(--rule-red)' : 'var(--hi)';
 
   return (
-    <Card className="!p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="label mb-0">All goals together</p>
-        {done.length > 0 && (
-          <span className="micro" style={{ color: 'var(--credit)' }}>
-            {done.length} finished
-          </span>
-        )}
+    <Card className="!p-5 sm:!p-6 glow-card bloom-lg">
+      <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-center">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="icon-tile icon-tile-accent !w-8 !h-8 !rounded-lg">
+              <NavIcon name="target" size={17} />
+            </span>
+            <span className="label mb-0">All goals together</span>
+            {done.length > 0 && (
+              <span className="badge badge-good">{done.length} finished</span>
+            )}
+          </div>
+
+          <p className="text-[15px] leading-relaxed">
+            <strong className="num text-[19px]">{formatINR(savedMinor)}</strong>{' '}
+            <span className="muted">saved of</span>{' '}
+            <span className="num">{formatINR(targetMinor)}</span>{' '}
+            <span className="muted">
+              across {open.length} active {open.length === 1 ? 'target' : 'targets'}
+            </span>
+          </p>
+          {perMonthMinor > 0 && (
+            <p className="text-[13px] mt-1.5" style={{ color: 'var(--accent)' }}>
+              <strong className="num">{formatINR(perMonthMinor)}</strong> a month to land them all on time
+            </p>
+          )}
+
+          <div className="mt-4">
+            <ShareBar share={progress} color="var(--accent)" height={6} />
+            <div className="flex items-baseline justify-between gap-3 mt-2">
+              <span className="num text-[11px] muted">
+                {formatINR(savedMinor)} collected ({Math.round(progress * 100)}%)
+              </span>
+              <span className="num text-[11px] muted">
+                {formatINR(Math.max(0, targetMinor - savedMinor))} remaining
+              </span>
+            </div>
+          </div>
+
+          {behind > 0 && (
+            <p className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--rule-red)' }}>
+              {behind} {behind === 1 ? 'goal is' : 'goals are'} behind pace. Pushing a target date out is a
+              decision; missing it quietly is not.
+            </p>
+          )}
+        </div>
+
+        {/* The plan at a glance: a verdict and the ring it is based on. */}
+        <div className="flex items-center gap-4 lg:flex-col lg:items-end lg:text-right shrink-0">
+          <div className="lg:order-2 lg:text-right">
+            <p className="micro">Portfolio health</p>
+            <p className="text-[17px] font-semibold mt-0.5" style={{ color: healthTone }}>
+              {health}
+            </p>
+          </div>
+          <ProgressRing share={progress} tone={healthTone} />
+        </div>
       </div>
-
-      <p className="text-[15px] mt-2.5 leading-relaxed">
-        <strong className="num">{formatINR(savedMinor)}</strong> saved of{' '}
-        <span className="num">{formatINR(targetMinor)}</span> across {open.length}{' '}
-        {open.length === 1 ? 'goal' : 'goals'}
-        {perMonthMinor > 0 && (
-          <>
-            {' '}
-            — <strong className="num">{formatINR(perMonthMinor)}</strong> a month to land them all on time
-          </>
-        )}
-        .
-      </p>
-
-      <div className="mt-3.5">
-        <ShareBar share={targetMinor > 0 ? savedMinor / targetMinor : 0} color="var(--credit)" height={6} />
-      </div>
-
-      {behind > 0 && (
-        <p className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--rule-red)' }}>
-          {behind} {behind === 1 ? 'goal is' : 'goals are'} behind pace. Pushing a target date out is a decision;
-          missing it quietly is not.
-        </p>
-      )}
     </Card>
+  );
+}
+
+/** A progress ring. SVG so the stroke is crisp at any size and needs no chart. */
+export function ProgressRing({
+  share,
+  tone = 'var(--accent)',
+  size = 64,
+}: {
+  share: number;
+  tone?: string;
+  size?: number;
+}) {
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const filled = Math.max(0, Math.min(1, share));
+
+  return (
+    <span className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="var(--surface-2)"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={tone}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${circumference * filled} ${circumference}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          style={{ filter: `drop-shadow(0 0 6px color-mix(in oklab, ${tone} 60%, transparent))` }}
+        />
+      </svg>
+      <span className="absolute num text-[13px] font-bold">{Math.round(filled * 100)}%</span>
+    </span>
   );
 }
 
@@ -620,6 +699,7 @@ export function MetricCard({
   badge,
   note,
   glow = false,
+  bloom,
   tone,
   footer,
 }: {
@@ -628,16 +708,23 @@ export function MetricCard({
   children: ReactNode;
   badge?: ReactNode;
   note?: ReactNode;
-  /** The ambient lime bloom. One card per screen earns it. */
+  /** The ambient bloom. Every card carries one; only its weight differs. */
   glow?: boolean;
+  /** What the card is about, which is what colour its light should be. */
+  bloom?: 'accent' | 'credit' | 'danger' | 'quiet';
   tone?: string;
   footer?: ReactNode;
 }) {
+  const bloomClass =
+    bloom === 'credit' ? 'bloom-credit' : bloom === 'danger' ? 'bloom-danger' : bloom === 'quiet' ? 'bloom-quiet' : '';
+
   return (
-    <Card className={`!p-5 flex flex-col justify-between ${glow ? 'glow-card' : ''}`}>
+    <Card
+      className={`!p-5 flex flex-col justify-between glow-card ${bloomClass} ${glow ? 'bloom-lg' : 'bloom-sm'}`}
+    >
       <div className="relative">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <span className={`icon-tile ${glow ? 'icon-tile-accent' : ''}`}>{icon}</span>
+          <span className={`icon-tile ${glow ? 'icon-tile-accent lit' : ''}`}>{icon}</span>
           {badge}
         </div>
         <p className="label mb-1.5">{label}</p>
@@ -687,10 +774,27 @@ export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
       </div>
 
       <div className="relative">
-        <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-          <span style={{ width: `${spent}%`, background: 'var(--text-muted)' }} />
-          <span style={{ width: `${invested}%`, background: 'var(--credit)' }} />
-          <span style={{ width: `${free}%`, background: 'var(--accent)' }} />
+        <div className="flex h-2.5 rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
+          <span
+            style={{
+              width: `${spent}%`,
+              background: 'linear-gradient(90deg, color-mix(in oklab, var(--text-muted) 55%, var(--surface-2)), var(--text-muted))',
+            }}
+          />
+          <span
+            style={{
+              width: `${invested}%`,
+              background: 'linear-gradient(90deg, color-mix(in oklab, var(--credit) 70%, var(--surface-2)), var(--credit))',
+              boxShadow: '0 0 10px -2px color-mix(in oklab, var(--credit) 55%, transparent)',
+            }}
+          />
+          <span
+            style={{
+              width: `${free}%`,
+              background: 'linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 80%, white))',
+              boxShadow: '0 0 12px -2px color-mix(in oklab, var(--accent) 60%, transparent)',
+            }}
+          />
         </div>
 
         {/* Where the money coming in ran out. Everything right of it was paid
@@ -809,5 +913,66 @@ export function TallyReconciliation({ plan }: { plan: MonthlyPlan }) {
         </>
       )}
     </p>
+  );
+}
+
+/**
+ * The goal you are closest to acting on, given a card of its own.
+ *
+ * The strip on the dashboard lists every goal compactly, which is right for
+ * three of them and wasteful for one. Where a single goal is the whole plan,
+ * the reference gives it the room: the figure, the ring, the monthly pace and
+ * the one button that moves it.
+ */
+export function ActiveGoalCard({ fund, onAdd }: { fund: Fund; onAdd: () => void }) {
+  const behind = fund.paceConfident && (fund.paceDeltaMinor ?? 0) < 0;
+
+  return (
+    <Card className="!p-5 glow-card bloom-lg">
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <span className="flex items-center gap-2.5 min-w-0">
+            <CategoryIcon icon={fund.icon} color={fund.color} size={32} />
+            <span className="micro truncate">Active goal</span>
+          </span>
+          <span className={`badge ${behind ? 'badge-up' : 'badge-good'}`}>
+            {Math.round(fund.progress * 100)}% funded
+          </span>
+        </div>
+
+        <h3 className="text-[19px] font-bold tracking-tight truncate">{fund.name}</h3>
+        {fund.targetDate && (
+          <p className="muted text-[12.5px] mt-0.5">by {targetLabel(fund.targetDate)}</p>
+        )}
+
+        <div className="flex items-center justify-between gap-4 mt-4">
+          <div className="min-w-0">
+            <p className="micro">Saved so far</p>
+            <p className="mt-1">
+              <span className="num text-[22px] font-bold" style={{ color: 'var(--hi)' }}>
+                {formatINR(fund.savedMinor)}
+              </span>
+              <span className="num muted text-[12px]"> / {formatINR(fund.targetMinor)}</span>
+            </p>
+            <p className="muted text-[12px] mt-1.5">
+              {fund.requiredPerMonthMinor ? (
+                <>
+                  <span className="num">{formatINR(fund.requiredPerMonthMinor)}</span>/mo
+                  {fund.monthsLeft != null && ` · ${fund.monthsLeft} months left`}
+                </>
+              ) : (
+                'No target date set'
+              )}
+            </p>
+          </div>
+          <ProgressRing share={fund.progress} tone={behind ? 'var(--rule-red)' : 'var(--accent)'} size={58} />
+        </div>
+
+        <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
+          <NavIcon name="plus" size={15} />
+          Add to goal
+        </button>
+      </div>
+    </Card>
   );
 }

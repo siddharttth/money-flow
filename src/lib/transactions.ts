@@ -46,6 +46,20 @@ export type FeedTotals = {
   lentMinor: number;
   borrowedMinor: number;
   count: number;
+  /*
+   * Per-kind counts, so the filter chips can say how much each one would
+   * show before you press it — and the cards can say "113 entries" and
+   * "3 people" rather than an unqualified figure.
+   *
+   * Counted over the SAME filter as the totals but ignoring the kind filter
+   * itself: a chip reading "Lent 9" has to keep saying 9 while you are
+   * looking at Spent, or it is describing the view rather than the month.
+   */
+  spentCount: number;
+  lentCount: number;
+  borrowedCount: number;
+  lentPeople: number;
+  borrowedPeople: number;
 };
 
 export async function getTransactions(
@@ -84,9 +98,14 @@ async function feedTotals(p: FeedParams, kinds: TxKind[]): Promise<FeedTotals> {
   const wantExpenses = kinds.includes('expense');
   const wantLedger = kinds.includes('lent') || kinds.includes('borrowed');
 
-  const [exp, led] = await Promise.all([
+  const ALL: TxKind[] = ['expense', 'lent', 'borrowed'];
+
+  const [exp, led, allExp, allLed] = await Promise.all([
     wantExpenses ? expenseTotals(p) : Promise.resolve({ spent: 0, invested: 0, income: 0, count: 0 }),
-    wantLedger ? ledgerTotals(p, kinds) : Promise.resolve({ lent: 0, borrowed: 0, count: 0 }),
+    wantLedger ? ledgerTotals(p, kinds) : Promise.resolve({ lent: 0, borrowed: 0, count: 0, outCount: 0, inCount: 0, outPeople: 0, inPeople: 0 }),
+    // Kind-blind, for the chip counts.
+    expenseTotals(p),
+    ledgerTotals(p, ALL),
   ]);
 
   return {
@@ -96,6 +115,11 @@ async function feedTotals(p: FeedParams, kinds: TxKind[]): Promise<FeedTotals> {
     lentMinor: led.lent,
     borrowedMinor: led.borrowed,
     count: exp.count + led.count,
+    spentCount: allExp.count,
+    lentCount: allLed.outCount,
+    borrowedCount: allLed.inCount,
+    lentPeople: allLed.outPeople,
+    borrowedPeople: allLed.inPeople,
   };
 }
 
@@ -125,6 +149,10 @@ async function ledgerTotals(p: FeedParams, kinds: TxKind[]) {
       lent: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'out'), 0)`,
       borrowed: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'in'), 0)`,
       count: sql<string>`COUNT(*)`,
+      outCount: sql<string>`COUNT(*) FILTER (WHERE ${ledgerEntries.direction} = 'out')`,
+      inCount: sql<string>`COUNT(*) FILTER (WHERE ${ledgerEntries.direction} = 'in')`,
+      outPeople: sql<string>`COUNT(DISTINCT ${ledgerEntries.personId}) FILTER (WHERE ${ledgerEntries.direction} = 'out')`,
+      inPeople: sql<string>`COUNT(DISTINCT ${ledgerEntries.personId}) FILTER (WHERE ${ledgerEntries.direction} = 'in')`,
     })
     .from(ledgerEntries)
     .where(and(...ledgerClauses(p, kinds)));
@@ -133,6 +161,10 @@ async function ledgerTotals(p: FeedParams, kinds: TxKind[]) {
     lent: Number(row?.lent ?? 0),
     borrowed: Number(row?.borrowed ?? 0),
     count: Number(row?.count ?? 0),
+    outCount: Number(row?.outCount ?? 0),
+    inCount: Number(row?.inCount ?? 0),
+    outPeople: Number(row?.outPeople ?? 0),
+    inPeople: Number(row?.inPeople ?? 0),
   };
 }
 

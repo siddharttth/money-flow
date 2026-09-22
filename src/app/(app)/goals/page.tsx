@@ -97,15 +97,26 @@ export default function InvestmentsPage() {
 
               {outgoings > 0 && (
                 <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-                  <p className="label mb-2">{monthName} · where the money went</p>
-                  <ShareBar share={investedShare} color="var(--credit)" height={6} />
-                  <div className="flex items-baseline justify-between gap-3 mt-2.5">
-                    <span className="text-[12px]" style={{ color: 'var(--credit)' }}>
-                      <span className="num font-semibold">{Math.round(investedShare * 100)}%</span> invested
+                  <p className="label mb-2.5">{monthName} · where the money went</p>
+                  {/* Both halves named. "26% invested" alone leaves the reader
+                      to work out what the other 74% was. */}
+                  <div className="flex items-baseline justify-between gap-3 mb-2 text-[12px]">
+                    <span style={{ color: 'var(--credit)' }}>
+                      <span className="num font-semibold">{Math.round(investedShare * 100)}%</span> invested (
+                      <span className="num">{formatINR(data.monthMinor)}</span>)
                     </span>
-                    <span className="muted text-[12px]">
-                      <span className="num">{formatINR(data.monthSpendingMinor)}</span> spent
+                    <span className="muted">
+                      <span className="num font-semibold">{Math.round((1 - investedShare) * 100)}%</span> spent (
+                      <span className="num">{formatINR(data.monthSpendingMinor)}</span>)
                     </span>
+                  </div>
+                  <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5" style={{ background: 'var(--surface-2)' }}>
+                    <span style={{ width: `${investedShare * 100}%`, background: 'var(--credit)' }} />
+                    <span style={{ width: `${(1 - investedShare) * 100}%`, background: 'var(--text-muted)' }} />
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 mt-2">
+                    <span className="micro">Inflow allocation</span>
+                    <span className="micro">Month to date</span>
                   </div>
                 </div>
               )}
@@ -114,8 +125,43 @@ export default function InvestmentsPage() {
             <div className="min-w-0">
               {data.byMonth.length >= 2 ? (
                 <>
-                  <p className="label mb-3">Contributions by month</p>
-                  <MonthBars data={data.byMonth} activeMonth={month} onPick={setMonth} height={150} />
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <h3 className="text-[15px] font-semibold">Contributions by month</h3>
+                      <p className="muted text-[12px] mt-0.5">How fast capital is going in</p>
+                    </div>
+                    <span className="badge badge-good">Monthly run</span>
+                  </div>
+                  <MonthBars
+                    detailed
+                    data={data.byMonth}
+                    activeMonth={month}
+                    onPick={setMonth}
+                    height={160}
+                    averageLabel={`Avg ${formatINR(data.averageMonthMinor)}`}
+                  />
+                  {data.previousMonthMinor > 0 && (
+                    <div className="flex items-baseline justify-between gap-3 mt-4">
+                      <span
+                        className="text-[12px]"
+                        style={{
+                          color:
+                            data.monthMinor >= data.previousMonthMinor ? 'var(--credit)' : 'var(--text-muted)',
+                        }}
+                      >
+                        {data.monthMinor >= data.previousMonthMinor ? '↗' : '↘'}{' '}
+                        {Math.abs(
+                          Math.round(
+                            ((data.monthMinor - data.previousMonthMinor) / data.previousMonthMinor) * 100,
+                          ),
+                        )}
+                        % {data.monthMinor >= data.previousMonthMinor ? 'acceleration' : 'slowdown'} vs last month
+                      </span>
+                      <span className="micro">
+                        Average {formatINR(data.averageMonthMinor)}/mo
+                      </span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <EmptyState
@@ -175,22 +221,38 @@ export default function InvestmentsPage() {
       </div>
 
       <StatStrip
+        split
         items={[
-          { label: 'Lifetime', minor: data?.lifetimeMinor ?? 0 },
+          {
+            label: 'Lifetime capital',
+            minor: data?.lifetimeMinor ?? 0,
+            sub: 'total deposits',
+            meter: 1,
+            meterTone: 'var(--accent)',
+          },
           {
             label: 'Monthly average',
             minor: data?.averageMonthMinor ?? 0,
-            sub: data ? `over ${data.activeMonths} ${data.activeMonths === 1 ? 'month' : 'months'}` : undefined,
+            sub: data ? `over ${data.activeMonths} active ${data.activeMonths === 1 ? 'month' : 'months'}` : undefined,
+            meter:
+              data && data.lifetimeMinor > 0 ? data.averageMonthMinor / data.lifetimeMinor : undefined,
+            meterTone: 'var(--credit)',
           },
           {
             label: 'Contributions',
-            value: String(data?.contributionCount ?? 0),
+            value: `${data?.contributionCount ?? 0} deposits`,
             sub: data?.firstDate ? `since ${dayLabel(data.firstDate)}` : undefined,
+            meter: data && data.contributionCount > 0 ? Math.min(1, data.contributionCount / 12) : undefined,
           },
           {
             label: 'Last month',
             minor: data?.previousMonthMinor ?? 0,
-            sub: monthLabel(shiftMonth(month, -1)).split(' ')[0],
+            sub: `closed in ${monthLabel(shiftMonth(month, -1))}`,
+            meter:
+              data && data.monthMinor > 0 && data.previousMonthMinor > 0
+                ? Math.min(1, data.previousMonthMinor / Math.max(data.monthMinor, data.previousMonthMinor))
+                : undefined,
+            meterTone: 'var(--text-muted)',
           },
         ]}
       />

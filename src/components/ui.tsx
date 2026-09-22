@@ -33,9 +33,11 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
  * uppercase label with a rule running out to the action on the right. Used to
  * group content without wrapping every group in another box.
  */
-export function SectionHead({ label, action }: { label: string; action?: ReactNode }) {
+export function SectionHead({ label, action }: { label: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex items-center gap-3 sm:gap-4 mb-3">
+      {/* ReactNode, not string — a section can carry a status badge beside its
+          name, and "Budgets · Over by ₹5,612" is one heading, not two. */}
       <span className="label mb-0 shrink-0">{label}</span>
       <span className="hair flex-1" aria-hidden />
       {action}
@@ -133,43 +135,85 @@ export function Delta({ pct, invert = false }: { pct: number | null | undefined;
 export function StatStrip({
   items,
   cols = 4,
+  /**
+   * Separate cards with their own borders, as the Obsidian screens draw them,
+   * rather than one card divided by hairlines. The joined form is still right
+   * where the strip is a footnote under a hero; the split form is right where
+   * the four figures ARE the section.
+   */
+  split = false,
 }: {
-  items: { label: string; minor?: number; value?: string; sub?: string; tone?: string }[];
+  items: {
+    label: string;
+    minor?: number;
+    value?: string;
+    sub?: string;
+    tone?: string;
+    /** A quiet mark in the corner, the way the reference cards carry one. */
+    icon?: ReactNode;
+    /** An accent rule under the figure, at 0–1 of the cell width. */
+    meter?: number;
+    meterTone?: string;
+  }[];
   cols?: 2 | 3 | 4;
+  split?: boolean;
 }) {
   const wide = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' }[cols];
+
+  const cells = items.map((it) => (
+    /*
+     * Labels wrap rather than truncate — "Monthly avera…" is worse than two
+     * lines — and the label block reserves two lines whether it needs them or
+     * not, so the figures below sit on one line across the row. Pushing the
+     * figures down with mt-auto instead would align their bottoms, which is
+     * not the same thing once one cell has a sub-line and its neighbour does
+     * not.
+     */
+    <div
+      key={it.label}
+      className={split ? 'card !p-4 min-w-0' : 'px-3.5 py-3 sm:px-5 sm:py-4 min-w-0'}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem]">{it.label}</p>
+        {it.icon && <span className="muted shrink-0 mt-[-2px]">{it.icon}</span>}
+      </div>
+      {it.minor !== undefined ? (
+        <Money
+          minor={it.minor}
+          className="text-[17px] sm:text-xl font-semibold"
+          style={it.tone ? { color: it.tone } : undefined}
+        />
+      ) : (
+        <p
+          className="text-[17px] sm:text-xl font-semibold truncate"
+          style={it.tone ? { color: it.tone } : undefined}
+        >
+          {it.value ?? '\u2014'}
+        </p>
+      )}
+      {it.sub && <p className="muted text-[11px] mt-1 truncate">{it.sub}</p>}
+      {it.meter !== undefined && (
+        <span
+          className="block h-[3px] rounded-full mt-2.5 overflow-hidden"
+          style={{ background: 'var(--surface-2)' }}
+        >
+          <span
+            className="block h-full rounded-full"
+            style={{
+              width: `${Math.max(2, Math.min(100, it.meter * 100))}%`,
+              background: it.meterTone ?? it.tone ?? 'var(--accent)',
+            }}
+          />
+        </span>
+      )}
+    </div>
+  ));
+
+  if (split) return <div className={`grid grid-cols-2 ${wide} gap-4`}>{cells}</div>;
+
   return (
     <div className="card overflow-hidden">
-      <div className={`grid grid-cols-2 ${wide} hair-grid`}>
-        {items.map((it) => (
-          /*
-           * Labels wrap rather than truncate — "Monthly avera…" is worse than
-           * two lines — and the label block reserves two lines whether it
-           * needs them or not, so the figures below sit on one line across the
-           * row. Pushing the figures down with mt-auto instead would align
-           * their bottoms, which is not the same thing once one cell has a
-           * sub-line and its neighbour does not.
-           */
-          <div key={it.label} className="px-3.5 py-3 sm:px-5 sm:py-4 min-w-0">
-            <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem]">{it.label}</p>
-            {it.minor !== undefined ? (
-              <Money
-                minor={it.minor}
-                className="text-[17px] sm:text-xl font-semibold"
-                style={it.tone ? { color: it.tone } : undefined}
-              />
-            ) : (
-              <p
-                className="text-[17px] sm:text-xl font-semibold truncate"
-                style={it.tone ? { color: it.tone } : undefined}
-              >
-                {it.value ?? '\u2014'}
-              </p>
-            )}
-            {it.sub && <p className="muted text-[11px] mt-1 truncate">{it.sub}</p>}
-          </div>
-        ))}
-      </div>
+      <div className={`grid grid-cols-2 ${wide} hair-grid`}>{cells}</div>
     </div>
   );
 }

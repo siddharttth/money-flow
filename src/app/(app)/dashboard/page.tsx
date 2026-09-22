@@ -26,12 +26,13 @@ import {
   Skeleton,
   StatStrip,
 } from '@/components/ui';
-import { FlowCurve } from '@/components/graph';
+import { CategoryBubbles, FlowCurve } from '@/components/graph';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { AttentionList } from '@/components/attention';
 import { NavIcon } from '@/components/icons';
 import {
+  ActiveGoalCard,
   AllocationBar,
   Badge,
   GoalsStrip,
@@ -239,6 +240,7 @@ export default function DashboardPage() {
         )}
 
         <MetricCard
+          bloom="quiet"
           icon={<NavIcon name="ledger" size={20} />}
           label={`Spent in ${monthName}`}
           badge={f?.pace.deltaPct != null ? <Delta pct={f.pace.deltaPct} /> : undefined}
@@ -271,6 +273,7 @@ export default function DashboardPage() {
         </MetricCard>
 
         <MetricCard
+          bloom={net < 0 ? 'danger' : 'credit'}
           icon={<NavIcon name="people" size={20} />}
           label="Net with people"
           badge={
@@ -360,7 +363,54 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-5 min-w-0">
-        {(funds.data?.items.length ?? 0) > 0 && <GoalsStrip funds={funds.data!.items} />}
+        {/* One goal gets the card; several get the strip. */}
+        {funds.data?.items.length === 1 ? (
+          <ActiveGoalCard fund={funds.data.items[0]} onAdd={() => openAdd()} />
+        ) : (funds.data?.items.length ?? 0) > 1 ? (
+          <GoalsStrip funds={funds.data!.items} />
+        ) : null}
+
+        {/* Spend by category, as proportional area. The donut lives on This
+            month, where a precise reading is wanted; here the only question
+            is which one is the big one. */}
+        {(catStats.data?.items.length ?? 0) > 0 && (
+          <div>
+            <SectionHead
+              label="Spend by category"
+              action={
+                <Link href="/analytics/month" className="micro micro-link" style={{ color: 'var(--accent)' }}>
+                  Break it down
+                </Link>
+              }
+            />
+            <Card className="!p-5">
+              <CategoryBubbles
+                data={catStats.data!.items.map((c) => ({
+                  name: c.name,
+                  totalMinor: c.totalMinor,
+                  color: c.color,
+                }))}
+                size={230}
+              />
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4">
+                {catStats.data!.items.slice(0, 6).map((c) => (
+                  <li key={c.categoryId} className="flex items-baseline justify-between gap-2 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: c.color }}
+                        aria-hidden
+                      />
+                      <span className="text-[11.5px] truncate">{c.name}</span>
+                      <span className="num text-[11px] muted shrink-0">{Math.round(c.share * 100)}%</span>
+                    </span>
+                    <span className="num text-[11.5px] font-semibold shrink-0">{formatINR(c.totalMinor)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        )}
 
         {/* 5 — what just happened. */}
         <div>

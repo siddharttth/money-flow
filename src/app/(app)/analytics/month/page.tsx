@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { InsightsTabs } from '@/components/insights-tabs';
-import { DayBars, DeltaBar, Donut, FlowCurve, ShareBar, WeekdayBars } from '@/components/graph';
+import { DayBars, DeltaBar, Donut, FlowCurve, SegmentLegend, ShareBar, WeekdayBars } from '@/components/graph';
 import { BreakdownList } from '@/components/breakdown';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
@@ -96,28 +96,106 @@ function AnalyticsInner() {
           <div>
             {f ? (
               <>
-                <HeroFigure
-                  label="Total spent"
-                  minor={f.pace.spentMinor}
-                  delta={<Delta pct={f.pace.deltaPct} />}
-                  note={
-                    <>
-                      <span className="num">{f.tickets.count}</span> transactions ·{' '}
-                      <span className="num">{formatINR(f.pace.perDayMinor)}</span> a day
-                    </>
-                  }
-                />
-                <dl className="mt-5 pt-4 border-t space-y-2.5" style={{ borderColor: 'var(--border)' }}>
-                  <Row
+                {/* Icon tile and a two-line label, as the reference heads its
+                    hero — "Total spent" alone does not say which direction the
+                    money went. */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <span className="flex items-center gap-2.5">
+                    <span className="icon-tile icon-tile-accent lit">
+                      <span className="text-[17px] font-bold">₹</span>
+                    </span>
+                    <span>
+                      <span className="micro block">Net outflow</span>
+                      <span className="text-[14px] font-semibold">Total spent</span>
+                    </span>
+                  </span>
+                  <Delta pct={f.pace.deltaPct} />
+                </div>
+
+                <p className="flex items-baseline gap-2">
+                  <span className="num text-[2.4rem] sm:text-[2.7rem] font-bold leading-none tracking-tight">
+                    {formatINR(f.pace.spentMinor)}
+                  </span>
+                  <span className="micro">INR</span>
+                </p>
+
+                <p className="muted text-[12.5px] mt-2.5 flex items-center gap-1.5">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ background: 'var(--accent)' }}
+                    aria-hidden
+                  />
+                  <span className="num">{f.tickets.count}</span> transactions recorded ·{' '}
+                  <span className="num">{formatINR(f.pace.perDayMinor)}</span> a day
+                </p>
+                {/*
+                  Four figures in wells, each with the one line that makes it
+                  mean something. A bare dl of four amounts made the reader
+                  work out for themselves whether ₹20,764 was good news.
+                */}
+                <div className="grid grid-cols-2 gap-3 mt-5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
+                  <SubStat
                     label={f.isCurrentMonth ? 'Last month by today' : 'The month before'}
                     value={formatINR(f.pace.prevSameDayMinor)}
+                    note={
+                      f.pace.deltaPct == null
+                        ? 'nothing to compare'
+                        : `${f.pace.spentMinor >= f.pace.prevSameDayMinor ? '+' : '−'}${formatINR(
+                            Math.abs(f.pace.spentMinor - f.pace.prevSameDayMinor),
+                          )} ${f.pace.spentMinor >= f.pace.prevSameDayMinor ? 'faster' : 'slower'} pace`
+                    }
+                    tone={
+                      f.pace.deltaPct == null
+                        ? undefined
+                        : f.pace.spentMinor >= f.pace.prevSameDayMinor
+                          ? 'var(--rule-red)'
+                          : 'var(--credit)'
+                    }
                   />
                   {f.isCurrentMonth && (
-                    <Row label="Projected month end" value={formatINR(f.pace.projectedMinor)} strong />
+                    <SubStat
+                      label="Projected month end"
+                      value={formatINR(f.pace.projectedMinor)}
+                      note={
+                        f.pace.projectedMinor > f.pace.prevFullMinor && f.pace.prevFullMinor > 0
+                          ? 'above last month'
+                          : 'at the current rate'
+                      }
+                      tone={
+                        f.pace.projectedMinor > f.pace.prevFullMinor && f.pace.prevFullMinor > 0
+                          ? 'var(--rule-red)'
+                          : undefined
+                      }
+                    />
                   )}
-                  <Row label="First half" value={formatINR(f.halves.firstMinor)} />
-                  <Row label="Second half" value={formatINR(f.halves.secondMinor)} />
-                </dl>
+                  <SubStat
+                    label={`First half (1–${Math.ceil(f.pace.monthDays / 2)})`}
+                    value={formatINR(f.halves.firstMinor)}
+                    note={
+                      f.pace.spentMinor > 0
+                        ? `${Math.round((f.halves.firstMinor / f.pace.spentMinor) * 100)}% of total spend`
+                        : undefined
+                    }
+                  />
+                  <SubStat
+                    label={`Second half (${Math.ceil(f.pace.monthDays / 2) + 1}–${f.pace.monthDays})`}
+                    value={formatINR(f.halves.secondMinor)}
+                    note={
+                      f.halves.secondMinor === 0 && f.isCurrentMonth
+                        ? 'not reached yet'
+                        : f.halves.secondMinor < f.halves.firstMinor
+                          ? 'pace slowed down'
+                          : 'pace picked up'
+                    }
+                    tone={
+                      f.halves.secondMinor === 0 && f.isCurrentMonth
+                        ? undefined
+                        : f.halves.secondMinor < f.halves.firstMinor
+                          ? 'var(--credit)'
+                          : 'var(--rule-red)'
+                    }
+                  />
+                </div>
               </>
             ) : (
               <ListSkeleton rows={4} />
@@ -127,6 +205,37 @@ function AnalyticsInner() {
           <div className="min-w-0">
             {f && f.cumulative.length >= 2 ? (
               <>
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                  <div>
+                    <span className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-semibold">Flow curve</h3>
+                      <span className="badge badge-neutral">Cumulative</span>
+                    </span>
+                    <p className="muted text-[12px] mt-0.5">
+                      This month&rsquo;s trajectory against the last
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-4 h-[3px] rounded" style={{ background: 'var(--accent)' }} />
+                      {monthLabel(month).split(' ')[0]}{' '}
+                      <span className="num muted">
+                        ({formatINR(f.pace.spentMinor, { compact: true })})
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 muted">
+                      <span
+                        className="w-4 h-[3px] rounded"
+                        style={{
+                          background:
+                            'repeating-linear-gradient(90deg, var(--text-muted) 0 3px, transparent 3px 6px)',
+                        }}
+                      />
+                      Last{' '}
+                      <span className="num">({formatINR(f.pace.prevFullMinor, { compact: true })})</span>
+                    </span>
+                  </div>
+                </div>
                 <FlowCurve points={f.cumulative} monthDays={f.pace.monthDays} height={210} />
                 <p className="muted text-[12px] mt-3 leading-relaxed">
                   Solid is this month, dashed is last month at the same point. Where the solid line pulls above the
@@ -142,23 +251,37 @@ function AnalyticsInner() {
 
       {/* ---------- Headline figures ---------- */}
       <StatStrip
+        split
         items={[
-          { label: 'Daily average', minor: f?.pace.perDayMinor ?? 0 },
+          {
+            label: 'Daily average',
+            minor: f?.pace.perDayMinor ?? 0,
+            sub: f ? `calculated over ${f.pace.elapsedDays} active days` : undefined,
+            icon: <StatMark>≡</StatMark>,
+          },
           {
             label: 'Vs last month',
             value: s?.changePct != null ? `${s.changePct > 0 ? '+' : ''}${s.changePct.toFixed(1)}%` : '—',
             sub: s ? `${monthLabel(s.previousMonth.month).split(' ')[0]}: ${formatINR(s.previousMonth.totalMinor)}` : undefined,
             tone: s?.changePct == null ? undefined : s.changePct > 0 ? 'var(--rule-red)' : 'var(--credit)',
+            icon: <StatMark>↗</StatMark>,
           },
           {
             label: 'Biggest day',
             minor: f?.cadence.busiest?.totalMinor ?? 0,
             sub: f?.cadence.busiest ? dayLabel(f.cadence.busiest.date) : undefined,
+            meter:
+              f && f.pace.spentMinor > 0 && f.cadence.busiest
+                ? f.cadence.busiest.totalMinor / f.pace.spentMinor
+                : undefined,
+            meterTone: 'var(--hi)',
+            icon: <StatMark>◎</StatMark>,
           },
           {
             label: 'Typical entry',
             minor: f?.tickets.medianMinor ?? 0,
-            sub: f ? `average ${formatINR(f.tickets.averageMinor)}` : undefined,
+            sub: f ? `median of ${f.tickets.count} · mean ${formatINR(f.tickets.averageMinor)}` : undefined,
+            icon: <StatMark>◨</StatMark>,
           },
         ]}
       />
@@ -186,8 +309,8 @@ function AnalyticsInner() {
             </p>
             {f && f.weekday.some((w) => w.avgMinor > 0) ? (
               <>
+                <PeakWeekday flow={f} lead />
                 <WeekdayBars data={f.weekday} />
-                <PeakWeekday flow={f} />
               </>
             ) : (
               <EmptyState title="No spending to place yet" />
@@ -261,18 +384,31 @@ function AnalyticsInner() {
               <ListSkeleton rows={5} />
             ) : cats.data?.items.length ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-5 items-center">
+                <div className="flex items-start justify-between gap-3 mb-5">
+                  <div>
+                    <h3 className="text-[15px] font-semibold">Where it went</h3>
+                    <p className="muted text-[12px] mt-0.5">Category distribution breakdown</p>
+                  </div>
+                  <span className="micro shrink-0">
+                    Top {Math.min(5, cats.data.items.length)} segments
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-7">
                   <Donut
-                    data={cats.data.items.map((c) => ({ name: c.name, totalMinor: c.totalMinor, color: c.color }))}
-                    size={148}
-                    centreLabel={filtered ? 'Filtered' : 'Month'}
+                    ranked
+                    data={cats.data.items.slice(0, 6).map((c) => ({
+                      name: c.name,
+                      totalMinor: c.totalMinor,
+                      color: c.color,
+                    }))}
+                    size={160}
+                    centreLabel={filtered ? 'Filtered' : '100%'}
                   />
-                  <BreakdownList
-                    items={cats.data.items.map((c) => ({
+                  <SegmentLegend
+                    items={cats.data.items.slice(0, 5).map((c) => ({
                       id: c.categoryId,
                       name: c.name,
-                      color: c.color,
-                      icon: c.icon,
                       totalMinor: c.totalMinor,
                       share: c.share,
                     }))}
@@ -552,16 +688,6 @@ function AnalyticsInner() {
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </dt>
-      <dd className={`num text-[13px] ${strong ? 'font-semibold' : ''}`}>{value}</dd>
-    </div>
-  );
-}
 
 function Mini({ label, value }: { label: string; value: string }) {
   return (
@@ -572,14 +698,36 @@ function Mini({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The one sentence the weekday chart is actually for. */
-function PeakWeekday({ flow }: { flow: Flow }) {
+/**
+ * The one sentence the weekday chart is actually for — and, above the bars,
+ * the same fact as a headline so the chart illustrates a claim rather than
+ * asking the reader to find one.
+ */
+function PeakWeekday({ flow, lead = false }: { flow: Flow; lead?: boolean }) {
   const active = flow.weekday.filter((w) => w.avgMinor > 0);
   if (active.length < 2) return null;
   const peak = active.reduce((a, b) => (b.avgMinor > a.avgMinor ? b : a));
   const rest = active.filter((w) => w.label !== peak.label);
   const restAvg = Math.round(rest.reduce((s, w) => s + w.avgMinor, 0) / rest.length);
   if (restAvg <= 0) return null;
+
+  if (lead) {
+    return (
+      <div
+        className="flex items-center justify-between gap-3 rounded-lg px-3.5 py-3 mb-4"
+        style={{ background: 'var(--surface-2)' }}
+      >
+        <span className="min-w-0">
+          <span className="text-[13.5px] font-semibold block truncate">{FULL_DAY[peak.label]} peak</span>
+          <span className="num text-[12px] muted">{formatINR(peak.avgMinor)} average spend</span>
+        </span>
+        <span className="text-right shrink-0">
+          <span className="micro block">Other days</span>
+          <span className="num text-[13px] font-semibold">{formatINR(restAvg)}</span>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
@@ -679,7 +827,7 @@ function BudgetSection({ month }: { month: string }) {
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const stats = useSWR<{ items: CategoryStat[] }>(`/api/analytics/categories?month=${month}`);
 
-  const spendById = new Map((stats.data?.items ?? []).map((c) => [c.categoryId, c.totalMinor]));
+  const statById = new Map((stats.data?.items ?? []).map((c) => [c.categoryId, c]));
   const budgeted = (cats.data?.items ?? [])
     .filter((c) => c.kind === 'expense' && c.monthlyBudgetMinor)
     .map((c) => ({
@@ -687,7 +835,8 @@ function BudgetSection({ month }: { month: string }) {
       name: c.name,
       icon: c.icon,
       color: c.color,
-      spentMinor: spendById.get(c.id) ?? 0,
+      spentMinor: statById.get(c.id)?.totalMinor ?? 0,
+      count: statById.get(c.id)?.count ?? 0,
       budgetMinor: c.monthlyBudgetMinor ?? 0,
     }))
     .sort((a, b) => b.spentMinor / b.budgetMinor - a.spentMinor / a.budgetMinor);
@@ -710,15 +859,24 @@ function BudgetSection({ month }: { month: string }) {
   return (
     <div>
       <SectionHead
-        label="Budgets"
+        label={
+          over ? (
+            <span className="inline-flex items-center gap-2">
+              Budgets
+              <span className="badge badge-up">Over by {formatINR(totalSpent - totalBudget)}</span>
+            </span>
+          ) : (
+            'Budgets'
+          )
+        }
         action={
           <Link href="/settings" className="micro micro-link" style={{ color: 'var(--accent)' }}>
             Set limits
           </Link>
         }
       />
-      <Card>
-        <div className="flex items-baseline justify-between gap-3 mb-2.5">
+      <Card className={`glow-card ${over ? 'bloom-danger' : 'bloom-quiet'}`}>
+        <div className="relative flex items-baseline justify-between gap-3 mb-2.5">
           <Money minor={totalSpent} className="text-2xl font-semibold" />
           <span className="num text-[13px] muted">of {formatINR(totalBudget)}</span>
         </div>
@@ -730,57 +888,111 @@ function BudgetSection({ month }: { month: string }) {
         <p className="muted text-[12px] mt-2.5">
           Across {budgeted.length} budgeted {budgeted.length === 1 ? 'category' : 'categories'}
           {over
-            ? ` — over by ${formatINR(totalSpent - totalBudget)}.`
-            : ` — ${formatINR(totalBudget - totalSpent)} left.`}
+            ? ` — over by ${formatINR(totalSpent - totalBudget)}`
+            : ` — ${formatINR(totalBudget - totalSpent)} left`}
+          {totalBudget > 0 && ` · ${Math.round((totalSpent / totalBudget) * 100)}% utilised`}.
         </p>
 
-        <ul className="mt-5 pt-4 border-t space-y-3.5" style={{ borderColor: 'var(--border)' }}>
+        <ul className="mt-5 space-y-3">
           {budgeted.map((c) => {
             const share = c.budgetMinor > 0 ? c.spentMinor / c.budgetMinor : 0;
             const isOver = c.spentMinor > c.budgetMinor;
             const aheadOfPace = !isOver && share > pace + 0.05;
+            /* Over-budget bars run red, ahead-of-pace amber, safe green — a
+               gradient each, so the bar itself carries the verdict before the
+               caption does. */
+            const from = isOver
+              ? 'color-mix(in oklab, var(--rule-red) 45%, var(--surface-2))'
+              : aheadOfPace
+                ? 'color-mix(in oklab, var(--hi) 45%, var(--surface-2))'
+                : 'color-mix(in oklab, var(--credit) 45%, var(--surface-2))';
+            const to = isOver ? 'var(--rule-red)' : aheadOfPace ? 'var(--hi)' : 'var(--credit)';
+
             return (
               <li key={c.id}>
-                <button className="w-full text-left" onClick={() => openCategory(c.id)}>
-                  <div className="flex items-center gap-2.5">
-                    <CategoryIcon icon={c.icon} color={c.color} size={22} />
-                    <span className="text-[13px] font-medium truncate flex-1">{c.name}</span>
-                    <span
-                      className="num text-[12px] font-semibold shrink-0"
-                      style={{ color: isOver ? 'var(--rule-red)' : undefined }}
-                    >
-                      {formatINR(c.spentMinor)}
-                      <span className="muted font-normal"> / {formatINR(c.budgetMinor)}</span>
+                {/* Each budget is its own card, as the reference draws them —
+                    eight rows in one divided list read as a table, and a
+                    table is not something you scan for a problem. */}
+                <button
+                  className="w-full text-left rounded-xl p-3.5 transition-colors"
+                  style={{ background: 'var(--surface-2)' }}
+                  onClick={() => openCategory(c.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="flex items-start gap-2.5 min-w-0">
+                      <CategoryIcon icon={c.icon} color={c.color} size={30} />
+                      <span className="min-w-0">
+                        <span className="text-[13.5px] font-semibold block truncate">{c.name}</span>
+                        <span className="muted text-[11px] block truncate">
+                          {c.count} {c.count === 1 ? 'entry' : 'entries'} this month
+                        </span>
+                      </span>
+                    </span>
+
+                    <span className="text-right shrink-0">
+                      <span className="block">
+                        <span
+                          className="num text-[14px] font-semibold"
+                          style={{ color: isOver ? 'var(--rule-red)' : undefined }}
+                        >
+                          {formatINR(c.spentMinor)}
+                        </span>
+                        <span className="num text-[12px] muted"> / {formatINR(c.budgetMinor)}</span>
+                      </span>
+                      <span
+                        className="text-[11px]"
+                        style={{ color: isOver ? 'var(--rule-red)' : 'var(--credit)' }}
+                      >
+                        {isOver
+                          ? `Over by ${formatINR(c.spentMinor - c.budgetMinor)}`
+                          : `${formatINR(c.budgetMinor - c.spentMinor)} left`}
+                      </span>
                     </span>
                   </div>
 
-                  <div className="mt-1.5 relative">
-                    <ShareBar
-                      share={share}
-                      color={isOver ? 'var(--rule-red)' : aheadOfPace ? 'var(--hi)' : c.color}
-                      height={5}
-                    />
-                    {/* The marker is the whole point: a bar at 60% on the 10th
-                        is a different story from the same bar on the 28th. */}
+                  <div className="relative mt-3">
+                    <div
+                      className="h-2 rounded-full overflow-hidden w-full"
+                      style={{ background: 'var(--surface-3, var(--bg))' }}
+                    >
+                      <div
+                        className="h-full rounded-full grow"
+                        style={{
+                          width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
+                          background: `linear-gradient(90deg, ${from}, ${to})`,
+                          boxShadow: `0 0 12px -2px color-mix(in oklab, ${to} 55%, transparent)`,
+                        }}
+                      />
+                    </div>
+                    {/* Where an even burn would put you today. A bar at 60% on
+                        the 10th is a different story from the same bar on the
+                        28th, and only the marker tells them apart. */}
                     {isCurrent && (
                       <span
                         aria-hidden
                         className="absolute top-[-2px] bottom-[-2px] w-px"
-                        style={{ left: `${pace * 100}%`, background: 'var(--text)', opacity: 0.45 }}
+                        style={{ left: `${pace * 100}%`, background: 'var(--text)', opacity: 0.55 }}
                       />
                     )}
                   </div>
 
-                  {(isOver || aheadOfPace) && (
-                    <p
-                      className="text-[11px] mt-1"
+                  <div className="flex items-baseline justify-between gap-3 mt-2">
+                    <span className="text-[11px] muted truncate">
+                      {isOver
+                        ? 'Limit already reached'
+                        : aheadOfPace
+                          ? 'Ahead of an even burn for this point in the month'
+                          : isCurrent
+                            ? `${Math.round(pace * 100)}% of the month elapsed`
+                            : 'Within the limit'}
+                    </span>
+                    <span
+                      className="num text-[11px] font-semibold shrink-0"
                       style={{ color: isOver ? 'var(--rule-red)' : 'var(--text-muted)' }}
                     >
-                      {isOver
-                        ? `Over by ${formatINR(c.spentMinor - c.budgetMinor)}.`
-                        : 'Ahead of an even burn for this point in the month.'}
-                    </p>
-                  )}
+                      {Math.round(share * 100)}% of planned
+                    </span>
+                  </div>
                 </button>
               </li>
             );
@@ -788,5 +1000,43 @@ function BudgetSection({ month }: { month: string }) {
         </ul>
       </Card>
     </div>
+  );
+}
+
+/** A figure in a well with the one line that makes it mean something. */
+function SubStat({
+  label,
+  value,
+  note,
+  tone,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  tone?: string;
+}) {
+  return (
+    <div className="min-w-0 px-1">
+      <p className="micro truncate">{label}</p>
+      <p className="num text-[17px] font-semibold mt-1">{value}</p>
+      {note && (
+        <p className="text-[11px] mt-0.5 truncate" style={{ color: tone ?? 'var(--text-muted)' }}>
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The quiet glyph in a stat card's corner. Structure, not decoration. */
+function StatMark({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="w-7 h-7 rounded-lg flex items-center justify-center text-[13px]"
+      style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+      aria-hidden
+    >
+      {children}
+    </span>
   );
 }
