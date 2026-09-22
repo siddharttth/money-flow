@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSWRConfig } from 'swr';
 import { api } from '@/lib/client';
@@ -263,237 +263,6 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
  * The tally
  * ------------------------------------------------------------------ */
 
-/**
- * WHAT THE MONTH CAME TO.
- *
- * Every other card here reports a slice: what you spent, what is safe to
- * spend, how a goal is doing. None of them answered the question people open a
- * money app to ask — *how much did I keep?* — and the figure existed in the
- * plan payload the whole time without ever reaching a screen.
- *
- * The arithmetic is one subtraction and one split, and the bar draws exactly
- * the same three numbers so the picture and the list can never disagree:
- *
- *     came in − spent − invested = what is left
- *
- * The headline used to be `came in − spent`, captioned "Saved". That is the
- * textbook savings rate and it was actively misleading: a month that earned
- * ₹33,133, spent ₹25,366 and invested ₹10,000 announced "SAVED ₹7,767" while
- * the account it describes ended ₹2,233 lighter. Nobody reading that has
- * saved anything they can point at.
- *
- * So the big number is what is actually left after everything left — and the
- * savings rate keeps its place underneath, where it can be qualified rather
- * than mistaken for cash.
- *
- * It runs on money that actually arrived. Safe-to-spend may lean on an
- * estimate to be useful before payday; a figure describing what you have
- * may not.
- */
-export function MonthTally({ plan, monthName }: { plan: MonthlyPlan; monthName: string }) {
-  const t = plan.tally;
-  if (!t.known) return null;
-
-  const short = plan.isCurrentMonth;
-  /** Spending alone outran the money coming in. */
-  const overspent = t.savedMinor < 0;
-  /** Spending did not, but spending plus investing did — the balance fell. */
-  const dipped = t.inHandMinor < 0;
-  /** The headline: what the month actually left behind, in cash. */
-  const net = t.inHandMinor;
-  const down = net < 0;
-
-  /*
-   * The bar is scaled to whichever is larger: what came in, or what went out.
-   *
-   * Scaling to income alone was wrong the moment a month invested more than it
-   * produced — the segments summed past 100%, flex silently squashed them to
-   * fit, and the picture quietly rescaled itself into a lie. Against the larger
-   * of the two, a month that spent everything fills the bar exactly, and a
-   * month that dipped into savings runs past the income mark drawn below.
-   */
-  const outTotal = t.outMinor + t.investedMinor;
-  const scale = Math.max(t.inMinor, outTotal, 1);
-  const pct = (v: number) => Math.max(0, Math.min(100, (v / scale) * 100));
-  const spentPct = pct(t.outMinor);
-  const investedPct = pct(t.investedMinor);
-  const inHandPct = Math.max(0, 100 - spentPct - investedPct);
-  /** Where the money coming in ran out, when the month went past it. */
-  const incomeMarkPct = dipped ? pct(t.inMinor) : null;
-
-  return (
-    <Card className="!p-5 sm:!p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="label mb-0">
-          {down ? 'Down in' : 'Left in hand ·'} {monthName}
-          {short && ' so far'}
-        </p>
-        <p className="muted text-[12px]">
-          <span className="num">{formatINR(t.inMinor)}</span> came in
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-        <span
-          className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight num"
-          style={down ? { color: 'var(--rule-red)' } : undefined}
-        >
-          {down && '−'}
-          {formatINR(Math.abs(net))}
-        </span>
-        <span className="muted text-[13px]">
-          after <span className="num">{formatINR(t.outMinor)}</span> spent
-          {t.investedMinor > 0 && (
-            <>
-              {' '}
-              and <span className="num">{formatINR(t.investedMinor)}</span> invested
-            </>
-          )}
-        </span>
-      </div>
-
-      {/*
-        One bar, three segments, in the order the money leaves.
-
-        The colours are picked to survive both themes: --brass and --hi are the
-        same gold once the lights go out, so brass/credit/hi drew as gold,
-        green, gold with two identical legend dots. Neutral for money that is
-        gone, green for money moved on purpose, gold for money still sitting
-        there — all three stay distinct in Paper and Ink alike.
-      */}
-      <div className="mt-5">
-        <div className="relative">
-          <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-            <span style={{ width: `${spentPct}%`, background: 'var(--text-muted)' }} />
-            <span style={{ width: `${investedPct}%`, background: 'var(--credit)' }} />
-            <span style={{ width: `${inHandPct}%`, background: 'var(--hi)' }} />
-          </div>
-
-          {/* Where the money coming in ran out. Everything to its right was
-              paid for out of what was already in the account. */}
-          {incomeMarkPct != null && (
-            <span
-              aria-hidden
-              className="absolute top-[-4px] bottom-[-4px] w-[2px] -translate-x-px rounded-full"
-              style={{ left: `${incomeMarkPct}%`, background: 'var(--rule-red)' }}
-            />
-          )}
-        </div>
-
-        {incomeMarkPct != null && (
-          <p className="micro mt-2" style={{ color: 'var(--rule-red)' }}>
-            past this line, the month drew on what you already had
-          </p>
-        )}
-
-        <dl
-          className={`grid grid-cols-1 gap-x-6 gap-y-2 mt-4 ${
-            t.investedMinor > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-          }`}
-        >
-          <TallyLeg color="var(--text-muted)" label="Spent" minor={t.outMinor} />
-          {/* The bar has no green segment when nothing was invested, so the
-              legend should not carry a ₹0 entry explaining it. */}
-          {t.investedMinor > 0 && (
-            <TallyLeg color="var(--credit)" label="Invested" minor={t.investedMinor} />
-          )}
-          {/* Goes negative and shows it. Printing this as a cheerful gold
-              "₹4,233" was the card's worst possible reading of its own
-              arithmetic. */}
-          <TallyLeg
-            color={down ? 'var(--rule-red)' : 'var(--hi)'}
-            label={down ? 'Taken from savings' : 'Left in hand'}
-            minor={net}
-            signed
-            tone={down ? 'var(--rule-red)' : undefined}
-          />
-        </dl>
-      </div>
-
-      {/*
-        The savings rate, kept but demoted.
-
-        `income − spending` is the textbook figure and it is worth knowing, but
-        as a 48px headline captioned "Saved" it told someone whose balance had
-        just fallen that they had put ₹7,767 away. Down here it can be given
-        the one qualifier that makes it true.
-      */}
-      <p className="muted text-[12px] mt-4 leading-relaxed">
-        {t.investedMinor > 0 ? (
-          <>
-            Income less spending is <span className="num">{formatINR(t.savedMinor)}</span>
-            {t.ratePct != null && !overspent && (
-              <>
-                {' '}
-                — {article(Math.round(t.ratePct))} {Math.round(t.ratePct)}% savings rate
-              </>
-            )}
-            , but{' '}
-            <span className="num">{formatINR(t.investedMinor)}</span> of it went into investments
-            {dipped ? (
-              <>
-                {' '}
-                — <span className="num">{formatINR(Math.abs(net))}</span> more than the month produced, so the
-                difference came out of money you already had.
-              </>
-            ) : (
-              <>
-                , which you still have — just not in cash.
-              </>
-            )}
-          </>
-        ) : overspent ? (
-          <>
-            <span className="num">{formatINR(Math.abs(t.savedMinor))}</span> more went out than came in.
-          </>
-        ) : (
-          <>
-            That is {article(Math.round(t.ratePct ?? 0))} {Math.round(t.ratePct ?? 0)}% savings rate — the
-            share of what came in that is still sitting there.
-          </>
-        )}
-      </p>
-
-    </Card>
-  );
-}
-
-/**
- * "a" or "an" for a percentage read aloud. Eighty, eleven and eighteen all
- * start with a vowel sound; every other leading digit does not.
- */
-function article(n: number): string {
-  const lead = String(Math.abs(n));
-  return lead.startsWith('8') || lead === '11' || lead === '18' ? 'an' : 'a';
-}
-
-function TallyLeg({
-  color,
-  label,
-  minor,
-  tone,
-  signed = false,
-}: {
-  color: string;
-  label: string;
-  minor: number;
-  tone?: string;
-  /** Print a minus for a negative figure instead of quietly taking its size. */
-  signed?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between sm:justify-start sm:flex-col gap-x-3 sm:gap-y-1">
-      <dt className="micro inline-flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />
-        {label}
-      </dt>
-      <dd className="num text-[15px] font-semibold" style={tone ? { color: tone } : undefined}>
-        {signed && minor < 0 && '−'}
-        {formatINR(Math.abs(minor))}
-      </dd>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ *
  * Goals, where you will actually see them
@@ -829,5 +598,216 @@ export function GoalsRollup({ funds }: { funds: Fund[] }) {
         </p>
       )}
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The three-up metric row
+ * ------------------------------------------------------------------ */
+
+/**
+ * A metric card in the Obsidian idiom: icon tile top-left, delta badge
+ * top-right, label, figure, then a supporting line — and optionally a
+ * stacked allocation bar underneath.
+ *
+ * The shape repeats across the top of Dashboard, Ledger and Goals, so it is
+ * one component rather than three near-identical blocks of markup.
+ */
+export function MetricCard({
+  icon,
+  label,
+  children,
+  badge,
+  note,
+  glow = false,
+  tone,
+  footer,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  badge?: ReactNode;
+  note?: ReactNode;
+  /** The ambient lime bloom. One card per screen earns it. */
+  glow?: boolean;
+  tone?: string;
+  footer?: ReactNode;
+}) {
+  return (
+    <Card className={`!p-5 flex flex-col justify-between ${glow ? 'glow-card' : ''}`}>
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <span className={`icon-tile ${glow ? 'icon-tile-accent' : ''}`}>{icon}</span>
+          {badge}
+        </div>
+        <p className="label mb-1.5">{label}</p>
+        <div className="flex items-baseline gap-2 flex-wrap" style={tone ? { color: tone } : undefined}>
+          {children}
+        </div>
+        {note && <p className="muted text-[12.5px] mt-1.5 leading-relaxed">{note}</p>}
+      </div>
+      {footer && <div className="relative mt-5">{footer}</div>}
+    </Card>
+  );
+}
+
+/** The delta pill that sits opposite a metric card's icon tile. */
+export function Badge({
+  tone = 'neutral',
+  children,
+}: {
+  tone?: 'up' | 'down' | 'good' | 'neutral';
+  children: ReactNode;
+}) {
+  return <span className={`badge badge-${tone}`}>{children}</span>;
+}
+
+/**
+ * The month's allocation as one bar plus a legend — the footer of the hero
+ * metric card. Same three quantities as MonthTally's bar, at a smaller size,
+ * and scaled the same way so the two can never disagree.
+ */
+export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
+  const t = plan.tally;
+  const outTotal = t.outMinor + t.investedMinor;
+  const scale = Math.max(t.inMinor, outTotal, 1);
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / scale) * 100));
+  const spent = pct(t.outMinor);
+  const invested = pct(t.investedMinor);
+  const free = Math.max(0, 100 - spent - invested);
+  const dipped = t.inHandMinor < 0;
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="micro">Spend allocation</span>
+        <span className="text-[11px] font-semibold">
+          <span className="num">{formatINR(t.inMinor)}</span> <span className="muted">in</span>
+        </span>
+      </div>
+
+      <div className="relative">
+        <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+          <span style={{ width: `${spent}%`, background: 'var(--text-muted)' }} />
+          <span style={{ width: `${invested}%`, background: 'var(--credit)' }} />
+          <span style={{ width: `${free}%`, background: 'var(--accent)' }} />
+        </div>
+
+        {/* Where the money coming in ran out. Everything right of it was paid
+            for out of what was already in the account — the bar is the only
+            thing that can say so, and without the mark it cannot. */}
+        {dipped && (
+          <span
+            aria-hidden
+            className="absolute top-[-4px] bottom-[-4px] w-[2px] -translate-x-px rounded-full"
+            style={{ left: `${pct(t.inMinor)}%`, background: 'var(--rule-red)' }}
+          />
+        )}
+      </div>
+
+      {dipped && (
+        <p className="micro mt-2" style={{ color: 'var(--rule-red)' }}>
+          past this line, the month drew on what you already had
+        </p>
+      )}
+
+      {/* Percentages AND amounts. A legend reading "Spent 74%" of an unstated
+          base is half a fact. */}
+      <div className="flex items-center justify-between gap-2 mt-2.5 text-[11px]">
+        <Leg color="var(--text-muted)" label="Spent" pct={spent} minor={t.outMinor} />
+        {t.investedMinor > 0 && (
+          <Leg color="var(--credit)" label="Invested" pct={invested} minor={t.investedMinor} />
+        )}
+        <Leg
+          color={dipped ? 'var(--rule-red)' : 'var(--accent)'}
+          label={dipped ? 'From savings' : 'Free'}
+          pct={free}
+          minor={t.inHandMinor}
+          signed
+        />
+      </div>
+    </>
+  );
+}
+
+function Leg({
+  color,
+  label,
+  pct,
+  minor,
+  signed = false,
+}: {
+  color: string;
+  label: string;
+  pct: number;
+  minor: number;
+  signed?: boolean;
+}) {
+  return (
+    <span className="inline-flex flex-col gap-0.5 min-w-0">
+      <span className="inline-flex items-center gap-1.5 muted">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} aria-hidden />
+        {label} {Math.round(pct)}%
+      </span>
+      <span className="num font-semibold pl-3" style={{ color }}>
+        {signed && minor < 0 && '−'}
+        {formatINR(Math.abs(minor))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The textbook savings rate, reconciled against the cash figure above it.
+ *
+ * `income − spending` is a legitimate number and a misleading headline, which
+ * is why it lives down here qualified rather than up there alone. The redesign
+ * dropped it along with the card it used to sit in; without it the hero says
+ * "−₹4,912" and never explains that the month did in fact save ₹10,088 before
+ * ₹15,000 went into investments.
+ */
+/**
+ * "a" or "an" for a percentage read aloud. Eighty, eleven and eighteen all
+ * start with a vowel sound; every other leading digit does not.
+ */
+function article(n: number): string {
+  const lead = String(Math.abs(n));
+  return lead.startsWith('8') || lead === '11' || lead === '18' ? 'an' : 'a';
+}
+
+export function TallyReconciliation({ plan }: { plan: MonthlyPlan }) {
+  const t = plan.tally;
+  if (!t.known) return null;
+  const overspent = t.savedMinor < 0;
+  const dipped = t.inHandMinor < 0;
+
+  return (
+    <p className="muted text-[12px] leading-relaxed">
+      {t.investedMinor > 0 ? (
+        <>
+          Income less spending is <span className="num">{formatINR(t.savedMinor)}</span>
+          {t.ratePct != null && !overspent && <> — a {Math.round(t.ratePct)}% savings rate</>}, but{' '}
+          <span className="num">{formatINR(t.investedMinor)}</span> of it went into investments
+          {dipped ? (
+            <>
+              {' '}
+              — <span className="num">{formatINR(Math.abs(t.inHandMinor))}</span> more than the month produced, so the
+              difference came out of money you already had.
+            </>
+          ) : (
+            <>, which you still have — just not in cash.</>
+          )}
+        </>
+      ) : overspent ? (
+        <>
+          <span className="num">{formatINR(Math.abs(t.savedMinor))}</span> more went out than came in.
+        </>
+      ) : (
+        <>
+          That is {article(Math.round(t.ratePct ?? 0))} {Math.round(t.ratePct ?? 0)}% savings rate — the share of what
+          came in that is still sitting there.
+        </>
+      )}
+    </p>
   );
 }

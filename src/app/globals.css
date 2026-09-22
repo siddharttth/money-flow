@@ -19,9 +19,13 @@
   /* next/font publishes --ff-*; these compose the real fallback stacks on top.
      Naming both sides --font-display would be a self-reference, which CSS
      treats as a cycle and drops, silently losing the fallbacks. */
+  /* Obsidian Kinetic is a one-typeface system: Plus Jakarta Sans carries the
+     UI, the headings and the figures. The serif is loaded for the marketing
+     page alone and never used inside the app. */
   --font-sans: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--ff-serif), ui-serif, Georgia, serif;
-  --font-mono: var(--ff-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-serif-lp: var(--ff-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--ff-grotesk), ui-sans-serif, system-ui, sans-serif;
 }
 
 /*
@@ -47,12 +51,28 @@
   --paper-line: oklch(0.885 0.018 110);
   --paper-line-2: oklch(0.795 0.027 120);
 
-  /* --- raw: ink stock --- */
-  --ink-0: oklch(0.158 0.017 155);
-  --ink-1: oklch(0.202 0.021 155);
-  --ink-2: oklch(0.252 0.024 155);
-  --ink-line: oklch(0.305 0.021 155);
-  --ink-line-2: oklch(0.415 0.026 155);
+  /*
+   * --- raw: obsidian stock ---
+   * Deep charcoal tiers, near-neutral with a faint cool cast. The old ink
+   * stock carried a green tint that fought the lime accent; these do not.
+   */
+  --ink-0: #0c0e10;   /* canvas */
+  --ink-1: #16191c;   /* cards, sidebar, header */
+  --ink-2: #22262a;   /* elevated: modals, hovers, wells */
+  --ink-3: #2c3136;   /* chips, tracks */
+  --ink-line: rgba(255, 255, 255, 0.08);
+  --ink-line-2: rgba(255, 255, 255, 0.16);
+
+  /* --- raw: kinetic pigments --- */
+  --lime: #a3e635;        /* primary accent: growth, action, active state */
+  --lime-bright: #ccff80; /* the brightest readout — hero figures */
+  --lime-deep: #65a30d;
+  --lime-ink: #16250a;    /* text on a lime fill */
+  --fiscal-green: #4ade80;
+  --coral: #fb7185;
+  --slate-text: #e6e8ea;
+  --slate-muted: #8b949e;
+  --slate-ghost: #5f6873;
 
   /* --- raw: pigments --- */
   --forest: oklch(0.335 0.072 152);
@@ -69,8 +89,59 @@
   --green-on-paper: oklch(0.475 0.115 158);
   --green-on-ink: oklch(0.735 0.13 160);
 
-  /* ================= PAPER (default) ================= */
-  --bg: var(--paper-0);
+  /* ================= OBSIDIAN (default) ================= */
+    --bg: var(--ink-0);
+  --surface: var(--ink-1);
+  --surface-2: var(--ink-2);
+  --surface-3: var(--ink-3);
+  --border: var(--ink-line);
+  --border-strong: var(--ink-line-2);
+  --text: var(--slate-text);
+  --text-muted: var(--slate-muted);
+  --text-ghost: var(--slate-ghost);
+
+  /* Lime is the action colour, and it is dark-on-light when filled. */
+  --brass: var(--lime);
+  --brass-bright: var(--lime-bright);
+  --on-brass: var(--lime-ink);
+  --brass-soft: color-mix(in oklab, var(--lime) 15%, transparent);
+
+  /* The brightest readout in the system — hero figures only. */
+  --hi: var(--lime-bright);
+  --hi-soft: color-mix(in oklab, var(--lime) 16%, transparent);
+
+  --rule-red: var(--coral);
+  --rule-red-soft: color-mix(in oklab, var(--coral) 14%, transparent);
+  --credit: var(--fiscal-green);
+  --credit-soft: color-mix(in oklab, var(--fiscal-green) 14%, transparent);
+
+  --danger: var(--coral);
+  --success: var(--fiscal-green);
+  --accent: var(--lime);
+  --accent-soft: color-mix(in oklab, var(--lime) 14%, transparent);
+
+  /* Depth is layered surface and a hairline, not a heavy drop shadow. */
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --glow: 0 0 24px -4px color-mix(in oklab, var(--lime) 35%, transparent);
+  --grid-ink: rgba(255, 255, 255, 0.035);
+  --logo-filter: brightness(1.75) saturate(0.9);
+
+  color-scheme: dark;
+}
+
+/*
+ * Paper is an explicit opt-in only — there is no `prefers-color-scheme: light`
+ * switch any more.
+ *
+ * Obsidian Kinetic is a dark design: the lime accent, the ambient blooms and
+ * the tiered charcoal surfaces are the identity, and auto-flipping half the
+ * audience to a cream theme on the strength of an OS setting would mean the
+ * app has no look of its own. Light stays available for anyone who wants it.
+ */
+/* ================= PAPER (explicit choice) ================= */
+:root[data-theme='light'] {
+--bg: var(--paper-0);
   --surface: var(--paper-1);
   --surface-2: var(--paper-2);
   --border: var(--paper-line);
@@ -105,80 +176,6 @@
   --logo-filter: none;
 
   color-scheme: light;
-}
-
-/* ================= INK (system preference) ================= */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: var(--ink-0);
-    --surface: var(--ink-1);
-    --surface-2: var(--ink-2);
-    --border: var(--ink-line);
-    --border-strong: var(--ink-line-2);
-    --text: var(--ivory);
-    --text-muted: var(--ivory-muted);
-
-    --brass: var(--gold);
-    --brass-bright: var(--gold-deep);
-    --on-brass: var(--forest-deep);
-    --brass-soft: color-mix(in oklab, var(--gold) 16%, transparent);
-
-    --hi: var(--gold);
-    --hi-soft: color-mix(in oklab, var(--gold) 18%, transparent);
-
-    --rule-red: var(--red-on-ink);
-    --rule-red-soft: color-mix(in oklab, var(--red-on-ink) 15%, transparent);
-    --credit: var(--green-on-ink);
-    --credit-soft: color-mix(in oklab, var(--green-on-ink) 15%, transparent);
-
-    --danger: var(--red-on-ink);
-    --success: var(--green-on-ink);
-    --accent: var(--gold);
-    --accent-soft: color-mix(in oklab, var(--gold) 15%, transparent);
-
-    --shadow: 0 1px 0 color-mix(in oklab, white 5%, transparent);
-    --shadow-lg: 0 28px 60px -24px rgb(0 0 0 / 0.75);
-    --grid-ink: color-mix(in oklab, var(--ivory) 5%, transparent);
-    --logo-filter: brightness(1.7) saturate(0.85);
-
-    color-scheme: dark;
-  }
-}
-
-/* ================= INK (explicit choice) ================= */
-:root[data-theme='dark'] {
-  --bg: var(--ink-0);
-  --surface: var(--ink-1);
-  --surface-2: var(--ink-2);
-  --border: var(--ink-line);
-  --border-strong: var(--ink-line-2);
-  --text: var(--ivory);
-  --text-muted: var(--ivory-muted);
-
-  --brass: var(--gold);
-  --brass-bright: var(--gold-deep);
-  --on-brass: var(--forest-deep);
-  --brass-soft: color-mix(in oklab, var(--gold) 16%, transparent);
-
-  --hi: var(--gold);
-  --hi-soft: color-mix(in oklab, var(--gold) 18%, transparent);
-
-  --rule-red: var(--red-on-ink);
-  --rule-red-soft: color-mix(in oklab, var(--red-on-ink) 15%, transparent);
-  --credit: var(--green-on-ink);
-  --credit-soft: color-mix(in oklab, var(--green-on-ink) 15%, transparent);
-
-  --danger: var(--red-on-ink);
-  --success: var(--green-on-ink);
-  --accent: var(--gold);
-  --accent-soft: color-mix(in oklab, var(--gold) 15%, transparent);
-
-  --shadow: 0 1px 0 color-mix(in oklab, white 5%, transparent);
-  --shadow-lg: 0 28px 60px -24px rgb(0 0 0 / 0.75);
-  --grid-ink: color-mix(in oklab, var(--ivory) 5%, transparent);
-  --logo-filter: brightness(1.7) saturate(0.85);
-
-  color-scheme: dark;
 }
 
 @layer base {
@@ -282,10 +279,14 @@ h1, h2, h3 {
 
 @layer components {
   /* Soft rectangle: white, hairline border, ambient glow. */
+  /*
+   * Tier 1. Obsidian's depth is layered surface plus a 1px hairline, not a
+   * drop shadow — `--shadow` is a whisper and carries no colour.
+   */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 0.625rem;
+    border-radius: 0.875rem;
     box-shadow: var(--shadow);
   }
 
@@ -343,10 +344,9 @@ h1, h2, h3 {
 
   .label {
     display: block;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    font-weight: 500;
-    letter-spacing: 0.14em;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 0.4rem;
@@ -372,7 +372,12 @@ h1, h2, h3 {
   .btn:active { transform: scale(0.985); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-  .btn-primary { background: var(--brass); color: var(--on-brass); }
+  .btn-primary {
+    background: var(--brass);
+    color: var(--on-brass);
+    /* Ambient lime bloom — the one place the system spends light. */
+    box-shadow: 0 0 20px -6px color-mix(in oklab, var(--brass) 45%, transparent);
+  }
   /*
    * The lift on hover is tinted with the button's own colour.
    *
@@ -428,10 +433,9 @@ h1, h2, h3 {
 
   /* Uppercase micro-header, per the type scale. */
   .micro {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    font-weight: 500;
-    letter-spacing: 0.14em;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
@@ -511,7 +515,18 @@ h1, h2, h3 {
      feeling for a bar that just moved forward. */
   .grow-spring { transition: width 560ms cubic-bezier(0.34, 1.4, 0.64, 1); }
 
-  @media (prefers-reduced-motion: reduce) {
+  /* The live dot on the dashboard header. Slow, low-amplitude — a heartbeat,
+   not a blink. Stopped entirely under reduced motion, below. */
+@keyframes mf-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+.pulse-dot {
+  animation: mf-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  box-shadow: 0 0 10px -1px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
     .rise,
     .wash,
     .attention-row,
@@ -523,6 +538,77 @@ h1, h2, h3 {
     .grow-spring {
       transition: none !important;
     }
+  }
+
+  /*
+   * OBSIDIAN KINETIC PRIMITIVES
+   * ---------------------------
+   * The four shapes the new design repeats everywhere.
+   */
+
+  /** A rounded square holding an icon, top-left of every metric card. */
+  .icon-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    background: var(--surface-2);
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .icon-tile-accent {
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+    color: var(--accent);
+  }
+
+  /** A compact delta badge sitting opposite the icon tile. */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .badge-up { background: var(--rule-red-soft); color: var(--rule-red); }
+  .badge-down,
+  .badge-good { background: var(--accent-soft); color: var(--accent); }
+  .badge-neutral { background: var(--surface-2); color: var(--text-muted); }
+
+  /**
+   * The ambient bloom in a hero card's top-right corner. A radial that fades
+   * to nothing by 65% — it lifts the card without lighting the whole thing.
+   */
+  .glow-card { position: relative; overflow: hidden; }
+  .glow-card::before {
+    content: '';
+    position: absolute;
+    top: -3rem;
+    right: -3rem;
+    width: 12rem;
+    height: 12rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--accent) 16%, transparent);
+    filter: blur(48px);
+    pointer-events: none;
+    transition: background 400ms ease-out;
+  }
+  @media (hover: hover) {
+    .glow-card:hover::before { background: color-mix(in oklab, var(--accent) 24%, transparent); }
+  }
+
+  /** An enclosed tray for segmented controls, one tier below its buttons. */
+  .tray {
+    background: var(--bg);
+    border-radius: 9999px;
+    padding: 0.25rem;
+    display: inline-flex;
+    gap: 0.25rem;
   }
 
   /* Anything in a list that can be opened. 150ms ease-out everywhere. */
@@ -751,11 +837,15 @@ body:has(.auth) { background: var(--paper-0); }
  * name, kept so no markup had to churn.
  */
 .tabular,
+/*
+ * Figures. Jakarta has true tabular digits, so a ledger column still lines up
+ * without a second family — `tnum` does the work the mono face used to.
+ */
 .num {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-  letter-spacing: -0.03em;
+  font-feature-settings: 'tnum' 1, 'ss01' 1;
+  letter-spacing: -0.02em;
+  font-weight: 600;
 }
 
 /* A genuine zero is not information — it should recede. */
@@ -839,14 +929,14 @@ body:has(.auth) { background: var(--paper-0); }
 .lp-dark { background: var(--forest-ink); color: var(--onforest); }
 
 .lp-display {
-  font-family: var(--font-display);
+  font-family: var(--font-serif-lp);
   font-weight: 400;
   font-optical-sizing: auto;
   letter-spacing: -0.025em;
   line-height: 1.05;
 }
 .lp-display-em {
-  font-family: var(--font-display);
+  font-family: var(--font-serif-lp);
   font-weight: 400;
   font-style: italic;
   font-optical-sizing: auto;
@@ -936,7 +1026,7 @@ body:has(.auth) { background: var(--paper-0); }
 }
 
 .lp-num {
-  font-family: var(--font-display);
+  font-family: var(--font-serif-lp);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }

@@ -33,7 +33,11 @@ export function Logo({
       height={height}
       priority
       className={className}
-      style={{ filter: onDark ? 'brightness(1.7) saturate(0.85)' : 'var(--logo-filter)', height, width: 'auto' }}
+      style={{
+        filter: onDark ? 'brightness(1.7) saturate(0.85)' : 'var(--logo-filter)',
+        height,
+        width: 'auto',
+      }}
     />
   );
 }

@@ -22,7 +22,7 @@ type CategoryRow = Category & {
   targetDate: string | null;
 };
 
-type ThemeChoice = 'system' | 'light' | 'dark';
+type ThemeChoice = 'light' | 'dark';
 
 /**
  * Configuration, not a daily destination — which is why categories live here
@@ -33,7 +33,7 @@ export default function SettingsPage() {
   const { toast } = useShell();
   const { openCategory } = useInspector();
   const { mutate } = useSWRConfig();
-  const [theme, setTheme] = useState<ThemeChoice>('system');
+  const [theme, setTheme] = useState<ThemeChoice>('dark');
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [creating, setCreating] = useState<null | 'expense' | 'income' | 'investment' | 'goal'>(null);
 
@@ -60,7 +60,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     try {
-      setTheme((localStorage.getItem('mf-theme') as ThemeChoice) ?? 'system');
+      setTheme((localStorage.getItem('mf-theme') as ThemeChoice) ?? 'dark');
     } catch {
       /* storage unavailable */
     }
@@ -85,13 +85,8 @@ export default function SettingsPage() {
   function applyTheme(next: ThemeChoice) {
     setTheme(next);
     try {
-      if (next === 'system') {
-        localStorage.removeItem('mf-theme');
-        document.documentElement.removeAttribute('data-theme');
-      } else {
-        localStorage.setItem('mf-theme', next);
-        document.documentElement.setAttribute('data-theme', next);
-      }
+      localStorage.setItem('mf-theme', next);
+      document.documentElement.setAttribute('data-theme', next);
     } catch {
       /* ignore */
     }
@@ -294,7 +289,7 @@ export default function SettingsPage() {
       <section>
         <SectionHead label="Appearance" />
         <Card>
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 max-w-sm">
             {THEMES.map((t) => (
               <button
                 key={t.value}
@@ -376,10 +371,14 @@ export default function SettingsPage() {
   );
 }
 
+/*
+ * "System" is gone. Obsidian is the app's look, not one of two equal options,
+ * and a device setting deciding which identity you get is how a product ends
+ * up with none. Paper stays for anyone who prefers light.
+ */
 const THEMES: { value: ThemeChoice; label: string; hint: string }[] = [
-  { value: 'system', label: 'System', hint: 'Follows your device' },
   { value: 'light', label: 'Paper', hint: 'Cream and forest' },
-  { value: 'dark', label: 'Ink', hint: 'Near-black and gold' },
+  { value: 'dark', label: 'Obsidian', hint: 'Charcoal and electric lime' },
 ];
 
 /**
@@ -389,16 +388,8 @@ const THEMES: { value: ThemeChoice; label: string; hint: string }[] = [
  */
 function ThemeSwatch({ kind }: { kind: ThemeChoice }) {
   const paper = { bg: 'var(--paper-0)', card: 'var(--paper-1)', ink: 'var(--forest)', line: 'var(--paper-line)' };
-  const ink = { bg: 'var(--ink-0)', card: 'var(--ink-1)', ink: 'var(--gold)', line: 'var(--ink-line)' };
+  const ink = { bg: 'var(--ink-0)', card: 'var(--ink-1)', ink: 'var(--lime)', line: 'var(--ink-line-2)' };
 
-  if (kind === 'system') {
-    return (
-      <span className="flex h-12 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-        <SwatchHalf tone={paper} />
-        <SwatchHalf tone={ink} />
-      </span>
-    );
-  }
   return (
     <span className="flex h-12 rounded overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <SwatchHalf tone={kind === 'light' ? paper : ink} full />

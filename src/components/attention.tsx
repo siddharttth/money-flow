@@ -69,14 +69,39 @@ export function AttentionList({ items, month }: { items: AttentionItem[]; month:
               className="attention-row flex items-start gap-3 px-4 py-3.5"
               style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}
             >
+              {/* An icon tile rather than a bare dot — the row reads as a card
+                  in a list, which is what the rest of the system does. */}
               <span
                 aria-hidden
-                className="w-1.5 h-1.5 rounded-full shrink-0 mt-[7px]"
-                style={{ background: toneColor(item.tone) }}
-              />
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{
+                  background: `color-mix(in oklab, ${toneColor(item.tone)} 14%, transparent)`,
+                  color: toneColor(item.tone),
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+              </span>
 
               <div className="min-w-0 flex-1">
-                <p className="text-[13.5px] font-semibold">{item.title}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[13.5px] font-semibold">{item.title}</p>
+                  {/* The severity, named. "Over budget" and "will pass its
+                      budget" are a fact and a forecast, and a reader skimming
+                      six rows should not have to parse the sentence to tell
+                      them apart. */}
+                  <span
+                    className="badge"
+                    style={{
+                      background: `color-mix(in oklab, ${toneColor(item.tone)} 14%, transparent)`,
+                      color: toneColor(item.tone),
+                      fontSize: '10px',
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {severity(item)}
+                  </span>
+                </div>
                 <p className="muted text-[12px] mt-0.5 leading-relaxed">{item.detail}</p>
               </div>
 
@@ -103,6 +128,30 @@ export function AttentionList({ items, month }: { items: AttentionItem[]; month:
       </Card>
     </div>
   );
+}
+
+/**
+ * A two-word name for what kind of problem this is, derived from the rule's
+ * own id — so the label cannot drift from the rule that raised it.
+ */
+function severity(item: AttentionItem): string {
+  const kind = item.id.split(':')[0];
+  switch (kind) {
+    case 'budget-over':
+      return 'Overrun';
+    case 'budget-pace':
+      return 'Forecast';
+    case 'income':
+      return 'Unlogged';
+    case 'goal':
+      return 'Behind';
+    case 'debt':
+      return 'Outstanding';
+    case 'pace':
+      return 'Running hot';
+    default:
+      return 'On track';
+  }
 }
 
 function toneColor(tone: AttentionItem['tone']): string {

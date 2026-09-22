@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, IBM_Plex_Mono, Space_Grotesk } from 'next/font/google';
+import { Fraunces, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
 /**
@@ -25,18 +25,19 @@ const serif = Fraunces({
   display: 'swap',
 });
 
-/* The UI face, across the marketing page and the app. */
-const grotesk = Space_Grotesk({
+/*
+ * Plus Jakarta Sans, universally — Obsidian Kinetic's one typeface.
+ *
+ * It carries the UI, the headings and the figures. Rupee amounts used to be
+ * set in a separate mono face because fixed-width digits are what make a
+ * ledger column scannable; Jakarta has real tabular figures, so `.num` asks
+ * for them with `font-variant-numeric: tabular-nums` instead of switching
+ * family. One face, and the columns still line up.
+ */
+const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--ff-grotesk',
-  display: 'swap',
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--ff-mono',
   display: 'swap',
 });
 
@@ -63,7 +64,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${serif.variable} ${grotesk.variable} ${mono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${serif.variable} ${jakarta.variable}`}>
       <head>
         {/* Applies the saved theme before first paint so there is no flash. */}
         <script

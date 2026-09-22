@@ -125,29 +125,21 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
            */}
           <aside
             className="hidden lg:flex flex-col w-[15rem] fixed left-0 top-0 bottom-0 z-40 border-r px-3 py-5 overflow-y-auto"
-            style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+            /* The rail sits on the canvas tier, not the card tier — the cards
+               it scrolls past are the lighter surface, which is what gives the
+               stage its depth. */
+            style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
           >
-            <Link href="/dashboard" className="flex items-center px-2 mb-7" aria-label="Money Flow home">
+            {/* The real mark, on its own. The redesign put it inside a lime
+                tile beside a "MoneyFlow" wordmark — a generic identity block
+                that threw away the actual logo. */}
+            <Link href="/dashboard" className="flex items-center px-2 mb-6" aria-label="Money Flow home">
               <Logo height={22} />
             </Link>
 
-            <button className="btn btn-primary w-full mb-2" onClick={() => openAdd()}>
+            <button className="btn btn-primary w-full mb-6" onClick={() => openAdd()}>
               <NavIcon name="plus" size={16} />
               Add transaction
-            </button>
-
-            <button
-              className="flex items-center justify-between gap-2 mb-6 px-3.5 h-9 rounded-full text-xs transition-colors"
-              style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', transitionDuration: '150ms' }}
-              onClick={openSearch}
-            >
-              <span>Search…</span>
-              <kbd
-                className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-                style={{ background: 'var(--surface)', color: 'var(--text-muted)' }}
-              >
-                ⌘K
-              </kbd>
             </button>
 
             <nav className="flex flex-col gap-0.5">
@@ -157,10 +149,10 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
                   <Link
                     href={item.href}
                     aria-current={isActive(item.href) ? 'page' : undefined}
-                    className="flex items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] font-semibold transition-colors"
+                    className="flex items-center gap-3 px-3 h-10 rounded-xl text-[13.5px] font-semibold transition-colors"
                     style={
                       isActive(item.href)
-                        ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                        ? { background: 'var(--surface-2)', color: 'var(--accent)' }
                         : { color: 'var(--text-muted)' }
                     }
                   >
@@ -173,10 +165,10 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               <Link
                 href="/settings"
                 aria-current={isActive('/settings') ? 'page' : undefined}
-                className="flex items-center gap-3 px-3 h-10 mt-4 rounded-lg text-[13.5px] font-semibold transition-colors"
+                className="flex items-center gap-3 px-3 h-10 mt-4 rounded-xl text-[13.5px] font-semibold transition-colors"
                 style={
                   isActive('/settings')
-                    ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                    ? { background: 'var(--surface-2)', color: 'var(--accent)' }
                     : { color: 'var(--text-muted)' }
                 }
               >
@@ -185,9 +177,22 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               </Link>
             </nav>
 
-            <div className="mt-auto pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-              <p className="text-[13px] font-semibold truncate px-3">{user.name}</p>
-              <p className="muted text-[11px] truncate px-3 mt-0.5">{user.email}</p>
+            <div className="mt-auto pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+              <div
+                className="flex items-center gap-2.5 p-2 rounded-xl"
+                style={{ background: 'var(--surface)' }}
+              >
+                <span
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0"
+                  style={{ background: 'var(--brass)', color: 'var(--on-brass)' }}
+                >
+                  {user.name.slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold truncate leading-tight">{user.name}</p>
+                  <p className="muted text-[11px] truncate">{user.email}</p>
+                </div>
+              </div>
               <button onClick={logout} className="muted text-[11px] px-3 mt-2 hover:underline">
                 Sign out
               </button>
@@ -238,8 +243,65 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
               </div>
             </header>
 
+            {/*
+              DESKTOP TOP BAR.
+              Search used to live in the sidebar and there was no header at all
+              above 1024px, so the content column started hard against the top
+              of the viewport. Obsidian puts a persistent bar there: search,
+              then the account controls. It is `sticky`, not `fixed`, so it
+              participates in the column and needs no offset compensating for
+              it anywhere else.
+            */}
+            <header
+              className="hidden lg:flex sticky top-0 z-30 items-center justify-between gap-4 px-8 h-16 border-b"
+              style={{
+                borderColor: 'var(--border)',
+                background: 'color-mix(in oklab, var(--bg) 80%, transparent)',
+                backdropFilter: 'blur(16px)',
+              }}
+            >
+              <button
+                onClick={openSearch}
+                className="flex items-center gap-2.5 h-9 pl-3.5 pr-2 rounded-full w-80 text-left transition-colors"
+                style={{ background: 'var(--surface)', color: 'var(--text-muted)' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+                  <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <path d="M16 16l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="flex-1 text-[13px]">Quick search…</span>
+                <kbd
+                  className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+                >
+                  ⌘K
+                </kbd>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/settings"
+                  aria-label="Settings"
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                  style={{
+                    background: 'var(--surface)',
+                    color: isActive('/settings') ? 'var(--accent)' : 'var(--text-muted)',
+                  }}
+                >
+                  <NavIcon name="settings" size={17} />
+                </Link>
+                <span
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-bold"
+                  style={{ background: 'var(--brass)', color: 'var(--on-brass)' }}
+                  title={user.name}
+                >
+                  {user.name.slice(0, 1).toUpperCase()}
+                </span>
+              </div>
+            </header>
+
             <main className="flex-1 w-full app-grid">
-              <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-32 lg:pb-10 max-w-6xl w-full mx-auto">
+              <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-32 lg:pb-10 max-w-[1600px] w-full mx-auto">
                 {children}
               </div>
             </main>
