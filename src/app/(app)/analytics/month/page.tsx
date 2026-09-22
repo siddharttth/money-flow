@@ -178,7 +178,12 @@ function AnalyticsInner() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <Card>
             <h3 className="text-[15px] font-semibold mb-1">What a weekday costs</h3>
-            <p className="muted text-[12px] mb-4">Average across the days of that name that saw any spending.</p>
+            {/* The denominator is every Thursday that has happened, not the
+                Thursdays you spent on — see the note in flow.ts. The caption
+                described the old, wrong one. */}
+            <p className="muted text-[12px] mb-4">
+              Total on each weekday, divided by how many of them have happened this month.
+            </p>
             {f && f.weekday.some((w) => w.avgMinor > 0) ? (
               <>
                 <WeekdayBars data={f.weekday} />
