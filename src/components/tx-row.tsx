@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { api } from '@/lib/client';
 import { dayLabel } from '@/lib/dates';
 import type { Transaction } from '@/lib/transactions';
@@ -23,6 +24,7 @@ export function TransactionRow({
   count = 1,
   onOpen,
   onDelete,
+  onEdit,
   onFilterCategory,
   onFilterPerson,
 }: {
@@ -36,6 +38,8 @@ export function TransactionRow({
   onOpen?: () => void;
   /** Omitted on read-only lists like the dashboard's recent activity. */
   onDelete?: () => void;
+  /** Editing a lent/borrowed entry. Expenses open the add sheet themselves. */
+  onEdit?: () => void;
   onFilterCategory?: (id: string) => void;
   onFilterPerson?: (id: string) => void;
 }) {
@@ -57,6 +61,13 @@ export function TransactionRow({
   // as a tag underneath was the same word twice on every second row.
   const showCategoryTag = !!tx.category && title !== tx.category.name;
 
+  /*
+   * A clustered row is itself pressable, and it contains pressable tags —
+   * category, person, Edit, Delete. `<button>` inside `<button>` is invalid
+   * HTML and React says so at hydration, so the inner ones are spans carrying
+   * `role="button"` and keyboard handling instead. They behave identically and
+   * nest legally.
+   */
   const Tag = clustered ? 'button' : 'div';
 
   return (
@@ -114,26 +125,24 @@ export function TransactionRow({
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
           {showDate && <span className="micro shrink-0">{dayLabel(tx.date)}</span>}
           {showCategoryTag && tx.category && (
-            <button
-              className="tag"
+            <PressableTag
               title="Open category · shift-click to filter"
-              onClick={(e) =>
-                e.shiftKey && onFilterCategory ? onFilterCategory(tx.category!.id) : openCategory(tx.category!.id)
+              onPress={(shift) =>
+                shift && onFilterCategory ? onFilterCategory(tx.category!.id) : openCategory(tx.category!.id)
               }
             >
               {tx.category.name}
-            </button>
+            </PressableTag>
           )}
           {tx.people.map((p) => (
-            <button
+            <PressableTag
               key={p.id}
-              className="tag"
               title="Open person · shift-click to filter"
-              onClick={(e) => (e.shiftKey && onFilterPerson ? onFilterPerson(p.id) : openPerson(p.id))}
+              onPress={(shift) => (shift && onFilterPerson ? onFilterPerson(p.id) : openPerson(p.id))}
             >
               <PersonMark name={p.name} color={p.color} size={14} />
               {p.name}
-            </button>
+            </PressableTag>
           ))}
           {isLedger && (
             <span
@@ -175,23 +184,67 @@ export function TransactionRow({
           {!clustered && onDelete && (
             <span className="reveal ml-auto flex items-center gap-1">
               {tx.kind === 'expense' && (
-                <button
-                  className="tag"
-                  onClick={async () => {
+                <PressableTag
+                  onPress={async () => {
                     const full = await api.get<never>(`/api/expenses/${tx.id}`);
                     openAdd(full);
                   }}
                 >
                   Edit
-                </button>
+                </PressableTag>
               )}
-              <button className="tag" style={{ color: 'var(--rule-red)' }} onClick={onDelete}>
+              {isLedger && onEdit && <PressableTag onPress={onEdit}>Edit</PressableTag>}
+              <PressableTag tone="var(--rule-red)" onPress={onDelete}>
                 Delete
-              </button>
+              </PressableTag>
             </span>
           )}
         </div>
       </div>
     </Tag>
+  );
+}
+
+/**
+ * A `.tag` that presses, without being a `<button>`.
+ *
+ * These sit inside a row that is itself a button when its entries are
+ * clustered, and nesting real buttons is invalid HTML — React raises a
+ * hydration error for it. A span with `role="button"`, a tab stop and Enter
+ * handling is the same control, legally nested. It also stops the click
+ * reaching the row behind it.
+ */
+function PressableTag({
+  children,
+  onPress,
+  title,
+  tone,
+}: {
+  children: ReactNode;
+  onPress: (shiftKey: boolean) => void;
+  title?: string;
+  tone?: string;
+}) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      title={title}
+      className="tag"
+      style={tone ? { color: tone } : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        onPress(e.shiftKey);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onPress(e.shiftKey);
+        }
+      }}
+    >
+      {children}
+    </span>
   );
 }

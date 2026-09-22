@@ -136,6 +136,18 @@ function toDTO(row: typeof ledgerEntries.$inferSelect, person: PeerBalance | { i
   };
 }
 
+/** One entry, with its person — what the edit sheet needs to open. */
+export async function getLedgerEntry(userId: string, id: string): Promise<LedgerEntryDTO> {
+  const [row] = await db
+    .select({ e: ledgerEntries, p: people })
+    .from(ledgerEntries)
+    .innerJoin(people, eq(people.id, ledgerEntries.personId))
+    .where(and(eq(ledgerEntries.id, id), live(userId)))
+    .limit(1);
+  if (!row) throw new ApiError(404, 'Entry not found');
+  return toDTO(row.e, { id: row.p.id, name: row.p.name, avatar: row.p.avatar, color: row.p.color });
+}
+
 /** Full history for one peer, newest first, with a running balance. */
 export async function getPeerLedger(userId: string, personId: string) {
   const [person] = await db

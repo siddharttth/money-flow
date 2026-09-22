@@ -23,6 +23,7 @@ import { MonthPicker } from '@/components/month-picker';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { CategoryIcon, PersonMark } from '@/components/icons';
+import { LedgerForm, type LedgerEntry } from '@/components/ledger-form';
 
 const KINDS: { key: TxKind; label: string }[] = [
   { key: 'expense', label: 'Spent' },
@@ -62,6 +63,7 @@ function Transactions() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(150);
   const [openCluster, setOpenCluster] = useState<{ cluster: TxCluster; date: string } | null>(null);
+  const [editingLedger, setEditingLedger] = useState<string | null>(null);
 
   const { start, end } = monthRange(month);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
@@ -275,6 +277,14 @@ function Transactions() {
                       count={c.items.length}
                       onOpen={() => setOpenCluster({ cluster: c, date })}
                       onDelete={c.items.length === 1 ? () => remove(c.lead) : undefined}
+                      /* Lent and borrowed rows had a Delete and no Edit, so a
+                         wrong amount meant delete-and-retype. Expenses open
+                         the add sheet themselves; these need the ledger form. */
+                      onEdit={
+                        c.items.length === 1 && c.lead.kind !== 'expense'
+                          ? () => setEditingLedger(c.lead.id)
+                          : undefined
+                      }
                       onFilterCategory={(id) => setCategoryIds([id])}
                       onFilterPerson={(id) => setPersonIds([id])}
                     />
@@ -295,6 +305,8 @@ function Transactions() {
           )}
         </div>
       )}
+
+      <EditLedgerModal id={editingLedger} onClose={() => setEditingLedger(null)} onSaved={refreshAll} />
 
       <ClusterModal
         open={openCluster}
@@ -428,6 +440,45 @@ function ClusterModal({
             ))}
           </ul>
         </>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * Editing one lent/borrowed entry.
+ *
+ * Fetched by id rather than passed down: the row in the feed is a `Transaction`
+ * — the merged shape — and `LedgerForm` wants the ledger entry itself, with its
+ * person and its major-unit amount. Asking the API is cheaper than widening the
+ * feed for one sheet.
+ */
+function EditLedgerModal({
+  id,
+  onClose,
+  onSaved,
+}: {
+  id: string | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useShell();
+  const { data } = useSWR<LedgerEntry>(id ? `/api/ledger/${id}` : null);
+
+  return (
+    <Modal open={!!id} onClose={onClose} title="Edit entry">
+      {data ? (
+        <LedgerForm
+          key={data.id}
+          existing={data}
+          onSaved={async () => {
+            onClose();
+            await onSaved();
+            toast('Entry updated');
+          }}
+        />
+      ) : (
+        <ListSkeleton rows={4} />
       )}
     </Modal>
   );

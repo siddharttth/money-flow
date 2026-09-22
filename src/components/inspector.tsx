@@ -10,7 +10,8 @@ import type { Transaction } from '@/lib/transactions';
 import type { PersonExpense } from '@/lib/analytics';
 import type { Expense } from '@/lib/types';
 import { Drawer } from './drawer';
-import { ListSkeleton, EmptyState, Money } from './ui';
+import { ListSkeleton, EmptyState, Modal, Money } from './ui';
+import { LedgerForm, type LedgerEntry } from './ledger-form';
 import { ShareBar } from './graph';
 import { useShell } from './app-shell';
 import { CategoryIcon, PersonMark } from './icons';
@@ -163,6 +164,9 @@ type PersonInsight = {
 
 function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading, mutate } = useSWR<PersonInsight>(`/api/insights/person/${id}`);
+  /* A lent/borrowed entry recorded wrong was previously unfixable from here —
+     the list was read-only, and `LedgerForm` has supported editing all along. */
+  const [editing, setEditing] = useState<LedgerEntry | null>(null);
   const [tab, setTab] = useState('Expenses');
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -177,6 +181,24 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
    * and the rows are only marked deleted, so restoring them is exact rather
    * than a re-entry job.
    */
+  /** One entry, soft-deleted, with the same undo the ledger page offers. */
+  async function removeLedgerEntry(entryId: string) {
+    try {
+      await api.del(`/api/ledger/${entryId}`);
+      await Promise.all([mutate(), mutateAll((k) => typeof k === 'string' && k.startsWith('/api/'))]);
+      toast('Entry deleted', 'success', {
+        label: 'Undo',
+        onClick: async () => {
+          await api.post(`/api/ledger/${entryId}/restore`);
+          await Promise.all([mutate(), mutateAll((k) => typeof k === 'string' && k.startsWith('/api/'))]);
+          toast('Entry restored');
+        },
+      });
+    } catch {
+      toast('Could not delete that entry', 'error');
+    }
+  }
+
   async function clearLedger() {
     setClearing(true);
     try {
@@ -277,7 +299,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
           ) : data.ledger.length ? (
             <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {data.ledger.map((e) => (
-                <div key={e.id} className="flex items-center gap-3 py-2.5">
+                <div key={e.id} className="group flex items-center gap-3 py-2.5">
                   <span
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
                     style={{
@@ -295,6 +317,36 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
                     </p>
                   </div>
                   <Money minor={e.amountMinor} className="text-sm font-semibold shrink-0" />
+                  <span className="reveal flex items-center gap-1 shrink-0">
+                    <button
+                      className="tag"
+                      onClick={() =>
+                        setEditing({
+                          id: e.id,
+                          direction: e.direction,
+                          amount: e.amountMinor / 100,
+                          amountMinor: e.amountMinor,
+                          entryDate: e.entryDate,
+                          note: e.note,
+                          person: {
+                            id: data.person.id,
+                            name: data.person.name,
+                            avatar: '',
+                            color: data.person.color,
+                          },
+                        })
+                      }
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="tag"
+                      style={{ color: 'var(--rule-red)' }}
+                      onClick={() => removeLedgerEntry(e.id)}
+                    >
+                      Delete
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
@@ -337,6 +389,20 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
           )}
         </>
       )}
+
+      <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit entry">
+        {editing && (
+          <LedgerForm
+            key={editing.id}
+            existing={editing}
+            onSaved={async () => {
+              setEditing(null);
+              await Promise.all([mutate(), mutateAll((k) => typeof k === 'string' && k.startsWith('/api/'))]);
+              toast('Entry updated');
+            }}
+          />
+        )}
+      </Modal>
     </Drawer>
   );
 }
