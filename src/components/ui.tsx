@@ -105,7 +105,16 @@ export function HeroFigure({
  * The change chip. Spending more is red and spending less is green — the
  * opposite of a stock ticker, and the right way round for an expense ledger.
  */
-export function Delta({ pct, invert = false }: { pct: number | null | undefined; invert?: boolean }) {
+export function Delta({
+  pct,
+  invert = false,
+  /** Named inside the pill — "↑ 4.1% vs last month" reads as one claim. */
+  suffix,
+}: {
+  pct: number | null | undefined;
+  invert?: boolean;
+  suffix?: string;
+}) {
   if (pct == null || !Number.isFinite(pct)) return null;
 
   // A change too small to round to a tenth of a percent is not a change, and
@@ -116,13 +125,14 @@ export function Delta({ pct, invert = false }: { pct: number | null | undefined;
 
   return (
     <span
-      className="num inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+      className="num inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap"
       style={{
         color: flat ? 'var(--text-muted)' : bad ? 'var(--rule-red)' : 'var(--credit)',
         background: flat ? 'var(--surface-2)' : bad ? 'var(--rule-red-soft)' : 'var(--credit-soft)',
       }}
     >
       {flat ? 'no change' : `${up ? '\u2191' : '\u2193'} ${Math.abs(pct).toFixed(Math.abs(pct) >= 10 ? 0 : 1)}%`}
+      {suffix && !flat && <span className="font-normal opacity-80">{suffix}</span>}
     </span>
   );
 }

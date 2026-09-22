@@ -43,10 +43,17 @@ export function FlowCurve({
   points,
   monthDays,
   height = 200,
+  /**
+   * Label the axis with real dates — "Sep 06" rather than "Day 6". On a
+   * screen already headed September the day number alone is ambiguous with
+   * every other number on the page.
+   */
+  dated = false,
 }: {
   points: FlowPoint[];
   monthDays: number;
   height?: number;
+  dated?: boolean;
 }) {
   const gid = useId().replace(/:/g, '');
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -94,44 +101,16 @@ export function FlowCurve({
   return (
     <div className="relative select-none" ref={wrapRef}>
       {/*
-        The readout as the reference draws it: two labelled columns, this
-        period against the same point in the last, rather than one figure with
-        a trailing "last". Above the plot, so a finger never covers it.
+        No readout block above the plot. It duplicated the legend the card
+        already prints and pushed the chart down by a row; the reference puts
+        the figure on the curve, at the point it belongs to.
       */}
-      <div className="flex items-start justify-between gap-3 mb-3 min-h-[2.4rem]">
-        <span className="micro pt-1">{active ? dayLabel(active.date) : 'This month'}</span>
-        <span
-          className="flex items-stretch rounded-lg overflow-hidden text-right"
-          style={{ background: 'var(--surface-2)' }}
-        >
-          <span className="px-3 py-1.5">
-            <span className="micro block" style={{ color: 'var(--accent)' }}>
-              This month
-            </span>
-            <span className="num text-[13px] font-semibold">
-              {formatINR((active ?? points.at(-1)!).thisMinor)}
-            </span>
-          </span>
-          <span className="px-3 py-1.5 border-l" style={{ borderColor: 'var(--border)' }}>
-            <span className="micro block">Last month</span>
-            <span className="num text-[13px] font-semibold muted">
-              {formatINR((active ?? points.at(-1)!).prevMinor)}
-            </span>
-          </span>
-        </span>
-      </div>
-
-      {/* A scale down the left, so a height can be read as an amount rather
-          than only compared with the height beside it. */}
-      <div className="flex gap-3">
-        <div className="flex flex-col justify-between shrink-0 pb-[22px]" style={{ height }}>
-          {[max, max * 0.5, 0].map((t) => (
-            <span key={t} className="micro leading-none">
-              {t === 0 ? '0' : formatINR(t, { compact: true })}
-            </span>
-          ))}
-        </div>
-
+      {/*
+        No y scale. A cumulative curve is read as a shape against the dashed
+        one beside it, not as a series of values off an axis — and the exact
+        figure is on the marker. The gridlines alone give the eye its levels.
+      */}
+      <div className="relative">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
@@ -260,12 +239,36 @@ export function FlowCurve({
         {/* End cap on the live line, so the eye lands on where you are now. */}
         <circle cx={x(points.at(-1)!.day)} cy={y(points.at(-1)!.thisMinor)} r="3" fill="var(--brass)" />
       </svg>
+
+      {/* The figure, pinned to the point it describes. Follows the hover and
+          rests on today otherwise. */}
+      {(() => {
+        const at = active ?? points.at(-1)!;
+        const left = (x(at.day) / W) * 100;
+        return (
+          <span
+            className="absolute -translate-x-1/2 -translate-y-full pointer-events-none whitespace-nowrap rounded-md px-2 py-1"
+            style={{
+              left: `${Math.min(92, Math.max(8, left))}%`,
+              top: `${(y(at.thisMinor) / H) * 100}%`,
+              marginTop: '-10px',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <span className="micro block leading-none">
+              {active ? dayLabel(at.date) : `Day ${at.day} · today`}
+            </span>
+            <span className="num text-[12px] font-semibold">{formatINR(at.thisMinor)}</span>
+          </span>
+        );
+      })()}
       </div>
 
       {/* Five stops rather than two ends — "Day 14" is a place, "1 … 30" is a
           range you have to measure against. */}
-      <div className="flex justify-between mt-1.5 pl-10">
-        {axisDays(monthDays, points.at(-1)!.day).map((d) => (
+      <div className="flex justify-between mt-2">
+        {axisDays(monthDays, points.at(-1)!.day, dated ? points[0].date : undefined).map((d) => (
           <span
             key={d.day}
             className="micro"
@@ -280,16 +283,24 @@ export function FlowCurve({
 }
 
 /** Five evenly spaced day labels, with today named where it falls. */
-function axisDays(monthDays: number, today: number) {
+function axisDays(monthDays: number, today: number, monthStart?: string) {
   const stops = [1, Math.round(monthDays * 0.25), Math.round(monthDays * 0.5), Math.round(monthDays * 0.75), monthDays];
-  const out = stops.map((day) => ({ day, label: `Day ${day}`, isToday: false }));
+  const name = (day: number) =>
+    monthStart
+      ? dayLabel(`${monthStart.slice(0, 8)}${String(day).padStart(2, '0')}`)
+      : `Day ${day}`;
+  const out = stops.map((day) => ({ day, label: name(day), isToday: false }));
   if (today > 1 && today < monthDays) {
     // Replace whichever stop today is nearest, so the labels never collide.
     let nearest = 0;
     for (let i = 1; i < out.length - 1; i++) {
       if (Math.abs(out[i].day - today) < Math.abs(out[nearest].day - today)) nearest = i;
     }
-    out[nearest] = { day: today, label: `Today (${today})`, isToday: true };
+    out[nearest] = {
+      day: today,
+      label: monthStart ? `${name(today)} · now` : `Today (${today})`,
+      isToday: true,
+    };
   }
   return out;
 }

@@ -101,15 +101,18 @@ function AnalyticsInner() {
                     money went. */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <span className="flex items-center gap-2.5">
-                    <span className="icon-tile icon-tile-accent lit">
+                    {/* Flat, not lit. The reference spends its glow on the
+                        goal ring and the primary pill — a label tile is
+                        furniture, and lighting it competes with the figure. */}
+                    <span className="icon-tile" style={{ color: 'var(--accent)' }}>
                       <span className="text-[17px] font-bold">₹</span>
                     </span>
-                    <span>
-                      <span className="micro block">Net outflow</span>
-                      <span className="text-[14px] font-semibold">Total spent</span>
+                    <span className="min-w-0">
+                      <span className="micro block whitespace-nowrap">Net outflow</span>
+                      <span className="text-[14px] font-semibold whitespace-nowrap">Total spent</span>
                     </span>
                   </span>
-                  <Delta pct={f.pace.deltaPct} />
+                  <Delta pct={f.pace.deltaPct} suffix="vs last month" />
                 </div>
 
                 <p className="flex items-baseline gap-2">
@@ -236,7 +239,7 @@ function AnalyticsInner() {
                     </span>
                   </div>
                 </div>
-                <FlowCurve points={f.cumulative} monthDays={f.pace.monthDays} height={210} />
+                <FlowCurve dated points={f.cumulative} monthDays={f.pace.monthDays} height={210} />
                 <p className="muted text-[12px] mt-3 leading-relaxed">
                   Solid is this month, dashed is last month at the same point. Where the solid line pulls above the
                   dashed one is where the extra money went.
@@ -1017,10 +1020,14 @@ function SubStat({
 }) {
   return (
     <div className="min-w-0 px-1">
-      <p className="micro truncate">{label}</p>
+      {/* Not `micro`: it uppercases and tracks out, which pushed "Projected
+          month end" past the column and left "PROJECTED MONT…" on screen. */}
+      <p className="text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </p>
       <p className="num text-[17px] font-semibold mt-1">{value}</p>
       {note && (
-        <p className="text-[11px] mt-0.5 truncate" style={{ color: tone ?? 'var(--text-muted)' }}>
+        <p className="text-[11px] mt-0.5 leading-snug" style={{ color: tone ?? 'var(--text-muted)' }}>
           {note}
         </p>
       )}
