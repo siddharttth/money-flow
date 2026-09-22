@@ -23,8 +23,9 @@ import { ShareBar } from '@/components/graph';
 import { LedgerForm } from '@/components/ledger-form';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
-import { PersonMark } from '@/components/icons';
+import { NavIcon, PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
+import { Badge, MetricCard } from '@/components/plan-cards';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
@@ -111,82 +112,233 @@ function PeopleHub() {
   const net = peers.data?.netMinor ?? 0;
   const owedToMe = peers.data?.owedToMeMinor ?? 0;
   const owedByMe = peers.data?.owedByMeMinor ?? 0;
+  /* Both sides of one bar, so the two are compared against the same scale. */
+  const receivableShare = owedToMe + owedByMe > 0 ? owedToMe / (owedToMe + owedByMe) : 0;
+
+  /* Counts run over EVERY person, not the filtered view — a tab reading
+     "Owing (2)" has to keep saying 2 while you are looking at Spending. */
+  const everyone = useMemo(() => {
+    const spendById = new Map((stats.data?.people ?? []).map((x) => [x.personId, x]));
+    const balById = new Map((peers.data?.balances ?? []).map((b) => [b.personId, b]));
+    return (people.data?.items ?? []).map((p) => ({
+      person: p,
+      spendMinor: spendById.get(p.id)?.totalMinor ?? 0,
+      count: spendById.get(p.id)?.count ?? 0,
+      balanceMinor: balById.get(p.id)?.balanceMinor ?? 0,
+    }));
+  }, [people.data, stats.data, peers.data]);
+
+  const counts = {
+    all: everyone.length,
+    debt: everyone.filter((r) => r.balanceMinor !== 0).length,
+    spend: everyone.filter((r) => r.spendMinor > 0).length,
+  };
+  const openCount = counts.debt;
+  const settledCount = everyone.length - openCount;
+
+  const grandSpend = stats.data?.grandTotalMinor ?? 0;
+  const topSharer = everyone
+    .filter((r) => !r.person.isSelf && r.spendMinor > 0)
+    .map((r) => ({ ...r, share: grandSpend > 0 ? r.spendMinor / grandSpend : 0 }))
+    .sort((a, b) => b.spendMinor - a.spendMinor)[0];
+
+  /** The balance most worth acting on — largest in absolute terms. */
+  const biggestDebt = everyone
+    .filter((r) => r.balanceMinor !== 0)
+    .sort((a, b) => Math.abs(b.balanceMinor) - Math.abs(a.balanceMinor))[0];
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        eyebrow="People"
-        title="Who it was with"
-        actions={<MonthPicker month={month} onChange={setMonth} />}
-      />
+      {/* Header. The subtitle names what the screen actually reconciles —
+          "Who it was with" alone reads as a contact list. */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="micro">People &amp; ledger</span>
+            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent)' }} aria-hidden />
+            <span className="micro" style={{ color: 'var(--accent)' }}>
+              Peer settlements
+            </span>
+          </div>
+          <h1 className="text-[28px] font-bold tracking-tight leading-tight">Who it was with</h1>
+          <p className="muted text-[13px] mt-1 max-w-xl">
+            Shared spending splits, lending exposure, and what is still owed either way.
+          </p>
+        </div>
 
-      {/* The net position, and the only two actions that change it. */}
-      <Card className="!p-5 sm:!p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-6 items-end">
+        <div className="flex items-center gap-2 self-start lg:self-auto">
+          <MonthPicker month={month} onChange={setMonth} />
+          <button className="btn btn-primary shrink-0" onClick={() => setAddingPerson(true)}>
+            <NavIcon name="plus" size={15} />
+            Add person
+          </button>
+        </div>
+      </div>
+
+      {/* NET EXPOSURE. One figure, the two sides it is made of, and the two
+          actions that change it. */}
+      <Card className={`!p-5 sm:!p-6 glow-card bloom-lg ${net < 0 ? 'bloom-danger' : ''}`}>
+        <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_auto] gap-6 lg:gap-8 items-center">
           <div>
-            <HeroFigure
-              label="Net position"
-              minor={Math.abs(net)}
-              note={
-                net === 0
-                  ? 'Everything is settled.'
-                  : net > 0
-                    ? 'owed to you, on balance'
-                    : 'you owe, on balance'
-              }
-            />
-            {(owedToMe > 0 || owedByMe > 0) && (
-              <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-                <div>
-                  <p className="label mb-1.5">They owe me</p>
-                  <Money minor={owedToMe} className="text-lg font-semibold" style={{ color: 'var(--credit)' }} />
-                  <div className="mt-2">
-                    <ShareBar
-                      share={owedToMe / Math.max(owedToMe, owedByMe)}
-                      color="var(--credit)"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <p className="label mb-1.5">I owe</p>
-                  <Money minor={owedByMe} className="text-lg font-semibold" style={{ color: 'var(--rule-red)' }} />
-                  <div className="mt-2">
-                    <ShareBar
-                      share={owedByMe / Math.max(owedToMe, owedByMe)}
-                      color="var(--rule-red)"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="label mb-0">Net exposure</span>
+              {net !== 0 && (
+                <span className={`badge ${net > 0 ? 'badge-good' : 'badge-up'}`}>
+                  {net > 0 ? 'Net receivable' : 'Net payable'}
+                </span>
+              )}
+            </div>
+            <p className="flex items-baseline gap-2 flex-wrap">
+              <span
+                className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight"
+                style={net === 0 ? undefined : { color: net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+              >
+                {formatINR(Math.abs(net))}
+              </span>
+              <span className="muted text-[13px]">
+                {net === 0 ? 'everything is settled' : net > 0 ? 'owed to you, on balance' : 'you owe, on balance'}
+              </span>
+            </p>
+            <p className="muted text-[12px] mt-2 leading-relaxed">
+              {openCount === 0
+                ? 'No open obligations either way.'
+                : `Across ${openCount} open ${openCount === 1 ? 'counterparty' : 'counterparties'}.`}
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 w-full lg:w-52">
-            {/* The same two words the Add sheet uses. One vocabulary for one
-                concept, everywhere it appears. */}
+          {(owedToMe > 0 || owedByMe > 0) && (
+            <div className="min-w-0">
+              <div className="flex items-baseline justify-between gap-4 mb-2">
+                <span>
+                  <span className="micro block">They owe me</span>
+                  <span className="num text-[19px] font-bold" style={{ color: 'var(--credit)' }}>
+                    {formatINR(owedToMe)}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="micro block">I owe</span>
+                  <span className="num text-[19px] font-bold" style={{ color: 'var(--rule-red)' }}>
+                    {formatINR(owedByMe)}
+                  </span>
+                </span>
+              </div>
+              {/* One bar, both sides — two separate bars invited the reader to
+                  compare their lengths against different scales. */}
+              <div className="flex h-2 rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
+                <span
+                  style={{
+                    width: `${receivableShare * 100}%`,
+                    background: 'linear-gradient(90deg, color-mix(in oklab, var(--credit) 60%, var(--surface-2)), var(--credit))',
+                    boxShadow: '0 0 10px -2px color-mix(in oklab, var(--credit) 55%, transparent)',
+                  }}
+                />
+                <span
+                  style={{
+                    width: `${(1 - receivableShare) * 100}%`,
+                    background: 'linear-gradient(90deg, color-mix(in oklab, var(--rule-red) 60%, var(--surface-2)), var(--rule-red))',
+                    boxShadow: '0 0 10px -2px color-mix(in oklab, var(--rule-red) 55%, transparent)',
+                  }}
+                />
+              </div>
+              <div className="flex items-baseline justify-between gap-3 mt-2 text-[11px] muted">
+                <span>
+                  <span className="num">{formatINR(owedToMe)}</span> receivable (
+                  {Math.round(receivableShare * 100)}%)
+                </span>
+                <span>
+                  <span className="num">{formatINR(owedByMe)}</span> payable (
+                  {Math.round((1 - receivableShare) * 100)}%)
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 w-full lg:w-52 shrink-0">
             <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'out' })}>
-              I lent
+              ↗ I lent money
             </button>
             <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'in' })}>
-              I borrowed
+              ↙ I borrowed money
             </button>
           </div>
         </div>
       </Card>
 
-      <div className="flex items-center justify-between gap-3">
+      {/* Three facts about the ledger as a whole, each a card. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <MetricCard
+          bloom="quiet"
+          icon={<NavIcon name="people" size={20} />}
+          label="Active ledgers"
+          badge={
+            openCount > 0 ? (
+              <Badge tone="up">{openCount} outstanding</Badge>
+            ) : (
+              <Badge tone="good">all clear</Badge>
+            )
+          }
+          note={`${settledCount} fully balanced${openCount ? '' : ' — nothing outstanding'}`}
+        >
+          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
+            {rows.length} {rows.length === 1 ? 'contact' : 'contacts'}
+          </span>
+        </MetricCard>
+
+        <MetricCard
+          bloom="credit"
+          icon={<NavIcon name="analytics" size={20} />}
+          label="Most shared with"
+          badge={topSharer ? <Badge tone="neutral">{Math.round(topSharer.share * 100)}% of spend</Badge> : undefined}
+          note={
+            topSharer
+              ? `${topSharer.person.name} · ${topSharer.count} ${topSharer.count === 1 ? 'transaction' : 'transactions'}`
+              : 'Tag someone on an expense to see this.'
+          }
+        >
+          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
+            {formatINR(topSharer?.spendMinor ?? 0)}
+          </span>
+        </MetricCard>
+
+        <MetricCard
+          bloom={biggestDebt ? 'danger' : 'quiet'}
+          icon={<NavIcon name="target" size={20} />}
+          label="Next settlement"
+          badge={biggestDebt ? <Badge tone="up">largest open</Badge> : <Badge tone="good">nothing due</Badge>}
+          note={
+            biggestDebt
+              ? biggestDebt.balanceMinor < 0
+                ? 'You owe this one — settle to clear it.'
+                : 'Owed to you — a nudge is one tap away.'
+              : 'Every balance is settled.'
+          }
+        >
+          {biggestDebt ? (
+            <span className="min-w-0">
+              <span className="text-[15px] font-semibold truncate block">{biggestDebt.person.name}</span>
+              <span
+                className="num text-[1.5rem] font-bold leading-none"
+                style={{ color: biggestDebt.balanceMinor < 0 ? 'var(--rule-red)' : 'var(--credit)' }}
+              >
+                {formatINR(Math.abs(biggestDebt.balanceMinor))}
+              </span>
+            </span>
+          ) : (
+            <span className="num text-[1.9rem] font-bold leading-none tracking-tight">—</span>
+          )}
+        </MetricCard>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: 'All' },
-            { value: 'debt', label: 'Owing' },
-            { value: 'spend', label: 'Spending' },
+            { value: 'all', label: `All (${counts.all})` },
+            { value: 'debt', label: `Owing (${counts.debt})` },
+            { value: 'spend', label: `Spending (${counts.spend})` },
           ]}
         />
-        <button className="chip shrink-0" onClick={() => setAddingPerson(true)}>
-          + Person
-        </button>
       </div>
 
       <div className="card overflow-hidden">
@@ -214,126 +366,173 @@ function PeopleHub() {
           <>
             {/* Column headings earn their place only once there is a table. */}
             <div
-              className="hidden sm:grid grid-cols-[minmax(0,1fr)_7rem_7rem_4.5rem] gap-4 px-4 py-2 border-b"
+              className="hidden sm:grid grid-cols-[minmax(0,1fr)_11rem_8rem_6rem] gap-4 px-4 py-2.5 border-b"
               style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
             >
               <span className="micro">Contact</span>
-              <span className="micro text-right">{monthLabel(month).split(' ')[0]} spend</span>
+              <span className="micro">{monthLabel(month).split(' ')[0]} spend</span>
               <span className="micro text-right">Balance</span>
-              <span className="micro text-right">Settle</span>
+              <span className="micro text-right">Action</span>
             </div>
 
             <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {rows.map(({ person, spendMinor, count, balanceMinor }) => (
-                <li
-                  key={person.id}
-                  className="row px-3.5 sm:px-4 py-3"
-                  onClick={() => openPerson(person.id)}
-                >
-                  <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_7rem_4.5rem] sm:gap-4 sm:items-center">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <PersonMark name={person.name} color={person.color} size={34} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13.5px] font-semibold truncate">
-                          {person.name}
-                          {person.isSelf && <span className="muted font-normal text-[11px]"> · you</span>}
-                        </p>
-                        <p className="muted text-[11px] capitalize mt-0.5">
-                          {person.relationshipType}
-                          {count > 0 && ` · ${count} ${count === 1 ? 'transaction' : 'transactions'}`}
-                        </p>
+              {rows.map(({ person, spendMinor, count, balanceMinor }) => {
+                const owed = balanceMinor > 0;
+                const owing = balanceMinor < 0;
+                const state = owed ? 'credit' : owing ? 'debit' : undefined;
+                const share = maxSpend > 0 ? spendMinor / maxSpend : 0;
+                const shareOfMonth = grandSpend > 0 ? spendMinor / grandSpend : 0;
+
+                return (
+                  <li
+                    key={person.id}
+                    className="row px-3.5 sm:px-4 py-3"
+                    onClick={() => openPerson(person.id)}
+                    /* A row with an open balance is tinted, so the two that
+                       need action are findable in a list of eight without
+                       reading a single figure. */
+                    style={
+                      state
+                        ? {
+                            background: `color-mix(in oklab, ${
+                              owed ? 'var(--credit)' : 'var(--rule-red)'
+                            } 6%, transparent)`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_8rem_6rem] sm:gap-4 sm:items-center">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <PersonMark name={person.name} color={person.color} size={38} state={state} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13.5px] font-semibold truncate flex items-center gap-2">
+                            <span className="truncate">{person.name}</span>
+                            {person.isSelf && <span className="badge badge-neutral">you</span>}
+                            {owing && <span className="badge badge-up">unsettled</span>}
+                            {owed && <span className="badge badge-good">receivable</span>}
+                          </p>
+                          <p className="muted text-[11px] capitalize mt-0.5 truncate">
+                            {person.relationshipType}
+                            {count > 0 && ` · ${count} ${count === 1 ? 'transaction' : 'transactions'}`}
+                          </p>
+                        </div>
+
+                        {/* On a phone the balance rides up next to the name. */}
+                        <span className="sm:hidden shrink-0 text-right">
+                          <Money minor={spendMinor} className="text-[13.5px] font-semibold block" />
+                          {balanceMinor !== 0 && (
+                            <span
+                              className="num text-[11px] font-semibold"
+                              style={{ color: owed ? 'var(--credit)' : 'var(--rule-red)' }}
+                            >
+                              {owed ? '+' : '−'}
+                              {formatINR(Math.abs(balanceMinor))}
+                            </span>
+                          )}
+                        </span>
                       </div>
-                      {/* On a phone the balance rides up next to the name,
-                          where the eye already is. */}
-                      <span className="sm:hidden shrink-0 text-right">
-                        <Money minor={spendMinor} className="text-[13.5px] font-semibold block" />
-                        {balanceMinor !== 0 && (
-                          <span
-                            className="num text-[11px] font-semibold"
-                            style={{ color: balanceMinor > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
+
+                      <div className="hidden sm:block">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <Money minor={spendMinor} className="text-[13px] font-semibold" />
+                          <span className="num text-[11px] muted">
+                            {shareOfMonth > 0 ? `${(shareOfMonth * 100).toFixed(1)}%` : '0%'}
+                          </span>
+                        </div>
+                        <div className="mt-1.5">
+                          <ShareBar
+                            share={share}
+                            color={person.isSelf ? 'var(--accent)' : 'var(--text-muted)'}
+                            height={4}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="hidden sm:block text-right">
+                        {balanceMinor === 0 ? (
+                          <span className="num text-[13px] muted">—</span>
+                        ) : (
+                          <>
+                            <span
+                              className="num text-[14px] font-semibold block"
+                              style={{ color: owed ? 'var(--credit)' : 'var(--rule-red)' }}
+                            >
+                              {owed ? '+' : '−'}
+                              {formatINR(Math.abs(balanceMinor))}
+                            </span>
+                            <span className="micro">{owed ? 'owes you' : 'you owe'}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="hidden sm:flex justify-end">
+                        {balanceMinor !== 0 && !person.isSelf ? (
+                          <button
+                            className="btn-pill"
+                            style={{
+                              background: owed ? 'var(--brass)' : 'var(--rule-red)',
+                              color: owed ? 'var(--on-brass)' : 'var(--bg)',
+                              boxShadow: `0 0 12px -3px color-mix(in oklab, ${
+                                owed ? 'var(--brass)' : 'var(--rule-red)'
+                              } 55%, transparent)`,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLedgerFor({
+                                direction: owed ? 'in' : 'out',
+                                personId: person.id,
+                                settleMinor: Math.abs(balanceMinor),
+                                name: person.name,
+                              });
+                            }}
                           >
-                            {balanceMinor > 0 ? '+' : '−'}
-                            {formatINR(Math.abs(balanceMinor))}
+                            {/* Owed TO you is a nudge, not a payment — you
+                                cannot settle someone else's debt for them. */}
+                            {owed ? 'Remind ▷' : 'Settle'}
+                          </button>
+                        ) : (
+                          <span aria-hidden className="micro">
+                            —
                           </span>
                         )}
-                      </span>
+                      </div>
                     </div>
 
-                    <div className="hidden sm:block text-right">
-                      <Money minor={spendMinor} className="text-[13px] font-semibold" />
-                      {spendMinor > 0 && (
-                        <div className="mt-1.5">
-                          <ShareBar share={spendMinor / maxSpend} color={person.color} height={3} />
-                        </div>
-                      )}
-                    </div>
-
-                    <span
-                      className="num hidden sm:block text-right text-[13px] font-semibold"
-                      style={{
-                        color:
-                          balanceMinor === 0
-                            ? 'var(--text-muted)'
-                            : balanceMinor > 0
-                              ? 'var(--credit)'
-                              : 'var(--rule-red)',
-                      }}
-                    >
-                      {balanceMinor === 0 ? '—' : `${balanceMinor > 0 ? '+' : '−'}${formatINR(Math.abs(balanceMinor))}`}
-                    </span>
-
-                    <div className="hidden sm:flex justify-end">
-                      {balanceMinor !== 0 && !person.isSelf ? (
+                    {balanceMinor !== 0 && !person.isSelf && (
+                      <div className="sm:hidden mt-2.5 pl-[3.125rem]">
                         <button
                           className="tag"
                           onClick={(e) => {
                             e.stopPropagation();
                             setLedgerFor({
-                              direction: balanceMinor > 0 ? 'in' : 'out',
+                              direction: owed ? 'in' : 'out',
                               personId: person.id,
                               settleMinor: Math.abs(balanceMinor),
                               name: person.name,
                             });
                           }}
                         >
-                          Settle
+                          {owed ? 'Remind about' : 'Settle'} {formatINR(Math.abs(balanceMinor))}
                         </button>
-                      ) : (
-                        <span aria-hidden className="micro">
-                          —
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Settling is a real action on a phone too, just not one
-                      that gets a column. */}
-                  {balanceMinor !== 0 && !person.isSelf && (
-                    <div className="sm:hidden mt-2.5 pl-[2.875rem]">
-                      <button
-                        className="tag"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLedgerFor({
-                            direction: balanceMinor > 0 ? 'in' : 'out',
-                            personId: person.id,
-                            settleMinor: Math.abs(balanceMinor),
-                            name: person.name,
-                          });
-                        }}
-                      >
-                        Settle {formatINR(Math.abs(balanceMinor))}
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
       </div>
 
-      <p className="muted text-[12px] leading-relaxed max-w-2xl">
+      <Card className="!p-4">
+        <p className="muted text-[12px] leading-relaxed">
+          <strong style={{ color: 'var(--text)' }}>Ledger isolation.</strong> Shared spend is your own share — an
+          ₹800 dinner split two ways records ₹400 against each, so the column adds up to the month rather than
+          multiplying it. Lending never mixes with it: a loan is money that is still yours.
+        </p>
+      </Card>
+
+      <p className="hidden muted text-[12px] leading-relaxed max-w-2xl">
         Spend is this person's <em>share</em>. An ₹800 dinner with two people puts ₹400 against each, so the column
         adds up to the month rather than multiplying it — open anyone to see the working, row by row. Balance is
         separate money entirely: what is actually owed, either way.

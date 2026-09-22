@@ -94,7 +94,31 @@ export function CategoryIcon({
  * People get initials rather than an emoji face — a name is more identifying
  * than a generic 🙂, and it scales to anyone the user adds.
  */
-export function PersonMark({ name, color, size = 36 }: { name: string; color: string; size?: number }) {
+/**
+ * A person, as a lettered disc.
+ *
+ * The tint is the LEDGER STATE, not a per-person hue. Assigning everyone a
+ * colour from the palette scattered pink, teal and violet discs across a lime
+ * system and made the two that matter — someone who owes you, someone you owe
+ * — impossible to pick out of a list of eight. Neutral is the default, green
+ * means money coming back, red means money going out, and that is the only
+ * thing the colour is ever allowed to say.
+ *
+ * `color` is still accepted so existing callers keep working; it is used only
+ * as a faint wash on the neutral state, never as the fill.
+ */
+export function PersonMark({
+  name,
+  color,
+  size = 36,
+  /** 'credit' — they owe you. 'debit' — you owe them. */
+  state,
+}: {
+  name: string;
+  color?: string;
+  size?: number;
+  state?: 'credit' | 'debit';
+}) {
   const initials = name
     .trim()
     .split(/\s+/)
@@ -103,15 +127,22 @@ export function PersonMark({ name, color, size = 36 }: { name: string; color: st
     .join('')
     .toUpperCase();
 
+  const tone =
+    state === 'credit' ? 'var(--credit)' : state === 'debit' ? 'var(--rule-red)' : undefined;
+
   return (
     <span
-      className="inline-flex items-center justify-center shrink-0 rounded-full font-semibold"
+      className="inline-flex items-center justify-center shrink-0 rounded-full font-bold"
       style={{
         width: size,
         height: size,
-        background: `color-mix(in srgb, ${color} 16%, transparent)`,
-        color,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+        background: tone
+          ? `color-mix(in oklab, ${tone} 18%, transparent)`
+          : 'var(--surface-2)',
+        color: tone ?? 'var(--text-muted)',
+        border: tone
+          ? `1px solid color-mix(in oklab, ${tone} 35%, transparent)`
+          : '1px solid var(--border-strong)',
         fontSize: Math.round(size * 0.36),
         letterSpacing: '0.01em',
       }}
