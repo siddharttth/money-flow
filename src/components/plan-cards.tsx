@@ -277,7 +277,7 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
  * carrying the two things that change behaviour — how far along, and what it
  * needs each month — with the full card a tap away.
  */
-export function GoalsStrip({ funds }: { funds: Fund[] }) {
+export function GoalsStrip({ funds, bare = false }: { funds: Fund[]; bare?: boolean }) {
   const open = funds.filter((f) => !f.isComplete);
   const done = funds.filter((f) => f.isComplete);
   if (!funds.length) return null;
@@ -291,11 +291,11 @@ export function GoalsStrip({ funds }: { funds: Fund[] }) {
         </Link>
       </div>
 
-      <Card className="!p-0 overflow-clip">
+      <GoalsStripFrame bare={bare}>
         <ul>
           {[...open, ...done].slice(0, 4).map((f, i) => (
             <li key={f.categoryId} style={i > 0 ? { borderTop: '1px solid var(--border)' } : undefined}>
-              <Link href="/investments" className="row block px-4 py-3.5">
+              <Link href="/investments" className={`row block py-3.5 ${bare ? 'px-4 sm:px-5' : 'px-4'}`}>
                 <div className="flex items-center gap-3">
                   <CategoryIcon icon={f.icon} color={f.color} size={30} />
                   <div className="min-w-0 flex-1">
@@ -338,8 +338,17 @@ export function GoalsStrip({ funds }: { funds: Fund[] }) {
             </li>
           ))}
         </ul>
-      </Card>
+      </GoalsStripFrame>
     </div>
+  );
+}
+
+/** The strip's own card, or — inside a shared card — rows run edge to edge. */
+function GoalsStripFrame({ bare, children }: { bare: boolean; children: ReactNode }) {
+  return bare ? (
+    <div className="-mx-4 sm:-mx-5">{children}</div>
+  ) : (
+    <Card className="!p-0 overflow-clip">{children}</Card>
   );
 }
 
@@ -465,7 +474,15 @@ export type LifetimeTallyRow = {
  * and, unlike everything else on the dashboard, does not move when you change
  * the month.
  */
-export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
+export function LifetimeInHand({
+  data,
+  bare = false,
+}: {
+  data: LifetimeTallyRow;
+  /** A section of a card it shares — no card of its own, and a figure one
+      step quieter than the headline above it. */
+  bare?: boolean;
+}) {
   /*
    * With nothing coming in there is no figure to give, and this is the only
    * card on the dashboard that is always present — so it carries the prompt
@@ -473,8 +490,8 @@ export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
    * fresh account with no route to setting income up at all.
    */
   if (!data.known) {
-    return (
-      <Card className="!p-5">
+    const prompt = (
+      <>
         <p className="label mb-2">Lifetime in hand</p>
         <p className="text-[15px] font-semibold">Tell the app what comes in</p>
         <p className="muted text-[13px] mt-1.5 leading-relaxed max-w-lg">
@@ -485,60 +502,63 @@ export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
         <Link href="/settings?add=income" className="btn btn-primary mt-4">
           Add an income source
         </Link>
-      </Card>
+      </>
     );
+    return bare ? <div>{prompt}</div> : <Card className="!p-5">{prompt}</Card>;
   }
 
   const down = data.inHandMinor < 0;
 
-  return (
-    <Card className="!p-5 sm:!p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-5 lg:gap-8 items-start">
-        <div>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="label mb-0">Lifetime in hand</p>
-            {/* The one figure here that is not about the month on screen. */}
-            <span className="micro">all time</span>
-          </div>
-
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-            <span
-              className="text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight num"
-              style={down ? { color: 'var(--rule-red)' } : undefined}
-            >
-              {down && '−'}
-              {formatINR(Math.abs(data.inHandMinor))}
-            </span>
-          </div>
-
-          <p className="muted text-[13px] mt-2.5 leading-relaxed">
-            {down ? 'drawn down' : 'kept'} across {data.months} {data.months === 1 ? 'month' : 'months'}
-            {data.firstMonth && <>, since {monthName(data.firstMonth)}</>}
-          </p>
+  const body = (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-5 lg:gap-8 items-start">
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="label mb-0">Lifetime in hand</p>
+          {/* The one figure here that is not about the month on screen. */}
+          <span className="micro">all time</span>
         </div>
 
-        {/* The same subtraction as the monthly card, over every month there is. */}
-        <div className="min-w-0">
-          <dl className="space-y-2">
-            <PlanLine label="Everything that came in" minor={data.inMinor} sign="+" strong />
-            <PlanLine label="Everything spent" minor={data.outMinor} sign="−" />
-            {data.investedMinor > 0 && <PlanLine label="Everything invested" minor={data.investedMinor} sign="−" />}
-            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-              <PlanLine label="In hand" minor={data.inHandMinor} strong tone={down ? 'bad' : 'good'} />
-            </div>
-          </dl>
-
-          {data.investedMinor > 0 && (
-            <p className="muted text-[12px] mt-3.5 leading-relaxed">
-              Investments are subtracted because this is cash, not net worth —{' '}
-              <span className="num">{formatINR(data.investedMinor)}</span> of it is still yours, just not
-              spendable.
-            </p>
-          )}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
+          <span
+            className={`${
+              bare ? 'text-[1.6rem] sm:text-3xl' : 'text-[2.4rem] sm:text-5xl'
+            } font-semibold leading-none tracking-tight num`}
+            style={down ? { color: 'var(--rule-red)' } : undefined}
+          >
+            {down && '−'}
+            {formatINR(Math.abs(data.inHandMinor))}
+          </span>
         </div>
+
+        <p className="muted text-[13px] mt-2.5 leading-relaxed">
+          {down ? 'drawn down' : 'kept'} across {data.months} {data.months === 1 ? 'month' : 'months'}
+          {data.firstMonth && <>, since {monthName(data.firstMonth)}</>}
+        </p>
       </div>
-    </Card>
+
+      {/* The same subtraction as the monthly card, over every month there is. */}
+      <div className="min-w-0">
+        <dl className="space-y-2">
+          <PlanLine label="Everything that came in" minor={data.inMinor} sign="+" strong />
+          <PlanLine label="Everything spent" minor={data.outMinor} sign="−" />
+          {data.investedMinor > 0 && <PlanLine label="Everything invested" minor={data.investedMinor} sign="−" />}
+          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+            <PlanLine label="In hand" minor={data.inHandMinor} strong tone={down ? 'bad' : 'good'} />
+          </div>
+        </dl>
+
+        {data.investedMinor > 0 && (
+          <p className="muted text-[12px] mt-3.5 leading-relaxed">
+            Investments are subtracted because this is cash, not net worth —{' '}
+            <span className="num">{formatINR(data.investedMinor)}</span> of it is still yours, just not
+            spendable.
+          </p>
+        )}
+      </div>
+    </div>
   );
+
+  return bare ? body : <Card className="!p-5 sm:!p-6">{body}</Card>;
 }
 
 /* ------------------------------------------------------------------ *
@@ -553,7 +573,18 @@ export function LifetimeInHand({ data }: { data: LifetimeTallyRow }) {
  * your head. This is also the honest home for the "goals ask for more than the
  * month has left" message, which used to interrupt the dashboard.
  */
-export function GoalsRollup({ funds }: { funds: Fund[] }) {
+export function GoalsRollup({
+  funds,
+  compact = false,
+}: {
+  funds: Fund[];
+  /**
+   * A summary band at the top of a card it shares — every figure, the verdict
+   * and the ring, at the size of a caption rather than a headline, so the
+   * figure the card is about keeps the page's one large number.
+   */
+  compact?: boolean;
+}) {
   const open = funds.filter((f) => !f.isComplete);
   const done = funds.filter((f) => f.isComplete);
   if (!funds.length) return null;
@@ -572,6 +603,56 @@ export function GoalsRollup({ funds }: { funds: Fund[] }) {
   const health = behind === 0 ? 'On track' : behind === open.length ? 'Off track' : 'Slipping';
   const healthTone =
     behind === 0 ? 'var(--accent)' : behind === open.length ? 'var(--rule-red)' : 'var(--hi)';
+
+  if (compact) {
+    return (
+      <div className="flex items-start gap-4">
+        <ProgressRing share={progress} tone={healthTone} size={48} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="label mb-0">All goals together</span>
+            <span className="text-[12px] font-semibold" style={{ color: healthTone }}>
+              {health}
+            </span>
+            {done.length > 0 && <span className="badge badge-good">{done.length} finished</span>}
+          </div>
+          <p className="text-[13px] mt-1 leading-relaxed">
+            <span className="num font-semibold">{formatINR(savedMinor)}</span>{' '}
+            <span className="muted">saved of</span> <span className="num">{formatINR(targetMinor)}</span>{' '}
+            <span className="muted">
+              across {open.length} active {open.length === 1 ? 'target' : 'targets'}
+            </span>
+            {perMonthMinor > 0 && (
+              <>
+                <span className="muted"> · </span>
+                <span style={{ color: 'var(--accent)' }}>
+                  <span className="num font-semibold">{formatINR(perMonthMinor)}</span> a month to land them all on
+                  time
+                </span>
+              </>
+            )}
+          </p>
+          <div className="mt-2.5">
+            <ShareBar share={progress} color="var(--accent)" height={4} />
+            <div className="flex items-baseline justify-between gap-3 mt-1.5">
+              <span className="num text-[11px] muted">
+                {formatINR(savedMinor)} collected ({Math.round(progress * 100)}%)
+              </span>
+              <span className="num text-[11px] muted">
+                {formatINR(Math.max(0, targetMinor - savedMinor))} remaining
+              </span>
+            </div>
+          </div>
+          {behind > 0 && (
+            <p className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--rule-red)' }}>
+              {behind} {behind === 1 ? 'goal is' : 'goals are'} behind pace. Pushing a target date out is a
+              decision; missing it quietly is not.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card className="!p-5 sm:!p-6 glow-card bloom-lg">
@@ -924,55 +1005,64 @@ export function TallyReconciliation({ plan }: { plan: MonthlyPlan }) {
  * the reference gives it the room: the figure, the ring, the monthly pace and
  * the one button that moves it.
  */
-export function ActiveGoalCard({ fund, onAdd }: { fund: Fund; onAdd: () => void }) {
+export function ActiveGoalCard({
+  fund,
+  onAdd,
+  bare = false,
+}: {
+  fund: Fund;
+  onAdd: () => void;
+  /** A section of a shared card: no card, no bloom of its own. */
+  bare?: boolean;
+}) {
   const behind = fund.paceConfident && (fund.paceDeltaMinor ?? 0) < 0;
 
-  return (
-    <Card className="!p-5 glow-card bloom-lg">
-      <div className="relative">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <span className="flex items-center gap-2.5 min-w-0">
-            <CategoryIcon icon={fund.icon} color={fund.color} size={32} />
-            <span className="micro truncate">Active goal</span>
-          </span>
-          <span className={`badge ${behind ? 'badge-up' : 'badge-good'}`}>
-            {Math.round(fund.progress * 100)}% funded
-          </span>
-        </div>
-
-        <h3 className="text-[19px] font-bold tracking-tight truncate">{fund.name}</h3>
-        {fund.targetDate && (
-          <p className="muted text-[12.5px] mt-0.5">by {targetLabel(fund.targetDate)}</p>
-        )}
-
-        <div className="flex items-center justify-between gap-4 mt-4">
-          <div className="min-w-0">
-            <p className="micro">Saved so far</p>
-            <p className="mt-1">
-              <span className="num text-[22px] font-bold" style={{ color: 'var(--hi)' }}>
-                {formatINR(fund.savedMinor)}
-              </span>
-              <span className="num muted text-[12px]"> / {formatINR(fund.targetMinor)}</span>
-            </p>
-            <p className="muted text-[12px] mt-1.5">
-              {fund.requiredPerMonthMinor ? (
-                <>
-                  <span className="num">{formatINR(fund.requiredPerMonthMinor)}</span>/mo
-                  {fund.monthsLeft != null && ` · ${fund.monthsLeft} months left`}
-                </>
-              ) : (
-                'No target date set'
-              )}
-            </p>
-          </div>
-          <ProgressRing share={fund.progress} tone={behind ? 'var(--rule-red)' : 'var(--accent)'} size={58} />
-        </div>
-
-        <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
-          <NavIcon name="plus" size={15} />
-          Add to goal
-        </button>
+  const body = (
+    <div className="relative">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <span className="flex items-center gap-2.5 min-w-0">
+          <CategoryIcon icon={fund.icon} color={fund.color} size={32} />
+          <span className="micro truncate">Active goal</span>
+        </span>
+        <span className={`badge ${behind ? 'badge-up' : 'badge-good'}`}>
+          {Math.round(fund.progress * 100)}% funded
+        </span>
       </div>
-    </Card>
+
+      <h3 className="text-[19px] font-bold tracking-tight truncate">{fund.name}</h3>
+      {fund.targetDate && (
+        <p className="muted text-[12.5px] mt-0.5">by {targetLabel(fund.targetDate)}</p>
+      )}
+
+      <div className="flex items-center justify-between gap-4 mt-4">
+        <div className="min-w-0">
+          <p className="micro">Saved so far</p>
+          <p className="mt-1">
+            <span className="num text-[22px] font-bold" style={{ color: 'var(--hi)' }}>
+              {formatINR(fund.savedMinor)}
+            </span>
+            <span className="num muted text-[12px]"> / {formatINR(fund.targetMinor)}</span>
+          </p>
+          <p className="muted text-[12px] mt-1.5">
+            {fund.requiredPerMonthMinor ? (
+              <>
+                <span className="num">{formatINR(fund.requiredPerMonthMinor)}</span>/mo
+                {fund.monthsLeft != null && ` · ${fund.monthsLeft} months left`}
+              </>
+            ) : (
+              'No target date set'
+            )}
+          </p>
+        </div>
+        <ProgressRing share={fund.progress} tone={behind ? 'var(--rule-red)' : 'var(--accent)'} size={58} />
+      </div>
+
+      <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
+        <NavIcon name="plus" size={15} />
+        Add to goal
+      </button>
+    </div>
   );
+
+  return bare ? body : <Card className="!p-5 glow-card bloom-lg">{body}</Card>;
 }

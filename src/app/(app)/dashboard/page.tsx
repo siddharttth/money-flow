@@ -15,6 +15,8 @@ import type { Transaction } from '@/lib/transactions';
 import { getAttention } from '@/lib/attention';
 import {
   Card,
+  CardSection,
+  CardStrip,
   Delta,
   EmptyState,
   ErrorState,
@@ -29,14 +31,13 @@ import {
 import { CategoryBubbles, FlowCurve } from '@/components/graph';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
-import { AttentionList } from '@/components/attention';
+import { AttentionRows, useAttention } from '@/components/attention';
 import { NavIcon } from '@/components/icons';
 import {
   ActiveGoalCard,
   AllocationBar,
   Badge,
   GoalsStrip,
-  MetricCard,
   SweepCard,
   TallyReconciliation,
 } from '@/components/plan-cards';
@@ -128,6 +129,8 @@ export default function DashboardPage() {
   }, [cats.data, catStats.data]);
 
   const t = plan.data?.tally;
+  const att = useAttention(attention, month);
+  const goalCount = funds.data?.items.length ?? 0;
 
   if (summary.error) return <ErrorState message={summary.error.message} onRetry={() => summary.mutate()} />;
 
@@ -182,193 +185,204 @@ export default function DashboardPage() {
       {plan.data && <SweepCard sweep={plan.data.sweep} funds={plan.data.funds} />}
 
       {/*
-        THE THREE FIGURES, ACROSS THE TOP.
-        What the month has left, what it has cost, and where you stand with
-        other people — the only three questions a daily check-in answers. The
-        first carries the ambient bloom because it is the one you came for.
-      */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {t?.known ? (
-          <MetricCard
-            glow
-            icon={<NavIcon name="dashboard" size={20} />}
-            label={`${t.inHandMinor < 0 ? 'Down in' : 'Left in hand ·'} ${monthName}`}
-            badge={
-              t.ratePct != null && t.inHandMinor >= 0 ? (
-                <Badge tone="good">{Math.round(t.ratePct)}% kept</Badge>
-              ) : t.inHandMinor < 0 ? (
-                <Badge tone="up">drawing down</Badge>
-              ) : undefined
-            }
-            note={
-              <>
-                after <span className="num">{formatINR(t.outMinor)}</span> spent
-                {t.investedMinor > 0 && (
-                  <>
-                    {' '}
-                    and <span className="num">{formatINR(t.investedMinor)}</span> invested
-                  </>
-                )}
-              </>
-            }
-            footer={
-              plan.data ? (
-                <>
-                  <AllocationBar plan={plan.data} />
-                  <div className="mt-3.5 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-                    <TallyReconciliation plan={plan.data} />
-                  </div>
-                </>
-              ) : undefined
-            }
-          >
-            <span
-              className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight"
-              style={{ color: t.inHandMinor < 0 ? 'var(--rule-red)' : 'var(--hi)' }}
-            >
-              {t.inHandMinor < 0 && '−'}
-              {formatINR(Math.abs(t.inHandMinor))}
-            </span>
-            <span className="muted text-[12px]">liquid</span>
-          </MetricCard>
-        ) : (
-          <Card className="!p-5">
-            <Skeleton className="h-10 w-10 rounded-xl" />
-            <Skeleton className="h-3 w-28 mt-4" />
-            <Skeleton className="h-9 w-40 mt-3" />
-          </Card>
-        )}
-
-        <MetricCard
-          bloom="quiet"
-          icon={<NavIcon name="ledger" size={20} />}
-          label={`Spent in ${monthName}`}
-          badge={f?.pace.deltaPct != null ? <Delta pct={f.pace.deltaPct} /> : undefined}
-          note={
-            f ? (
-              <>
-                projected <span className="num">{formatINR(f.pace.projectedMinor)}</span> at{' '}
-                <span className="num">{formatINR(f.pace.perDayMinor)}</span>/day
-              </>
-            ) : undefined
-          }
-          footer={
-            f && (invest.data?.monthMinor ?? 0) > 0 ? (
-              <Link href="/goals" className="row flex items-baseline justify-between gap-3 -mx-2 px-2 py-2 rounded-lg">
-                <span className="micro">Invested, separately</span>
-                <span className="flex items-baseline gap-1.5">
-                  <Money minor={invest.data!.monthMinor} className="text-[14px] font-semibold" />
-                  <span className="micro" style={{ color: 'var(--accent)' }}>
-                    →
-                  </span>
-                </span>
-              </Link>
-            ) : undefined
-          }
-        >
-          <span className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight">
-            {formatINR(f?.pace.spentMinor ?? 0)}
-          </span>
-          <span className="muted text-[12px]">{s?.transactionCount ?? 0} entries</span>
-        </MetricCard>
-
-        <MetricCard
-          bloom={net < 0 ? 'danger' : 'credit'}
-          icon={<NavIcon name="people" size={20} />}
-          label="Net with people"
-          badge={
-            peers.data ? (
-              <Badge tone="neutral">{peers.data.balances.length} contacts</Badge>
-            ) : undefined
-          }
-          note={net === 0 ? 'Everything is settled.' : net > 0 ? 'owed to you, on balance' : 'you owe, on balance'}
-          footer={
-            peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[12px]">
-                  <span className="muted">You are owed </span>
-                  <span className="num font-semibold" style={{ color: 'var(--credit)' }}>
-                    {formatINR(peers.data.owedToMeMinor)}
-                  </span>
-                </span>
-                <Link href="/people" className="micro micro-link" style={{ color: 'var(--accent)' }}>
-                  Settle →
-                </Link>
-              </div>
-            ) : undefined
-          }
-        >
-          <span
-            className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight"
-            style={net === 0 ? undefined : { color: net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
-          >
-            {formatINR(Math.abs(net))}
-          </span>
-        </MetricCard>
-      </div>
-
-      {/*
         TWO COLUMNS, FROM xl UP.
-        Left is the month in motion — the curve, the pace tiles, and the list
-        of things that need doing. Right is the standing context: what the
-        saving is for, and what just happened. Below xl they stack in that
-        same order, so the phone reading is the desktop reading flattened.
+        Left is the month — one card, because "how is this month going" is one
+        question: what is left, what it has cost, the curve, and the pace tiles
+        are chapters of it rather than four answers to four questions. Right is
+        what needs doing, what the saving is for, and what just happened. Below
+        xl they stack in that order, so the phone reading is the desktop
+        reading flattened.
       */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-5 items-start">
-        <div className="space-y-5 min-w-0">
-        <Card className="!p-5 sm:!p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-            <div>
-              <h2 className="text-[17px] font-semibold tracking-tight">Cumulative spend trajectory</h2>
-              <p className="muted text-[12.5px] mt-0.5">This month against the same days of last month</p>
+        <Card className="!p-5 sm:!p-6 glow-card bloom-lg min-w-0">
+          <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 md:gap-6">
+              {/* The figure you came for. The largest number on the page. */}
+              {t?.known ? (
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <span className="icon-tile icon-tile-accent lit">
+                      <NavIcon name="dashboard" size={20} />
+                    </span>
+                    {t.ratePct != null && t.inHandMinor >= 0 ? (
+                      <Badge tone="good">{Math.round(t.ratePct)}% kept</Badge>
+                    ) : t.inHandMinor < 0 ? (
+                      <Badge tone="up">drawing down</Badge>
+                    ) : null}
+                  </div>
+                  <p className="label mb-1.5">
+                    {t.inHandMinor < 0 ? 'Down in' : 'Left in hand ·'} {monthName}
+                  </p>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span
+                      className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight"
+                      style={{ color: t.inHandMinor < 0 ? 'var(--rule-red)' : 'var(--hi)' }}
+                    >
+                      {t.inHandMinor < 0 && '−'}
+                      {formatINR(Math.abs(t.inHandMinor))}
+                    </span>
+                    <span className="muted text-[12px]">liquid</span>
+                  </div>
+                  <p className="muted text-[12.5px] mt-1.5 leading-relaxed">
+                    after <span className="num">{formatINR(t.outMinor)}</span> spent
+                    {t.investedMinor > 0 && (
+                      <>
+                        {' '}
+                        and <span className="num">{formatINR(t.investedMinor)}</span> invested
+                      </>
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Skeleton className="h-10 w-10 rounded-xl" />
+                  <Skeleton className="h-3 w-28 mt-4" />
+                  <Skeleton className="h-9 w-40 mt-3" />
+                </div>
+              )}
+
+              {/* What it has cost — second in rank, so a step down in size. */}
+              <div
+                className="min-w-0 pt-4 border-t md:pt-0 md:border-t-0 md:pl-6 md:border-l"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <div className="flex items-center justify-between gap-3 mb-1.5">
+                  <p className="label mb-0">Spent in {monthName}</p>
+                  {f?.pace.deltaPct != null && <Delta pct={f.pace.deltaPct} />}
+                </div>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="num text-[1.6rem] sm:text-[1.75rem] font-semibold leading-none tracking-tight">
+                    {formatINR(f?.pace.spentMinor ?? 0)}
+                  </span>
+                  <span className="muted text-[12px]">{s?.transactionCount ?? 0} entries</span>
+                </div>
+                {f && (
+                  <p className="muted text-[12.5px] mt-1.5 leading-relaxed">
+                    projected <span className="num">{formatINR(f.pace.projectedMinor)}</span> at{' '}
+                    <span className="num">{formatINR(f.pace.perDayMinor)}</span>/day
+                  </p>
+                )}
+                {f && (invest.data?.monthMinor ?? 0) > 0 && (
+                  <Link
+                    href="/goals"
+                    className="row flex items-baseline justify-between gap-3 -mx-2 px-2 py-2 mt-2 rounded-lg"
+                  >
+                    <span className="micro">Invested, separately</span>
+                    <span className="flex items-baseline gap-1.5">
+                      <Money minor={invest.data!.monthMinor} className="text-[14px] font-semibold" />
+                      <span className="micro" style={{ color: 'var(--accent)' }}>
+                        →
+                      </span>
+                    </span>
+                  </Link>
+                )}
+              </div>
             </div>
+
+            {/* Where the month's money went, and the subtraction behind the figure. */}
+            {t?.known && plan.data && (
+              <div className="mt-5">
+                <AllocationBar plan={plan.data} />
+                <div className="mt-3.5 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <TallyReconciliation plan={plan.data} />
+                </div>
+              </div>
+            )}
+
+            <CardSection>
+              <div className="mb-4">
+                <h2 className="text-[15px] font-semibold tracking-tight">Cumulative spend trajectory</h2>
+                <p className="muted text-[12px] mt-0.5">This month against the same days of last month</p>
+              </div>
+              {f && f.cumulative.length >= 2 ? (
+                <FlowCurve points={f.cumulative} monthDays={f.pace.monthDays} height={230} />
+              ) : (
+                <EmptyState
+                  title="Not enough to draw yet"
+                  hint="Two days of spending gives the curve something to say."
+                  action={
+                    <button className="btn btn-primary" onClick={() => openAdd()}>
+                      Add a transaction
+                    </button>
+                  }
+                />
+              )}
+            </CardSection>
+
+            {/* The pace tiles, as the card's footer row. Net with people was a
+                card of its own as well as a tile here; its detail folds into
+                the tile so the figure is on screen once. */}
+            <CardStrip pad="lg">
+              <StatStrip
+                bare
+                items={[
+                  { label: 'Today', minor: s?.todayMinor ?? 0 },
+                  { label: 'This week', minor: s?.weekMinor ?? 0 },
+                  {
+                    label: 'Typical entry',
+                    minor: f?.tickets.medianMinor ?? 0,
+                    sub: f ? `${f.tickets.count} this month` : undefined,
+                  },
+                  {
+                    label: 'Net with people',
+                    minor: Math.abs(net),
+                    tone: net === 0 ? undefined : net > 0 ? 'var(--credit)' : 'var(--rule-red)',
+                    sub: peers.data
+                      ? `${net === 0 ? 'all settled' : net > 0 ? 'owed to you' : 'you owe'} · ${
+                          peers.data.balances.length
+                        } contacts`
+                      : net === 0
+                        ? 'all settled'
+                        : net > 0
+                          ? 'owed to you'
+                          : 'you owe',
+                    extra:
+                      peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) ? (
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mt-1">
+                          <span className="text-[11px] whitespace-nowrap">
+                            <span className="muted">You are owed </span>
+                            <span className="num font-semibold" style={{ color: 'var(--credit)' }}>
+                              {formatINR(peers.data.owedToMeMinor)}
+                            </span>
+                          </span>
+                          <Link
+                            href="/people"
+                            className="micro micro-link shrink-0"
+                            style={{ color: 'var(--accent)' }}
+                          >
+                            Settle →
+                          </Link>
+                        </div>
+                      ) : undefined,
+                  },
+                ]}
+              />
+            </CardStrip>
           </div>
-          {f && f.cumulative.length >= 2 ? (
-            <FlowCurve points={f.cumulative} monthDays={f.pace.monthDays} height={230} />
-          ) : (
-            <EmptyState
-              title="Not enough to draw yet"
-              hint="Two days of spending gives the curve something to say."
-              action={
-                <button className="btn btn-primary" onClick={() => openAdd()}>
-                  Add a transaction
-                </button>
-              }
-            />
-          )}
         </Card>
 
-        <StatStrip
-          items={[
-            { label: 'Today', minor: s?.todayMinor ?? 0 },
-            { label: 'This week', minor: s?.weekMinor ?? 0 },
-            {
-              label: 'Typical entry',
-              minor: f?.tickets.medianMinor ?? 0,
-              sub: f ? `${f.tickets.count} this month` : undefined,
-            },
-            {
-              label: 'Net with people',
-              minor: Math.abs(net),
-              tone: net === 0 ? undefined : net > 0 ? 'var(--credit)' : 'var(--rule-red)',
-              sub: net === 0 ? 'all settled' : net > 0 ? 'owed to you' : 'you owe',
-            },
-          ]}
-        />
-
-          {/* What needs doing. Below the figures rather than above them: a
-              list of chores between the headline and the month buries the
-              thing the page exists to say. */}
-        <AttentionList items={attention} month={month} />
-        </div>
-
         <div className="space-y-5 min-w-0">
-        {/* One goal gets the card; several get the strip. */}
-        {funds.data?.items.length === 1 ? (
-          <ActiveGoalCard fund={funds.data.items[0]} onAdd={() => openAdd()} />
-        ) : (funds.data?.items.length ?? 0) > 1 ? (
-          <GoalsStrip funds={funds.data!.items} />
-        ) : null}
+        {/* What needs doing, and what the saving is for — both are "what
+            should I act on", so one card with a section each. Either half
+            steps aside when it has nothing to say, and so does the card. */}
+        {(att.visible.length > 0 || goalCount > 0) && (
+          <Card>
+            {att.visible.length > 0 && <AttentionRows bare visible={att.visible} onDismiss={att.dismiss} />}
+            {goalCount > 0 && (
+              <div
+                className={att.visible.length > 0 ? '-mx-4 sm:-mx-5 px-4 sm:px-5 mt-1 pt-4 border-t' : ''}
+                style={{ borderColor: 'var(--border)' }}
+              >
+                {/* One goal gets the card; several get the strip. */}
+                {goalCount === 1 ? (
+                  <ActiveGoalCard bare fund={funds.data!.items[0]} onAdd={() => openAdd()} />
+                ) : (
+                  <GoalsStrip bare funds={funds.data!.items} />
+                )}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Spend by category, as proportional area. The donut lives on This
             month, where a precise reading is wanted; here the only question

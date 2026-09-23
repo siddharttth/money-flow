@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 
 export function Card({
@@ -152,6 +152,7 @@ export function StatStrip({
    * the four figures ARE the section.
    */
   split = false,
+  bare = false,
 }: {
   items: {
     label: string;
@@ -164,9 +165,17 @@ export function StatStrip({
     /** An accent rule under the figure, at 0–1 of the cell width. */
     meter?: number;
     meterTone?: string;
+    /** Anything the figure needs beneath it that is not a sub-line — a
+        second amount, a link — when a card's detail folds into its cell. */
+    extra?: ReactNode;
   }[];
   cols?: 2 | 3 | 4;
   split?: boolean;
+  /**
+   * No card of its own — the strip is the bottom row of a card it shares.
+   * Wrap it in a CardStrip so the hairlines run to the card's edges.
+   */
+  bare?: boolean;
 }) {
   const wide = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' }[cols];
 
@@ -202,6 +211,7 @@ export function StatStrip({
         </p>
       )}
       {it.sub && <p className="muted text-[11px] mt-1 truncate">{it.sub}</p>}
+      {it.extra}
       {it.meter !== undefined && (
         <span
           className="block h-[3px] rounded-full mt-2.5 overflow-hidden"
@@ -221,9 +231,111 @@ export function StatStrip({
 
   if (split) return <div className={`grid grid-cols-2 ${wide} gap-4`}>{cells}</div>;
 
+  if (bare) return <div className={`grid grid-cols-2 ${wide} hair-grid`}>{cells}</div>;
+
   return (
     <div className="card overflow-hidden">
       <div className={`grid grid-cols-2 ${wide} hair-grid`}>{cells}</div>
+    </div>
+  );
+}
+
+/**
+ * One part of a card that holds several — a hairline above it and the same
+ * gap every sub-section uses, so a merged card reads as one surface with
+ * chapters rather than cards stacked inside a card.
+ */
+export function CardSection({
+  label,
+  action,
+  children,
+  className = '',
+}: {
+  label?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`mt-5 pt-4 border-t ${className}`} style={{ borderColor: 'var(--border)' }}>
+      {(label || action) && (
+        <div className="flex items-baseline justify-between gap-3 mb-3">
+          {label && <span className="label mb-0">{label}</span>}
+          {action}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A bare StatStrip as the bottom row of a card: pulled out to the card's
+ * edges so its hairlines meet the border, with a rule above it. Pass the
+ * card's own padding so the bleed matches.
+ */
+export function CardStrip({ children, pad = 'md' }: { children: ReactNode; pad?: 'md' | 'lg' }) {
+  const bleed = pad === 'lg' ? '-mx-5 -mb-5 sm:-mx-6 sm:-mb-6' : '-mx-4 -mb-4 sm:-mx-5 sm:-mb-5';
+  return (
+    <div className={`mt-5 border-t overflow-hidden rounded-b-[0.875rem] ${bleed}`} style={{ borderColor: 'var(--border)' }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A section read less often than the rest of the page, folded to one line.
+ * The summary rides on the closed header, so the headline figure is visible
+ * without opening it — collapsing hides the working, never the answer.
+ */
+export function Disclosure({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  title: ReactNode;
+  summary?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="row w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 text-left"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="label mb-0 shrink-0">{title}</span>
+        <span className="flex items-center gap-2.5 min-w-0">
+          {summary && <span className="text-[12.5px] truncate">{summary}</span>}
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className="muted shrink-0 transition-transform"
+            style={{ transform: open ? 'rotate(180deg)' : undefined, transitionDuration: '150ms' }}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </button>
+      {open && (
+        <div id={id} className="px-4 sm:px-5 pb-5 pt-1">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
