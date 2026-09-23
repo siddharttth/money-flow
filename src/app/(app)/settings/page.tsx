@@ -15,6 +15,8 @@ import { CategoryIcon, Icon, ICON_KEYS, resolveIcon } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
 import { IncomeSourceModal } from '@/components/income-source-modal';
 import { GoalModal } from '@/components/goal-modal';
+import { InlineEdit, useFreshKeys } from '@/components/motion';
+import { useSaveCategory } from '@/components/plan-cards';
 
 type CategoryRow = Category & {
   monthlyBudgetMinor: number | null;
@@ -33,6 +35,7 @@ export default function SettingsPage() {
   const { toast } = useShell();
   const { openCategory } = useInspector();
   const { mutate } = useSWRConfig();
+  const saveCategory = useSaveCategory();
   const [theme, setTheme] = useState<ThemeChoice>('dark');
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [creating, setCreating] = useState<null | 'expense' | 'income' | 'investment' | 'goal'>(null);
@@ -50,6 +53,11 @@ export default function SettingsPage() {
   const spendById = new Map((stats.data?.items ?? []).map((s) => [s.categoryId, s.totalMinor]));
   const all = cats.data?.items ?? [];
   const active = all.filter((c) => c.isActive && c.kind !== 'income');
+  /* A row whose limit just changed washes once (motion.tsx). */
+  const changedBudgets = useFreshKeys(
+    active.map((c) => `${c.id}:${c.monthlyBudgetMinor ?? ''}`),
+    !!cats.data && !cats.isValidating,
+  );
   const incomeCats = all.filter((c) => c.isActive && c.kind === 'income');
   const disabled = all.filter((c) => !c.isActive);
 
@@ -165,7 +173,9 @@ export default function SettingsPage() {
                 return (
                   <li
                     key={c.id}
-                    className="row flex items-center gap-3 px-3.5 sm:px-4 py-3"
+                    className={`row flex items-center gap-3 px-3.5 sm:px-4 py-3 ${
+                      changedBudgets.has(`${c.id}:${c.monthlyBudgetMinor ?? ''}`) ? 'wash' : ''
+                    }`}
                     onClick={() => openCategory(c.id)}
                   >
                     <CategoryIcon icon={c.icon} color={c.color} size={34} />
@@ -175,7 +185,18 @@ export default function SettingsPage() {
                         <p className="text-[13.5px] font-semibold truncate flex-1">{c.name}</p>
                         {budget ? (
                           <span className="num text-[12px] shrink-0" style={{ color: over ? 'var(--rule-red)' : 'var(--text-muted)' }}>
-                            {formatINR(spent)} / {formatINR(budget)}
+                            {formatINR(spent)} /{' '}
+                            {/* The limit, changed where it is printed. Emptying
+                                it removes the budget. */}
+                            <InlineEdit
+                              kind="money"
+                              clearable
+                              label={`${c.name} monthly budget`}
+                              value={budget / 100}
+                              onSave={(v) => saveCategory(c.id, { monthlyBudget: v as number | null })}
+                            >
+                              {formatINR(budget)}
+                            </InlineEdit>
                           </span>
                         ) : (
                           <span className="num text-[12px] muted shrink-0">{formatINR(spent)}</span>

@@ -503,10 +503,59 @@ h1, h2, h3 {
    * A bar or progress fill animates its own width. Applied by the component,
    * not globally, so a chart redrawing on a refresh does not re-animate.
    */
-  .grow { transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .grow { transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1); }
   /* Goals and budgets overshoot ~2%. It reads as effort, which is the right
      feeling for a bar that just moved forward. */
-  .grow-spring { transition: width 560ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+  .grow-spring { transition: width 260ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+
+  /*
+   * Open and close by animating one grid row between 0fr and 1fr — a smooth
+   * height with nothing measured. The fade is shorter than the height so the
+   * contents are readable before the section finishes opening.
+   */
+  .collapse-rows {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms ease-out;
+  }
+  .collapse-rows[data-open='true'] { grid-template-rows: 1fr; opacity: 1; }
+
+  /*
+   * A card acknowledging a change you just made: the accent ring breathes in
+   * and out once. Two identical keyframes so a second change mid-pulse
+   * restarts it instead of being swallowed.
+   */
+  @keyframes mf-pulse-a { 0% { box-shadow: 0 0 0 0 transparent; } 35% { box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @keyframes mf-pulse-b { 0% { box-shadow: 0 0 0 0 transparent; } 35% { box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  [data-pulse='a'] { animation: mf-pulse-a 250ms ease-out; }
+  [data-pulse='b'] { animation: mf-pulse-b 250ms ease-out; }
+
+  /* A progress ring sweeping to its new share, with the goal bars' overshoot. */
+  .ring-sweep { transition: stroke-dasharray 260ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+
+  /* A tab's contents swapping in. Only applied once the page has settled. */
+  @keyframes mf-fade { from { opacity: 0; } }
+  .tab-fade { animation: mf-fade 150ms ease-out both; }
+
+  /* A figure you can tap to change: a dotted underline says so. */
+  .inline-edit-target {
+    cursor: text;
+    border-bottom: 1px dotted var(--border-strong);
+    transition: border-color 150ms ease-out;
+  }
+  .inline-edit-target:hover,
+  .inline-edit-target:focus-visible { border-bottom-color: var(--accent); outline: none; }
+  .inline-edit {
+    background: var(--surface-2);
+    border: 1px solid var(--accent);
+    border-radius: 0.375rem;
+    padding: 0.125rem 0.375rem;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    min-width: 5ch;
+  }
 
   /* The live dot on the dashboard header. Slow, low-amplitude — a heartbeat,
    not a blink. Stopped entirely under reduced motion, below. */
@@ -527,8 +576,14 @@ h1, h2, h3 {
       animation: none !important;
     }
     .grow,
-    .grow-spring {
+    .grow-spring,
+    .ring-sweep,
+    .collapse-rows {
       transition: none !important;
+    }
+    [data-pulse],
+    .tab-fade {
+      animation: none !important;
     }
   }
 

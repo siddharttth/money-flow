@@ -23,6 +23,7 @@ import { InsightsTabs } from '@/components/insights-tabs';
 import { BreakdownList } from '@/components/breakdown';
 import { LifetimeInHand, SavingsHistory, type LifetimeTallyRow } from '@/components/plan-cards';
 import { useInspector } from '@/components/inspector';
+import { CountMoney, useGrowClass } from '@/components/motion';
 
 type CategoryTotal = {
   categoryId: string;
@@ -113,7 +114,7 @@ export default function LifetimePage() {
                   style={netMinor < 0 ? { color: 'var(--rule-red)' } : undefined}
                 >
                   {netMinor < 0 && '−'}
-                  {formatINR(Math.abs(netMinor))}
+                  <CountMoney minor={Math.abs(netMinor)} />
                 </span>
                 <p className="muted text-[13px] mt-2.5 leading-relaxed">
                   Cash, investments and the ledger together — the one figure the
@@ -155,12 +156,24 @@ export default function LifetimePage() {
               <StatStrip
                 bare
                 items={[
-                  { label: 'Months tracked', value: String(life.months ?? 0), sub: life.firstMonth ?? undefined },
-                  { label: 'Ever invested', minor: invest.data?.lifetimeMinor ?? 0, tone: 'var(--credit)' },
+                  {
+                    label: 'Months tracked',
+                    value: String(life.months ?? 0),
+                    sub: life.firstMonth ?? undefined,
+                    /* Back to where it started. */
+                    href: life.firstMonth ? `/analytics/month?month=${life.firstMonth}` : undefined,
+                  },
+                  {
+                    label: 'Ever invested',
+                    minor: invest.data?.lifetimeMinor ?? 0,
+                    tone: 'var(--credit)',
+                    href: '/goals',
+                  },
                   {
                     label: 'Best month kept',
                     minor: best?.savedMinor ?? 0,
                     sub: best ? monthName(best.month) : undefined,
+                    href: best ? `/analytics/month?month=${best.month}` : undefined,
                   },
                   {
                     label: 'Positive streak',
@@ -328,7 +341,7 @@ function PositionLine({
       </dt>
       <dd className={`num text-[13px] ${strong ? 'font-semibold' : ''}`} style={tone ? { color: tone } : undefined}>
         {minor < 0 ? '−' : ''}
-        {formatINR(Math.abs(minor))}
+        <CountMoney minor={Math.abs(minor)} />
       </dd>
     </div>
   );
@@ -400,12 +413,13 @@ function Figure({ label, minor, sub, tone }: { label: string; minor: number; sub
 }
 
 function YearBar({ label, minor, max, color }: { label: string; minor: number; max: number; color: string }) {
+  const grow = useGrowClass();
   return (
     <div className="flex items-center gap-2.5">
       <span className="micro w-6 shrink-0">{label}</span>
       <span className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
         <span
-          className="block h-full rounded-full"
+          className={`block h-full rounded-full ${grow}`}
           style={{ width: `${Math.max(1, (minor / max) * 100)}%`, background: color }}
         />
       </span>

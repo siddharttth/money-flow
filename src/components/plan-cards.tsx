@@ -11,6 +11,7 @@ import type { Fund } from '@/lib/funds';
 import { Card, Money } from './ui';
 import { ShareBar } from './graph';
 import { CategoryIcon, NavIcon } from './icons';
+import { Collapse, CountMoney, InlineEdit, useGrowClass, useMotionOk, usePulseOnChange, useTween } from './motion';
 import { useToast } from './toast';
 
 function PlanLine({
@@ -161,8 +162,23 @@ function monthName(month: string): string {
  * about a goal they will miss by a year, so the pace line is not optional
  * decoration — it is the point of the card.
  */
-export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
+export function FundCard({
+  fund,
+  onAdd,
+  month = '',
+  settled = true,
+}: {
+  fund: Fund;
+  onAdd?: () => void;
+  /** The month the card is shown under, and whether its data has arrived for
+      it — so stepping the month picker is not mistaken for a contribution. */
+  month?: string;
+  settled?: boolean;
+}) {
   const ahead = (fund.paceDeltaMinor ?? 0) >= 0;
+  const save = useSaveCategory();
+  /* The card acknowledges a contribution landing or a target you changed. */
+  const pulse = usePulseOnChange([fund.savedMinor, fund.targetMinor, fund.targetDate], month, settled);
 
   /*
    * Laid out by the card's own width, not the screen's. One goal gets the
@@ -177,6 +193,7 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
     <Card
       className="@container glow-card bloom-sm"
       style={{ '--bloom': fund.isComplete ? 'var(--credit)' : fund.color } as React.CSSProperties}
+      {...pulse}
     >
       <div className="relative @2xl:grid @2xl:grid-cols-2 @2xl:gap-8 @2xl:items-start">
         <div>
@@ -195,9 +212,30 @@ export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
                 )}
               </div>
               <p className="muted text-[12px] mt-0.5">
-                <span className="num">{formatINR(fund.savedMinor)}</span> of{' '}
-                <span className="num">{formatINR(fund.targetMinor)}</span>
-                {fund.targetDate && ` · by ${targetLabel(fund.targetDate)}`}
+                <CountMoney minor={fund.savedMinor} /> of{' '}
+                {/* The target and the date are one field each — editable where
+                    they are printed. The date cannot go into the past, and
+                    clearing it leaves a goal with no deadline. */}
+                <InlineEdit
+                  kind="money"
+                  label={`${fund.name} target`}
+                  value={fund.targetMinor / 100}
+                  onSave={(v) => save(fund.categoryId, { target: v as number })}
+                  className="num"
+                >
+                  {formatINR(fund.targetMinor)}
+                </InlineEdit>
+                {' · '}
+                <InlineEdit
+                  kind="date"
+                  clearable
+                  min={todayISO()}
+                  label={`${fund.name} target date`}
+                  value={fund.targetDate}
+                  onSave={(v) => save(fund.categoryId, { targetDate: (v as string | null) ?? null })}
+                >
+                  {fund.targetDate ? `by ${targetLabel(fund.targetDate)}` : 'add a date'}
+                </InlineEdit>
               </p>
             </div>
           </div>
@@ -376,6 +414,19 @@ function GoalsStripFrame({ bare, children }: { bare: boolean; children: ReactNod
   );
 }
 
+/**
+ * Save one field of a category and refresh everything that reads it. A
+ * budget or a target shows on several screens at once, and a stale copy on
+ * any of them would contradict the one just edited.
+ */
+export function useSaveCategory() {
+  const { mutate } = useSWRConfig();
+  return async (id: string, body: { monthlyBudget?: number | null; target?: number | null; targetDate?: string | null }) => {
+    await api.patch(`/api/categories/${id}`, body);
+    await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Saving, over time
  * ------------------------------------------------------------------ */
@@ -418,8 +469,10 @@ export function SavingsHistory({
   const withIncome = rows.filter((r) => r.ratePct != null);
   if (withIncome.length === 0) return null;
 
-  const hidden = recent && !showAll ? Math.max(0, rows.length - recent) : 0;
-  const shown = hidden ? rows.slice(hidden) : rows;
+  /* The earlier months slide open above the recent ones rather than
+     appearing all at once; once shown they stay shown. */
+  const earlier = recent ? Math.max(0, rows.length - recent) : 0;
+  const hidden = showAll ? 0 : earlier;
 
   /*
    * POOLED, NOT AVERAGED.
@@ -432,6 +485,49 @@ export function SavingsHistory({
   const pooledIn = withIncome.reduce((s, r) => s + r.inMinor, 0);
   const pooledSaved = withIncome.reduce((s, r) => s + r.savedMinor, 0);
   const avg = pooledIn > 0 ? (pooledSaved / pooledIn) * 100 : 0;
+
+  const renderRow = (r: SavedMonthRow) => {
+    const negative = r.savedMinor < 0;
+    return (
+      <li key={r.month}>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="micro">{monthName(r.month)}</span>
+          <span className="flex items-baseline gap-2.5 min-w-0">
+            {r.ratePct != null && (
+              <span
+                className="num text-[12px] font-semibold"
+                style={{ color: negative ? 'var(--rule-red)' : 'var(--credit)' }}
+              >
+                {negative ? '−' : ''}
+                {Math.abs(Math.round(r.ratePct))}%
+              </span>
+            )}
+            <span className="num text-[12px] muted">
+              {negative && '−'}
+              {formatINR(Math.abs(r.savedMinor))}
+            </span>
+          </span>
+        </div>
+        <div className="mt-1.5">
+          {r.ratePct == null ? (
+            /* No income logged. An empty track says "no record" where a
+               0% bar would have said "you kept nothing". */
+            <div
+              className="h-1.5 rounded-full"
+              style={{ background: 'var(--surface-2)' }}
+              title="Nothing logged as income this month"
+            />
+          ) : (
+            <ShareBar
+              share={Math.max(0, Math.min(1, r.ratePct / 100))}
+              color={negative ? 'var(--rule-red)' : 'var(--credit)'}
+              height={6}
+            />
+          )}
+        </div>
+      </li>
+    );
+  };
 
   const body = (
     <>
@@ -446,49 +542,14 @@ export function SavingsHistory({
         </button>
       )}
 
+      {earlier > 0 && (
+        <Collapse open={showAll}>
+          <ul className="space-y-3 pb-3">{rows.slice(0, earlier).map(renderRow)}</ul>
+        </Collapse>
+      )}
+
       <ul className="space-y-3">
-        {shown.map((r) => {
-          const negative = r.savedMinor < 0;
-          return (
-            <li key={r.month}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="micro">{monthName(r.month)}</span>
-                <span className="flex items-baseline gap-2.5 min-w-0">
-                  {r.ratePct != null && (
-                    <span
-                      className="num text-[12px] font-semibold"
-                      style={{ color: negative ? 'var(--rule-red)' : 'var(--credit)' }}
-                    >
-                      {negative ? '−' : ''}
-                      {Math.abs(Math.round(r.ratePct))}%
-                    </span>
-                  )}
-                  <span className="num text-[12px] muted">
-                    {negative && '−'}
-                    {formatINR(Math.abs(r.savedMinor))}
-                  </span>
-                </span>
-              </div>
-              <div className="mt-1.5">
-                {r.ratePct == null ? (
-                  /* No income logged. An empty track says "no record" where a
-                     0% bar would have said "you kept nothing". */
-                  <div
-                    className="h-1.5 rounded-full"
-                    style={{ background: 'var(--surface-2)' }}
-                    title="Nothing logged as income this month"
-                  />
-                ) : (
-                  <ShareBar
-                    share={Math.max(0, Math.min(1, r.ratePct / 100))}
-                    color={negative ? 'var(--rule-red)' : 'var(--credit)'}
-                    height={6}
-                  />
-                )}
-              </div>
-            </li>
-          );
-        })}
+        {rows.slice(earlier).map(renderRow)}
       </ul>
 
       <p className="muted text-[12px] mt-4 pt-3.5 border-t leading-relaxed" style={{ borderColor: 'var(--border)' }}>
@@ -576,7 +637,7 @@ export function LifetimeInHand({
             style={down ? { color: 'var(--rule-red)' } : undefined}
           >
             {down && '−'}
-            {formatINR(Math.abs(data.inHandMinor))}
+            <CountMoney minor={Math.abs(data.inHandMinor)} />
           </span>
         </div>
 
@@ -667,7 +728,7 @@ export function GoalsRollup({
             {done.length > 0 && <span className="badge badge-good">{done.length} finished</span>}
           </div>
           <p className="text-[13px] mt-1 leading-relaxed">
-            <span className="num font-semibold">{formatINR(savedMinor)}</span>{' '}
+            <CountMoney minor={savedMinor} className="font-semibold" />{' '}
             <span className="muted">saved of</span> <span className="num">{formatINR(targetMinor)}</span>{' '}
             <span className="muted">
               across {open.length} active {open.length === 1 ? 'target' : 'targets'}
@@ -781,6 +842,9 @@ export function ProgressRing({
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
   const filled = Math.max(0, Math.min(1, share));
+  /* The ring sweeps and its figure counts when the share moves after load. */
+  const ok = useMotionOk();
+  const pctShown = useTween(Math.round(filled * 100));
 
   return (
     <span className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
@@ -803,10 +867,11 @@ export function ProgressRing({
           strokeLinecap="round"
           strokeDasharray={`${circumference * filled} ${circumference}`}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          className={ok ? 'ring-sweep' : undefined}
           style={{ filter: `drop-shadow(0 0 6px color-mix(in oklab, ${tone} 60%, transparent))` }}
         />
       </svg>
-      <span className="absolute num text-[13px] font-bold">{Math.round(filled * 100)}%</span>
+      <span className="absolute num text-[13px] font-bold">{pctShown}%</span>
     </span>
   );
 }
@@ -886,6 +951,7 @@ export function Badge({
  * and scaled the same way so the two can never disagree.
  */
 export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
+  const grow = useGrowClass();
   const t = plan.tally;
   const outTotal = t.outMinor + t.investedMinor;
   const scale = Math.max(t.inMinor, outTotal, 1);
@@ -907,12 +973,14 @@ export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
       <div className="relative">
         <div className="flex h-2.5 rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
           <span
+            className={grow}
             style={{
               width: `${spent}%`,
               background: 'linear-gradient(90deg, color-mix(in oklab, var(--text-muted) 55%, var(--surface-2)), var(--text-muted))',
             }}
           />
           <span
+            className={grow}
             style={{
               width: `${invested}%`,
               background: 'linear-gradient(90deg, color-mix(in oklab, var(--credit) 70%, var(--surface-2)), var(--credit))',
@@ -920,6 +988,7 @@ export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
             }}
           />
           <span
+            className={grow}
             style={{
               width: `${free}%`,
               background: 'linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 80%, white))',
@@ -935,7 +1004,11 @@ export function AllocationBar({ plan }: { plan: MonthlyPlan }) {
           <span
             aria-hidden
             className="absolute top-[-4px] bottom-[-4px] w-[2px] -translate-x-px rounded-full"
-            style={{ left: `${pct(t.inMinor)}%`, background: 'var(--rule-red)' }}
+            style={{
+              left: `${pct(t.inMinor)}%`,
+              background: 'var(--rule-red)',
+              transition: grow ? 'left 220ms cubic-bezier(0.22, 1, 0.36, 1)' : undefined,
+            }}
           />
         )}
       </div>
@@ -1059,13 +1132,18 @@ export function ActiveGoalCard({
   fund,
   onAdd,
   bare = false,
+  editable = false,
 }: {
   fund: Fund;
   onAdd: () => void;
   /** A section of a shared card: no card, no bloom of its own. */
   bare?: boolean;
+  /** The target amount can be changed in place. */
+  editable?: boolean;
 }) {
   const behind = fund.paceConfident && (fund.paceDeltaMinor ?? 0) < 0;
+  const save = useSaveCategory();
+  const pulse = usePulseOnChange([fund.savedMinor, fund.targetMinor, fund.targetDate]);
 
   const body = (
     <div className="relative">
@@ -1088,10 +1166,22 @@ export function ActiveGoalCard({
         <div className="min-w-0">
           <p className="micro">Saved so far</p>
           <p className="mt-1">
-            <span className="num text-[22px] font-bold" style={{ color: 'var(--hi)' }}>
-              {formatINR(fund.savedMinor)}
+            <CountMoney minor={fund.savedMinor} className="text-[22px] font-bold" style={{ color: 'var(--hi)' }} />
+            <span className="num muted text-[12px]">
+              {' / '}
+              {editable ? (
+                <InlineEdit
+                  kind="money"
+                  label={`${fund.name} target`}
+                  value={fund.targetMinor / 100}
+                  onSave={(v) => save(fund.categoryId, { target: v as number })}
+                >
+                  {formatINR(fund.targetMinor)}
+                </InlineEdit>
+              ) : (
+                formatINR(fund.targetMinor)
+              )}
             </span>
-            <span className="num muted text-[12px]"> / {formatINR(fund.targetMinor)}</span>
           </p>
           <p className="muted text-[12px] mt-1.5">
             {fund.requiredPerMonthMinor ? (
@@ -1114,5 +1204,9 @@ export function ActiveGoalCard({
     </div>
   );
 
-  return bare ? body : <Card className="!p-5 glow-card bloom-lg">{body}</Card>;
+  return bare ? body : (
+    <Card className="!p-5 glow-card bloom-lg" {...pulse}>
+      {body}
+    </Card>
+  );
 }

@@ -27,6 +27,7 @@ import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { NavIcon, PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
+import { CountMoney, useFreshKeys, useGrowClass, usePulseOnChange } from '@/components/motion';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
@@ -108,7 +109,6 @@ function PeopleHub() {
     await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
   }
 
-  if (people.error) return <ErrorState message={people.error.message} onRetry={() => people.mutate()} />;
 
   const net = peers.data?.netMinor ?? 0;
   const owedToMe = peers.data?.owedToMeMinor ?? 0;
@@ -148,6 +148,23 @@ function PeopleHub() {
     .filter((r) => r.balanceMinor !== 0)
     .sort((a, b) => Math.abs(b.balanceMinor) - Math.abs(a.balanceMinor))[0];
 
+  /*
+   * Motion for what you change (motion.tsx): the net card acknowledges a
+   * lend, a borrow or a settle-up, and the person it moved washes once. Keyed
+   * on balances alone — they are not month-scoped, so stepping the month
+   * picker can never flash a row.
+   */
+  const grow = useGrowClass();
+  const netPulse = usePulseOnChange([net, owedToMe, owedByMe]);
+  const moved = useFreshKeys(
+    everyone.map((r) => `${r.person.id}:${r.balanceMinor}`),
+    !!people.data && !!peers.data,
+  );
+  const movedPeople = new Set([...moved].map((k) => k.split(':')[0]));
+
+  /* After every hook, so an error cannot change how many of them run. */
+  if (people.error) return <ErrorState message={people.error.message} onRetry={() => people.mutate()} />;
+
   return (
     <div className="space-y-5">
       {/* Header. The subtitle names what the screen actually reconciles —
@@ -178,7 +195,7 @@ function PeopleHub() {
 
       {/* NET EXPOSURE. One figure, the two sides it is made of, and the two
           actions that change it. */}
-      <Card className={`!p-5 sm:!p-6 glow-card bloom-lg ${net < 0 ? 'bloom-danger' : ''}`}>
+      <Card className={`!p-5 sm:!p-6 glow-card bloom-lg ${net < 0 ? 'bloom-danger' : ''}`} {...netPulse}>
         <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_auto] gap-6 lg:gap-8 items-center">
           <div>
             <div className="flex items-center gap-2.5 mb-2">
@@ -194,7 +211,7 @@ function PeopleHub() {
                 className="num text-[2.4rem] sm:text-[2.6rem] font-bold leading-none tracking-tight"
                 style={net === 0 ? undefined : { color: net > 0 ? 'var(--credit)' : 'var(--rule-red)' }}
               >
-                {formatINR(Math.abs(net))}
+                <CountMoney minor={Math.abs(net)} />
               </span>
               <span className="muted text-[13px]">
                 {net === 0 ? 'everything is settled' : net > 0 ? 'owed to you, on balance' : 'you owe, on balance'}
@@ -213,13 +230,13 @@ function PeopleHub() {
                 <span>
                   <span className="micro block">They owe me</span>
                   <span className="num text-[19px] font-bold" style={{ color: 'var(--credit)' }}>
-                    {formatINR(owedToMe)}
+                    <CountMoney minor={owedToMe} />
                   </span>
                 </span>
                 <span className="text-right">
                   <span className="micro block">I owe</span>
                   <span className="num text-[19px] font-bold" style={{ color: 'var(--rule-red)' }}>
-                    {formatINR(owedByMe)}
+                    <CountMoney minor={owedByMe} />
                   </span>
                 </span>
               </div>
@@ -227,6 +244,7 @@ function PeopleHub() {
                   compare their lengths against different scales. */}
               <div className="flex h-2 rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
                 <span
+                  className={grow}
                   style={{
                     width: `${receivableShare * 100}%`,
                     background: 'linear-gradient(90deg, color-mix(in oklab, var(--credit) 60%, var(--surface-2)), var(--credit))',
@@ -234,6 +252,7 @@ function PeopleHub() {
                   }}
                 />
                 <span
+                  className={grow}
                   style={{
                     width: `${(1 - receivableShare) * 100}%`,
                     background: 'linear-gradient(90deg, color-mix(in oklab, var(--rule-red) 60%, var(--surface-2)), var(--rule-red))',
@@ -282,6 +301,9 @@ function PeopleHub() {
             items={[
               {
                 label: 'Active ledgers',
+                /* The open ones, listed. */
+                onClick: () => setFilter(filter === 'debt' ? 'all' : 'debt'),
+                active: filter === 'debt',
                 value: `${rows.length} ${rows.length === 1 ? 'contact' : 'contacts'}`,
                 icon: <NavIcon name="people" size={16} />,
                 sub: openCount > 0 ? `${openCount} outstanding` : 'all clear',
@@ -293,6 +315,7 @@ function PeopleHub() {
               },
               {
                 label: 'Most shared with',
+                onClick: topSharer ? () => openPerson(topSharer.person.id) : undefined,
                 minor: topSharer?.spendMinor ?? 0,
                 icon: <NavIcon name="analytics" size={16} />,
                 sub: topSharer
@@ -309,6 +332,15 @@ function PeopleHub() {
               biggestDebt
                 ? {
                     label: 'Next settlement',
+                    /* The same sheet the row's Settle / Remind opens, with the
+                       same direction and amount — its confirm step intact. */
+                    onClick: () =>
+                      setLedgerFor({
+                        direction: biggestDebt.balanceMinor > 0 ? 'in' : 'out',
+                        personId: biggestDebt.person.id,
+                        settleMinor: Math.abs(biggestDebt.balanceMinor),
+                        name: biggestDebt.person.name,
+                      }),
                     minor: Math.abs(biggestDebt.balanceMinor),
                     tone: biggestDebt.balanceMinor < 0 ? 'var(--rule-red)' : 'var(--credit)',
                     icon: <NavIcon name="target" size={16} />,
@@ -390,7 +422,7 @@ function PeopleHub() {
                 return (
                   <li
                     key={person.id}
-                    className="row px-3.5 sm:px-4 py-3"
+                    className={`row px-3.5 sm:px-4 py-3 ${movedPeople.has(person.id) ? 'wash' : ''}`}
                     onClick={() => openPerson(person.id)}
                     /* A row with an open balance is tinted, so the two that
                        need action are findable in a list of eight without

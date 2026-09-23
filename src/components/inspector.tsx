@@ -16,6 +16,8 @@ import { ShareBar } from './graph';
 import { useShell } from './app-shell';
 import { CategoryIcon, PersonMark } from './icons';
 import { useToast } from './toast';
+import { InlineEdit } from './motion';
+import { useSaveCategory } from './plan-cards';
 
 /**
  * The app's connective tissue: a person or category name is clickable
@@ -440,6 +442,7 @@ function CategoryInspector({
   const { openPerson } = useInspector();
   const { openAdd } = useShell();
   const lifetime = scope === 'lifetime';
+  const saveCategory = useSaveCategory();
 
   const budget = data?.category.monthlyBudgetMinor ?? null;
   const pct = budget ? Math.min((data!.monthMinor / budget) * 100, 100) : 0;
@@ -500,7 +503,16 @@ function CategoryInspector({
               <div className="flex items-baseline justify-between mb-1.5">
                 <span className="micro">Monthly budget</span>
                 <span className="text-xs num">
-                  {formatINR(data.monthMinor)} / {formatINR(budget)}
+                  {formatINR(data.monthMinor)} /{' '}
+                  <InlineEdit
+                    kind="money"
+                    clearable
+                    label={`${data.category.name} monthly budget`}
+                    value={budget / 100}
+                    onSave={(v) => saveCategory(data.category.id, { monthlyBudget: v as number | null })}
+                  >
+                    {formatINR(budget)}
+                  </InlineEdit>
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden relative" style={{ background: 'var(--surface-2)' }}>

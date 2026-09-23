@@ -1,11 +1,11 @@
 'use client';
 
-import { Suspense, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { qs } from '@/lib/client';
-import { currentMonth, dayLabel, monthLabel, monthRange, todayISO } from '@/lib/dates';
+import { currentMonth, dayLabel, monthLabel, monthRange, shiftMonth, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat, Expense, ExpenseList, Person, PersonStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
@@ -31,6 +31,8 @@ import { BreakdownList } from '@/components/breakdown';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { CategoryIcon } from '@/components/icons';
+import { CountMoney, InlineEdit, useGrowClass, useMotionOk, usePulseOnChange } from '@/components/motion';
+import { useSaveCategory } from '@/components/plan-cards';
 
 export default function AnalyticsPage() {
   return (
@@ -58,6 +60,12 @@ function AnalyticsInner() {
   const [month, setMonth] = useState(search.get('month') ?? currentMonth());
   const [personIds, setPersonIds] = useState<string[]>([]);
   const [drill, setDrill] = useState<CategoryStat | null>(null);
+  /* Held here, not in the card, so the strip's Typical entry can open Entry
+     sizes. Starts from ?tab= — where the dashboard's Typical entry lands. */
+  const [tab, setTab] = useState<CloserTab>(() => {
+    const t = search.get('tab');
+    return t === 'sizes' || t === 'trends' ? t : 'rhythm';
+  });
   const { openPerson, openCategory } = useInspector();
 
   const { start, end } = monthRange(month);
@@ -124,9 +132,10 @@ function AnalyticsInner() {
                 </div>
 
                 <p className="flex items-baseline gap-2">
-                  <span className="num text-[2.4rem] sm:text-[2.7rem] font-bold leading-none tracking-tight">
-                    {formatINR(f.pace.spentMinor)}
-                  </span>
+                  <CountMoney
+                    minor={f.pace.spentMinor}
+                    className="text-[2.4rem] sm:text-[2.7rem] font-bold leading-none tracking-tight"
+                  />
                   <span className="micro">INR</span>
                 </p>
 
@@ -147,7 +156,7 @@ function AnalyticsInner() {
                 <div className="grid grid-cols-2 gap-3 mt-5 rounded-xl p-3" style={{ background: 'var(--surface-2)' }}>
                   <SubStat
                     label={f.isCurrentMonth ? 'Last month by today' : 'The month before'}
-                    value={formatINR(f.pace.prevSameDayMinor)}
+                    minor={f.pace.prevSameDayMinor}
                     note={
                       f.pace.deltaPct == null
                         ? 'nothing to compare'
@@ -166,7 +175,7 @@ function AnalyticsInner() {
                   {f.isCurrentMonth && (
                     <SubStat
                       label="Projected month end"
-                      value={formatINR(f.pace.projectedMinor)}
+                      minor={f.pace.projectedMinor}
                       note={
                         f.pace.projectedMinor > f.pace.prevFullMinor && f.pace.prevFullMinor > 0
                           ? 'above last month'
@@ -181,7 +190,7 @@ function AnalyticsInner() {
                   )}
                   <SubStat
                     label={`First half (1–${Math.ceil(f.pace.monthDays / 2)})`}
-                    value={formatINR(f.halves.firstMinor)}
+                    minor={f.halves.firstMinor}
                     note={
                       f.pace.spentMinor > 0
                         ? `${Math.round((f.halves.firstMinor / f.pace.spentMinor) * 100)}% of total spend`
@@ -190,7 +199,7 @@ function AnalyticsInner() {
                   />
                   <SubStat
                     label={`Second half (${Math.ceil(f.pace.monthDays / 2) + 1}–${f.pace.monthDays})`}
-                    value={formatINR(f.halves.secondMinor)}
+                    minor={f.halves.secondMinor}
                     note={
                       f.halves.secondMinor === 0 && f.isCurrentMonth
                         ? 'not reached yet'
@@ -277,6 +286,8 @@ function AnalyticsInner() {
             sub: s ? `${monthLabel(s.previousMonth.month).split(' ')[0]}: ${formatINR(s.previousMonth.totalMinor)}` : undefined,
             tone: s?.changePct == null ? undefined : s.changePct > 0 ? 'var(--rule-red)' : 'var(--credit)',
             icon: <StatMark>↗</StatMark>,
+            /* The month it is compared against, one tap away. */
+            onClick: () => setMonth(shiftMonth(month, -1)),
           },
           {
             label: 'Biggest day',
@@ -288,12 +299,20 @@ function AnalyticsInner() {
                 : undefined,
             meterTone: 'var(--hi)',
             icon: <StatMark>◎</StatMark>,
+            href: f?.cadence.busiest ? `/expenses?day=${f.cadence.busiest.date}` : undefined,
           },
           {
             label: 'Typical entry',
             minor: f?.tickets.medianMinor ?? 0,
             sub: f ? `median of ${f.tickets.count} · mean ${formatINR(f.tickets.averageMinor)}` : undefined,
             icon: <StatMark>◨</StatMark>,
+            onClick:
+              f && f.tickets.count > 0
+                ? () => {
+                    setTab('sizes');
+                    document.getElementById('closer-look')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                : undefined,
           },
         ]}
       />
@@ -456,7 +475,7 @@ function AnalyticsInner() {
           deeper reading of the month — asked less often than the hero or the
           budgets, so they share one card and show one at a time. Each tab
           keeps the gate its section always had. */}
-      <CloserLook flow={f} daily={daily.data?.items} openCategory={openCategory} />
+      <CloserLook flow={f} daily={daily.data?.items} openCategory={openCategory} tab={tab} onTab={setTab} />
 
       {/* ---------- Money that is not spending ----------
           Investing and lending are both kept out of every figure above, for
@@ -478,10 +497,10 @@ function AnalyticsInner() {
                 <div className="grid grid-cols-3 gap-3 sm:gap-4">
                   <Figure
                     label={`Put in during ${monthLabel(month).split(' ')[0]}`}
-                    value={formatINR(invest.data!.monthMinor)}
+                    minor={invest.data!.monthMinor}
                     tone="var(--credit)"
                   />
-                  <Figure label="Lifetime" value={formatINR(invest.data!.lifetimeMinor)} />
+                  <Figure label="Lifetime" minor={invest.data!.lifetimeMinor} />
                   <Figure
                     label="Share of outgoings"
                     value={`${Math.round(
@@ -507,11 +526,11 @@ function AnalyticsInner() {
               >
                 <span className="label mb-3 block">Lending, separately</span>
                 <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                  <Figure label="Lent out" value={formatINR(f.ledger.lentMinor)} tone="var(--rule-red)" />
-                  <Figure label="Received" value={formatINR(f.ledger.borrowedMinor)} tone="var(--credit)" />
+                  <Figure label="Lent out" minor={f.ledger.lentMinor} tone="var(--rule-red)" />
+                  <Figure label="Received" minor={f.ledger.borrowedMinor} tone="var(--credit)" />
                   <Figure
                     label="Net movement"
-                    value={formatINR(Math.abs(f.ledger.netMinor))}
+                    minor={Math.abs(f.ledger.netMinor)}
                     sub={f.ledger.netMinor >= 0 ? 'out of pocket' : 'into pocket'}
                   />
                 </div>
@@ -565,17 +584,24 @@ function AnalyticsInner() {
  * month, Entry sizes in a month with no entries — so a tab is never a door
  * to an empty room.
  */
+type CloserTab = 'rhythm' | 'trends' | 'sizes';
+
 function CloserLook({
   flow: f,
   daily,
   openCategory,
+  tab,
+  onTab,
 }: {
   flow: Flow | undefined;
   daily: { date: string; totalMinor: number }[] | undefined;
   openCategory: (id: string) => void;
+  tab: CloserTab;
+  onTab: (t: CloserTab) => void;
 }) {
-  type Tab = 'rhythm' | 'trends' | 'sizes';
-  const [tab, setTab] = useState<Tab>('rhythm');
+  type Tab = CloserTab;
+  const motionOk = useMotionOk();
+  const router = useRouter();
 
   const options: { value: Tab; label: string }[] = [{ value: 'rhythm', label: 'Rhythm' }];
   if (f && f.momentum.some((m) => !m.isNew)) options.push({ value: 'trends', label: 'Category trends' });
@@ -584,12 +610,15 @@ function CloserLook({
   const active: Tab = options.some((o) => o.value === tab) ? tab : 'rhythm';
 
   return (
-    <div>
+    <div id="closer-look" className="scroll-mt-24">
       <SectionHead label="A closer look" />
       <Card className="!p-0 overflow-clip">
+        {/* Keyed on the tab, so switching fades the new contents in — once
+            the page is up; the first render just appears. */}
+        <div key={active} className={motionOk ? 'tab-fade' : undefined}>
         {options.length > 1 && (
           <div className="px-4 sm:px-5 pt-4 sm:pt-5 scroll-x">
-            <Segmented options={options} value={active} onChange={setTab} />
+            <Segmented options={options} value={active} onChange={onTab} />
           </div>
         )}
 
@@ -627,6 +656,7 @@ function CloserLook({
                   <div className="flex-1 min-h-0 flex flex-col">
                     <DayBars
                       fill
+                      onPick={(date) => router.push(`/expenses?day=${date}`)}
                       data={daily}
                       monthDays={f.pace.monthDays}
                       days={f.isCurrentMonth ? f.pace.elapsedDays : f.pace.monthDays}
@@ -767,20 +797,42 @@ function CloserLook({
             </div>
           </div>
         )}
+        </div>
       </Card>
     </div>
   );
 }
 
 /** A figure with its label, for a section of a card rather than a strip. */
-function Figure({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+function Figure({
+  label,
+  value,
+  minor,
+  sub,
+  tone,
+}: {
+  label: string;
+  value?: string;
+  /** Money, which counts when it changes; `value` for anything else. */
+  minor?: number;
+  sub?: string;
+  tone?: string;
+}) {
   return (
     <div className="min-w-0">
       {/* Two lines reserved on a phone, where labels wrap at two columns. */}
       <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem] sm:min-h-0">{label}</p>
-      <p className="num text-[17px] sm:text-xl font-semibold truncate" style={tone ? { color: tone } : undefined}>
-        {value}
-      </p>
+      {minor !== undefined ? (
+        <CountMoney
+          minor={minor}
+          className="block text-[17px] sm:text-xl font-semibold truncate"
+          style={tone ? { color: tone } : undefined}
+        />
+      ) : (
+        <p className="num text-[17px] sm:text-xl font-semibold truncate" style={tone ? { color: tone } : undefined}>
+          {value}
+        </p>
+      )}
       {sub && <p className="muted text-[11px] mt-1 truncate">{sub}</p>}
     </div>
   );
@@ -923,6 +975,11 @@ function CategoryDrilldown({
  */
 function BudgetSection({ month }: { month: string }) {
   const { openCategory } = useInspector();
+  const save = useSaveCategory();
+  const grow = useGrowClass(true);
+  /* Arriving on #budgets: the section only exists once its data has loaded,
+     after the browser has already tried and failed to scroll to it. */
+  const scrolled = useRef(false);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const stats = useSWR<{ items: CategoryStat[] }>(`/api/analytics/categories?month=${month}`);
 
@@ -940,6 +997,19 @@ function BudgetSection({ month }: { month: string }) {
     }))
     .sort((a, b) => b.spentMinor / b.budgetMinor - a.spentMinor / a.budgetMinor);
 
+  /* The card acknowledges a limit you just changed, or spending that moved it. */
+  const budgetPulse = usePulseOnChange(
+    budgeted.map((c) => [c.id, c.budgetMinor, c.spentMinor]),
+    month,
+    !!stats.data && !stats.isValidating && !cats.isValidating,
+  );
+
+  useEffect(() => {
+    if (scrolled.current || !budgeted.length || window.location.hash !== '#budgets') return;
+    scrolled.current = true;
+    document.getElementById('budgets')?.scrollIntoView({ block: 'start' });
+  });
+
   if (!budgeted.length) return null;
 
   const totalBudget = budgeted.reduce((s, c) => s + c.budgetMinor, 0);
@@ -956,7 +1026,7 @@ function BudgetSection({ month }: { month: string }) {
     : 1;
 
   return (
-    <div>
+    <div id="budgets" className="scroll-mt-24">
       <SectionHead
         label={
           over ? (
@@ -974,9 +1044,9 @@ function BudgetSection({ month }: { month: string }) {
           </Link>
         }
       />
-      <Card className={`glow-card ${over ? 'bloom-danger' : 'bloom-quiet'}`}>
+      <Card className={`glow-card ${over ? 'bloom-danger' : 'bloom-quiet'}`} {...budgetPulse}>
         <div className="relative flex items-baseline justify-between gap-3 mb-2.5">
-          <Money minor={totalSpent} className="text-2xl font-semibold" />
+          <CountMoney minor={totalSpent} className="text-2xl font-semibold" />
           <span className="num text-[13px] muted">of {formatINR(totalBudget)}</span>
         </div>
         <ShareBar
@@ -1012,10 +1082,20 @@ function BudgetSection({ month }: { month: string }) {
                 {/* Each budget is its own card, as the reference draws them —
                     eight rows in one divided list read as a table, and a
                     table is not something you scan for a problem. */}
-                <button
-                  className="w-full text-left rounded-xl p-3.5 transition-colors"
+                {/* A pressable div, not a button: the budget figure inside
+                    is itself editable, and a field cannot sit in a button. */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="w-full text-left rounded-xl p-3.5 transition-colors cursor-pointer"
                   style={{ background: 'var(--surface-2)' }}
                   onClick={() => openCategory(c.id)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openCategory(c.id);
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="flex items-start gap-2.5 min-w-0">
@@ -1036,7 +1116,18 @@ function BudgetSection({ month }: { month: string }) {
                         >
                           {formatINR(c.spentMinor)}
                         </span>
-                        <span className="num text-[12px] muted"> / {formatINR(c.budgetMinor)}</span>
+                        <span className="num text-[12px] muted">
+                          {' / '}
+                          <InlineEdit
+                            kind="money"
+                            clearable
+                            label={`${c.name} monthly budget`}
+                            value={c.budgetMinor / 100}
+                            onSave={(v) => save(c.id, { monthlyBudget: v as number | null })}
+                          >
+                            {formatINR(c.budgetMinor)}
+                          </InlineEdit>
+                        </span>
                       </span>
                       <span
                         className="text-[11px]"
@@ -1055,7 +1146,7 @@ function BudgetSection({ month }: { month: string }) {
                       style={{ background: 'var(--surface-3, var(--bg))' }}
                     >
                       <div
-                        className="h-full rounded-full grow"
+                        className={`h-full rounded-full ${grow}`}
                         style={{
                           width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
                           background: `linear-gradient(90deg, ${from}, ${to})`,
@@ -1092,7 +1183,7 @@ function BudgetSection({ month }: { month: string }) {
                       {Math.round(share * 100)}% of planned
                     </span>
                   </div>
-                </button>
+                </div>
               </li>
             );
           })}
@@ -1105,12 +1196,12 @@ function BudgetSection({ month }: { month: string }) {
 /** A figure in a well with the one line that makes it mean something. */
 function SubStat({
   label,
-  value,
+  minor,
   note,
   tone,
 }: {
   label: string;
-  value: string;
+  minor: number;
   note?: string;
   tone?: string;
 }) {
@@ -1121,7 +1212,7 @@ function SubStat({
       <p className="text-[12px] leading-snug" style={{ color: 'var(--text-muted)' }}>
         {label}
       </p>
-      <p className="num text-[17px] font-semibold mt-1">{value}</p>
+      <CountMoney minor={minor} className="block text-[17px] font-semibold mt-1" />
       {note && (
         <p className="text-[11px] mt-0.5 leading-snug" style={{ color: tone ?? 'var(--text-muted)' }}>
           {note}

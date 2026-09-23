@@ -98,6 +98,11 @@ export function TransactionRow({
       </span>
     ) : null;
 
+  /* A row with nothing to press (the dashboard's recent list) keeps its
+     amount beside the title on a phone too — the column only exists to give
+     the actions room. */
+  const hasActions = clustered || !!onDelete;
+
   const amount = (
     <Money
       minor={shown}
@@ -151,7 +156,7 @@ export function TransactionRow({
               ×{count}
             </span>
           )}
-          <span className="max-sm:hidden shrink-0">{amount}</span>
+          <span className={hasActions ? 'max-sm:hidden shrink-0' : 'shrink-0'}>{amount}</span>
         </div>
 
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -210,10 +215,12 @@ export function TransactionRow({
       {/* On a phone the amount and its actions are a column of their own.
           Sharing the tag line, Edit and Delete wrapped under a second tag and
           every row came out a different height. */}
-      <div className="sm:hidden flex flex-col items-end gap-1.5 shrink-0">
-        {amount}
-        {renderActions(true)}
-      </div>
+      {hasActions && (
+        <div className="sm:hidden flex flex-col items-end gap-1.5 shrink-0">
+          {amount}
+          {renderActions(true)}
+        </div>
+      )}
     </Tag>
   );
 }

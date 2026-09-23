@@ -3,6 +3,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
+import { useGrowClass } from './motion';
 
 /**
  * Every chart in the app, hand-drawn in SVG.
@@ -319,10 +320,17 @@ export function DayBars({
   height = 120,
   days,
   fill = false,
+  onPick,
 }: {
   data: { date: string; totalMinor: number }[];
   monthDays: number;
   height?: number;
+  /**
+   * Open a day. With a mouse, a click; on touch the first tap reads the day
+   * out (as it always has) and a second tap on the same bar opens it, so the
+   * readout is not lost to the link. Only days with spending are pressable.
+   */
+  onPick?: (date: string) => void;
   /**
    * How many days to draw — the days that have happened, in a month still
    * running. The days still to come are a count at the end of the axis, not
@@ -334,6 +342,8 @@ export function DayBars({
   fill?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const lastPointer = useRef<string>('mouse');
+  const tappedDay = useRef<number | null>(null);
 
   const byDay = new Map(data.map((d) => [Number(d.date.slice(8, 10)), d.totalMinor]));
   const lastDataDay = Math.max(0, ...[...byDay.entries()].filter(([, m]) => m > 0).map(([d]) => d));
@@ -381,11 +391,30 @@ export function DayBars({
                is two pixels wide and impossible to point at. */
             <div
               key={day}
-              className="flex-1 flex items-end min-w-0 cursor-default"
+              className={`flex-1 flex items-end min-w-0 ${onPick && minor > 0 ? 'cursor-pointer' : 'cursor-default'}`}
               onMouseEnter={() => setHover(day)}
               onPointerDown={(e) => {
+                lastPointer.current = e.pointerType;
                 if (e.pointerType !== 'mouse') setHover(day);
               }}
+              {...(onPick && minor > 0
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-label': `Open ${dayLabel(`${monthPrefix}${String(day).padStart(2, '0')}`)}, ${formatINR(minor)}`,
+                    onClick: () => {
+                      const date = `${monthPrefix}${String(day).padStart(2, '0')}`;
+                      if (lastPointer.current === 'mouse' || tappedDay.current === day) onPick(date);
+                      tappedDay.current = day;
+                    },
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onPick(`${monthPrefix}${String(day).padStart(2, '0')}`);
+                      }
+                    },
+                  }
+                : {})}
               title={`${dayLabel(`${monthPrefix}${String(day).padStart(2, '0')}`)}: ${formatINR(minor)}`}
             >
               <div
@@ -898,6 +927,9 @@ export function ShareBar({
   spring?: boolean;
 }) {
   const base = color ?? 'var(--brass)';
+  /* No transition while the page arrives — a bar filling from nothing on
+     every load is not progress. */
+  const grow = useGrowClass(spring);
 
   return (
     <div
@@ -906,7 +938,7 @@ export function ShareBar({
       role="presentation"
     >
       <div
-        className={`h-full rounded-full ${spring ? 'grow-spring' : 'grow'}`}
+        className={`h-full rounded-full ${grow}`}
         style={{
           width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
           /*

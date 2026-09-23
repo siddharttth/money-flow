@@ -13,7 +13,6 @@ import {
   HeroFigure,
   Insight,
   ListSkeleton,
-  Money,
   PageHeader,
   SectionHead,
   StatStrip,
@@ -24,6 +23,7 @@ import { CategoryIcon } from '@/components/icons';
 import { IncomeSourceModal } from '@/components/income-source-modal';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
+import { CountMoney, useFreshKeys, usePulseOnChange } from '@/components/motion';
 
 /**
  * Everything about money arriving.
@@ -41,7 +41,20 @@ export default function IncomePage() {
   const { openCategory } = useInspector();
   const { mutate } = useSWRConfig();
 
-  const { data, error } = useSWR<IncomeOverview>(`/api/income?month=${month}`);
+  const { data, error, isValidating } = useSWR<IncomeOverview>(`/api/income?month=${month}`);
+
+  /*
+   * Motion for what you change (motion.tsx), before any early return so the
+   * hooks always run: the hero acknowledges a payment you just recorded, and
+   * the source it landed in washes once. Within one month only — stepping
+   * the picker changes every figure and none of that is news.
+   */
+  const heroPulse = usePulseOnChange(data?.monthMinor, month, !!data && !isValidating);
+  const freshSources = useFreshKeys(
+    (data?.sources ?? []).map((src) => `${src.categoryId}:${src.monthMinor}`),
+    !!data && !isValidating,
+    month,
+  );
   const monthName = monthLabel(month).split(' ')[0];
 
   if (error) return <ErrorState message={error.message} />;
@@ -70,6 +83,9 @@ export default function IncomePage() {
     months: series.length,
   };
   const firstPaid = series.findIndex((d) => d.totalMinor > 0);
+  /* The most recent month in the series with exactly this total. */
+  const monthOf = (minor: number) =>
+    minor > 0 ? [...series].reverse().find((d) => d.totalMinor === minor)?.month : undefined;
   const chartSeries =
     firstPaid <= 0 ? series : series.slice(Math.max(0, Math.min(firstPaid, series.length - 6)));
 
@@ -106,7 +122,7 @@ export default function IncomePage() {
         </Card>
       ) : (
         <>
-          <Card className="!p-5 sm:!p-6 glow-card bloom-lg bloom-credit">
+          <Card className="!p-5 sm:!p-6 glow-card bloom-lg bloom-credit" {...heroPulse}>
             <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
               <div>
                 <HeroFigure
@@ -175,8 +191,18 @@ export default function IncomePage() {
           <StatStrip
             items={[
               { label: 'Typical month', minor: data.typicalMinor, sub: `median of ${data.activeMonths}` },
-              { label: 'Best month', minor: data.highMinor, tone: 'var(--credit)' },
-              { label: 'Leanest month', minor: data.lowMinor },
+              {
+                label: 'Best month',
+                minor: data.highMinor,
+                tone: 'var(--credit)',
+                /* Which month it was, found in the series already on screen. */
+                onClick: monthOf(data.highMinor) ? () => setMonth(monthOf(data.highMinor)!) : undefined,
+              },
+              {
+                label: 'Leanest month',
+                minor: data.lowMinor,
+                onClick: monthOf(data.lowMinor) ? () => setMonth(monthOf(data.lowMinor)!) : undefined,
+              },
               { label: 'Lifetime', minor: data.lifetimeMinor },
             ]}
           />
@@ -211,7 +237,9 @@ export default function IncomePage() {
                 {data.sources.map((src) => (
                   <li
                     key={src.categoryId}
-                    className="row px-3.5 sm:px-4 py-3.5"
+                    className={`row px-3.5 sm:px-4 py-3.5 ${
+                      freshSources.has(`${src.categoryId}:${src.monthMinor}`) ? 'wash' : ''
+                    }`}
                     onClick={() => openCategory(src.categoryId)}
                   >
                     {/* Capped on a wide screen: the amount sits beside the
@@ -221,7 +249,7 @@ export default function IncomePage() {
                       <div className="min-w-0 flex-1 sm:max-w-md">
                         <div className="flex items-baseline justify-between gap-3">
                           <span className="text-[13.5px] font-semibold truncate">{src.name}</span>
-                          <Money
+                          <CountMoney
                             minor={src.monthMinor}
                             className="num text-[13px] font-semibold shrink-0"
                             style={src.monthMinor > 0 ? { color: 'var(--credit)' } : undefined}

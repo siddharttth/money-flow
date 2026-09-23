@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { currentMonth, monthLabel, monthRange } from '@/lib/dates';
+import { currentMonth, monthLabel, monthRange, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
@@ -30,6 +30,7 @@ import { CategoryBubbles, FlowCurve } from '@/components/graph';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { NavIcon } from '@/components/icons';
+import { CountMoney, useFreshKeys, useGrowClass, usePulseOnChange } from '@/components/motion';
 import {
   ActiveGoalCard,
   AllocationBar,
@@ -99,6 +100,14 @@ export default function DashboardPage() {
   const t = plan.data?.tally;
   const goalCount = funds.data?.items.length ?? 0;
 
+  /* Motion for what you change, never for the page arriving (motion.tsx). */
+  const grow = useGrowClass();
+  const monthPulse = usePulseOnChange([t?.inHandMinor, f?.pace.spentMinor, s?.todayMinor]);
+  const freshRows = useFreshKeys(
+    (recent.data?.items ?? []).map((x) => `${x.kind}-${x.id}`),
+    !!recent.data && !recent.isValidating,
+  );
+
   if (summary.error) return <ErrorState message={summary.error.message} onRetry={() => summary.mutate()} />;
 
   return (
@@ -124,14 +133,16 @@ export default function DashboardPage() {
         </div>
 
         {budgetPace != null && (
-          <div
-            className="flex items-center gap-3 px-4 py-2 rounded-full self-start md:self-auto"
+          <Link
+            href="/analytics/month#budgets"
+            className="row flex items-center gap-3 px-4 py-2 rounded-full self-start md:self-auto"
             style={{ background: 'var(--surface)' }}
+            aria-label={`Budget pace ${budgetPace}% — open Budgets`}
           >
             <span className="micro">Budget pace</span>
             <span className="w-24 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
               <span
-                className="block h-full rounded-full"
+                className={`block h-full rounded-full ${grow}`}
                 style={{
                   width: `${Math.min(100, budgetPace)}%`,
                   background: budgetPace > 100 ? 'var(--rule-red)' : 'var(--accent)',
@@ -144,7 +155,7 @@ export default function DashboardPage() {
             >
               {budgetPace}%
             </span>
-          </div>
+          </Link>
         )}
       </div>
 
@@ -164,7 +175,7 @@ export default function DashboardPage() {
           whatever height is left, so the card never ends a third of the way
           down with the right-hand column still going. */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-5">
-        <Card className="!p-5 sm:!p-6 glow-card bloom-lg min-w-0 flex flex-col">
+        <Card className="!p-5 sm:!p-6 glow-card bloom-lg min-w-0 flex flex-col" {...monthPulse}>
           <div className="relative flex flex-col flex-1">
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 md:gap-6">
               {/* The figure you came for. The largest number on the page. */}
@@ -189,7 +200,7 @@ export default function DashboardPage() {
                       style={{ color: t.inHandMinor < 0 ? 'var(--rule-red)' : 'var(--hi)' }}
                     >
                       {t.inHandMinor < 0 && '−'}
-                      {formatINR(Math.abs(t.inHandMinor))}
+                      <CountMoney minor={Math.abs(t.inHandMinor)} />
                     </span>
                     <span className="muted text-[12px]">liquid</span>
                   </div>
@@ -216,22 +227,26 @@ export default function DashboardPage() {
                 className="min-w-0 pt-4 border-t md:pt-0 md:border-t-0 md:pl-6 md:border-l"
                 style={{ borderColor: 'var(--border)' }}
               >
-                <div className="flex items-center justify-between gap-3 mb-1.5">
-                  <p className="label mb-0">Spent in {monthName}</p>
-                  {f?.pace.deltaPct != null && <Delta pct={f.pace.deltaPct} />}
-                </div>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="num text-[1.6rem] sm:text-[1.75rem] font-semibold leading-none tracking-tight">
-                    {formatINR(f?.pace.spentMinor ?? 0)}
-                  </span>
-                  <span className="muted text-[12px]">{s?.transactionCount ?? 0} entries</span>
-                </div>
-                {f && (
-                  <p className="muted text-[12.5px] mt-1.5 leading-relaxed">
-                    projected <span className="num">{formatINR(f.pace.projectedMinor)}</span> at{' '}
-                    <span className="num">{formatINR(f.pace.perDayMinor)}</span>/day
-                  </p>
-                )}
+                {/* The whole figure leads to the month it summarises. */}
+                <Link href="/analytics/month" className="row block -mx-2 px-2 py-1 -my-1 rounded-lg">
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    <p className="label mb-0">Spent in {monthName}</p>
+                    {f?.pace.deltaPct != null && <Delta pct={f.pace.deltaPct} />}
+                  </div>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <CountMoney
+                      minor={f?.pace.spentMinor ?? 0}
+                      className="text-[1.6rem] sm:text-[1.75rem] font-semibold leading-none tracking-tight"
+                    />
+                    <span className="muted text-[12px]">{s?.transactionCount ?? 0} entries</span>
+                  </div>
+                  {f && (
+                    <p className="muted text-[12.5px] mt-1.5 leading-relaxed">
+                      projected <span className="num">{formatINR(f.pace.projectedMinor)}</span> at{' '}
+                      <span className="num">{formatINR(f.pace.perDayMinor)}</span>/day
+                    </p>
+                  )}
+                </Link>
                 {f && (invest.data?.monthMinor ?? 0) > 0 && (
                   <Link
                     href="/goals"
@@ -239,7 +254,7 @@ export default function DashboardPage() {
                   >
                     <span className="micro">Invested, separately</span>
                     <span className="flex items-baseline gap-1.5">
-                      <Money minor={invest.data!.monthMinor} className="text-[14px] font-semibold" />
+                      <CountMoney minor={invest.data!.monthMinor} className="text-[14px] font-semibold" />
                       <span className="micro" style={{ color: 'var(--accent)' }}>
                         →
                       </span>
@@ -286,12 +301,13 @@ export default function DashboardPage() {
               <StatStrip
                 bare
                 items={[
-                  { label: 'Today', minor: s?.todayMinor ?? 0 },
-                  { label: 'This week', minor: s?.weekMinor ?? 0 },
+                  { label: 'Today', minor: s?.todayMinor ?? 0, href: `/expenses?day=${todayISO()}` },
+                  { label: 'This week', minor: s?.weekMinor ?? 0, href: `/expenses?week=${todayISO()}` },
                   {
                     label: 'Typical entry',
                     minor: f?.tickets.medianMinor ?? 0,
                     sub: f ? `${f.tickets.count} this month` : undefined,
+                    href: '/analytics/month?tab=sizes',
                   },
                   {
                     label: 'Net with people',
@@ -334,7 +350,7 @@ export default function DashboardPage() {
         <div className="space-y-5 min-w-0 self-start">
         {/* What the saving is for. One goal gets the card; several get the strip. */}
         {goalCount === 1 ? (
-          <ActiveGoalCard fund={funds.data!.items[0]} onAdd={() => openAdd()} />
+          <ActiveGoalCard fund={funds.data!.items[0]} onAdd={() => openAdd()} editable />
         ) : goalCount > 1 ? (
           <GoalsStrip funds={funds.data!.items} />
         ) : null}
@@ -399,7 +415,11 @@ export default function DashboardPage() {
             ) : recent.data.items.length ? (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                 {recent.data.items.map((t) => (
-                  <TransactionRow key={`${t.kind}-${t.id}`} tx={t} showDate />
+                  /* A row that was not here a moment ago — one you just
+                     added — washes once, so the eye finds it. */
+                  <div key={`${t.kind}-${t.id}`} className={freshRows.has(`${t.kind}-${t.id}`) ? 'wash' : undefined}>
+                    <TransactionRow tx={t} showDate />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -427,7 +447,7 @@ export default function DashboardPage() {
         >
           <span className="label mb-0">Kept across {lifetime.data.months} months</span>
           <span className="flex items-baseline gap-1.5">
-            <Money
+            <CountMoney
               minor={Math.abs(lifetime.data.inHandMinor)}
               className="text-[15px] font-semibold"
               style={lifetime.data.inHandMinor < 0 ? { color: 'var(--rule-red)' } : undefined}

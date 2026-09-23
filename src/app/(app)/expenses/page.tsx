@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, qs } from '@/lib/client';
-import { currentMonth, dayLabel, fullDayLabel, monthLabel, monthRange, todayISO } from '@/lib/dates';
+import { currentMonth, dayLabel, fullDayLabel, monthLabel, monthRange, todayISO, weekRange } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, Person } from '@/lib/types';
 import type { FeedTotals, Transaction, TxKind } from '@/lib/transactions';
@@ -24,6 +24,7 @@ import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { CategoryIcon, NavIcon, PersonMark } from '@/components/icons';
 import { LedgerForm, type LedgerEntry } from '@/components/ledger-form';
+import { useFreshKeys } from '@/components/motion';
 
 const KINDS: { key: TxKind; label: string }[] = [
   { key: 'expense', label: 'Spent' },
@@ -55,7 +56,28 @@ function Transactions() {
   const { openAdd, toast } = useShell();
   const { mutate } = useSWRConfig();
 
-  const [month, setMonth] = useState(currentMonth());
+  /*
+   * A day or a week inside the month, from ?day= or ?week= — where the
+   * dashboard's Today and This week figures, and a day's bar on This month,
+   * land. The week is the same Monday-start week those figures add up, so the
+   * list shows exactly the money the figure counted. Changing month drops it.
+   */
+  const [range, setRange] = useState<{ start: string; end: string; label: string } | null>(() => {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    const day = params.get('day');
+    if (day && iso.test(day)) return { start: day, end: day, label: fullDayLabel(day) };
+    const week = params.get('week');
+    if (week && iso.test(week)) {
+      const w = weekRange(week);
+      return { ...w, label: `Week of ${dayLabel(w.start)}` };
+    }
+    return null;
+  });
+  const [month, setMonthState] = useState(range ? range.start.slice(0, 7) : currentMonth());
+  const setMonth = (m: string) => {
+    setMonthState(m);
+    setRange(null);
+  };
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [personIds, setPersonIds] = useState<string[]>(params.get('person') ? [params.get('person')!] : []);
   const [kinds, setKinds] = useState<TxKind[]>([]);
@@ -65,12 +87,16 @@ function Transactions() {
   const [openCluster, setOpenCluster] = useState<{ cluster: TxCluster; date: string } | null>(null);
   const [editingLedger, setEditingLedger] = useState<string | null>(null);
 
-  const { start, end } = monthRange(month);
+  const { start, end } = range ?? monthRange(month);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const people = useSWR<{ items: Person[] }>('/api/people');
 
   const key = `/api/transactions${qs({ start, end, categoryIds, personIds, kinds, search: search.trim(), limit })}`;
-  const { data, error, isLoading } = useSWR<{ items: Transaction[]; hasMore: boolean; totals: FeedTotals }>(key);
+  const { data, error, isLoading, isValidating } = useSWR<{
+    items: Transaction[];
+    hasMore: boolean;
+    totals: FeedTotals;
+  }>(key);
 
   /*
    * Grouped by day, then folded within the day: three identical cigarette runs
@@ -118,12 +144,39 @@ function Transactions() {
   /* Over the days of the month that have happened, not the days that had
      spending — the same denominator rule the weekday chart follows. */
   const dailyAverageMinor = useMemo(() => {
+    /* Narrowed to a day or a week, the average is over the days shown. */
+    if (range) {
+      const last = range.end < todayISO() ? range.end : todayISO();
+      const days = Math.max(1, Math.round((Date.parse(last) - Date.parse(range.start)) / 86_400_000) + 1);
+      return Math.round(totals.spentMinor / days);
+    }
     const isCurrent = month === todayISO().slice(0, 7);
     const days = isCurrent
       ? Number(todayISO().slice(8, 10))
       : Number(monthRange(month).end.slice(8, 10));
     return days > 0 ? Math.round(totals.spentMinor / days) : 0;
-  }, [totals.spentMinor, month]);
+  }, [totals.spentMinor, month, range]);
+
+  /*
+   * Rows that were not here a moment ago, or changed — the one you just added
+   * or edited — wash once, so the eye finds it. Only within one view: a new
+   * month or filter replaces every row, and none of that is news. The
+   * baseline is taken only once a load has finished, against the query it
+   * belongs to.
+   */
+  const sigOf = (c: TxCluster) =>
+    `${c.key}|${c.totalMinor}|${c.lead.date}|${c.lead.note ?? ''}|${c.lead.category?.id ?? ''}|${c.lead.people
+      .map((p) => p.id)
+      .join(',')}`;
+  const fresh = useFreshKeys(
+    groups.flatMap((g) => g.clusters.map(sigOf)),
+    !!data && !isValidating,
+    key,
+  );
+
+  function toggleKind(k: TxKind) {
+    setKinds((v) => (v.includes(k) ? v.filter((x) => x !== k) : [...v, k]));
+  }
 
   const activeFilters = categoryIds.length + personIds.length + kinds.length + (search ? 1 : 0);
   const today = todayISO();
@@ -203,6 +256,9 @@ function Transactions() {
           {
             label: 'Total spent',
             minor: totals.spentMinor,
+            /* Each figure switches on the chip that shows just its rows. */
+            onClick: () => toggleKind('expense'),
+            active: kinds.includes('expense'),
             icon: <NavIcon name="ledger" size={16} />,
             sub: `${totals.spentCount} ${totals.spentCount === 1 ? 'entry' : 'entries'}`,
             extra:
@@ -214,6 +270,7 @@ function Transactions() {
           },
           {
             label: totals.incomeMinor > 0 ? 'Income received' : 'Invested',
+            href: totals.incomeMinor > 0 ? '/income' : '/goals',
             minor: totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor,
             tone: totals.incomeMinor > 0 ? 'var(--hi)' : undefined,
             icon: <NavIcon name="cash" size={16} />,
@@ -228,6 +285,8 @@ function Transactions() {
           {
             label: 'Lent out',
             minor: totals.lentMinor,
+            onClick: () => toggleKind('lent'),
+            active: kinds.includes('lent'),
             tone: totals.lentMinor ? 'var(--rule-red)' : undefined,
             icon: <span className="text-[13px] font-bold">↑</span>,
             sub:
@@ -238,6 +297,8 @@ function Transactions() {
           {
             label: 'Borrowed',
             minor: totals.borrowedMinor,
+            onClick: () => toggleKind('borrowed'),
+            active: kinds.includes('borrowed'),
             tone: totals.borrowedMinor ? 'var(--credit)' : undefined,
             icon: <span className="text-[13px] font-bold">↓</span>,
             sub:
@@ -261,7 +322,7 @@ function Transactions() {
             key={k.key}
             className="chip shrink-0"
             data-selected={kinds.includes(k.key)}
-            onClick={() => setKinds((v) => (v.includes(k.key) ? v.filter((x) => x !== k.key) : [...v, k.key]))}
+            onClick={() => toggleKind(k.key)}
           >
             {k.label}
             <span className="micro ml-1">
@@ -269,6 +330,16 @@ function Transactions() {
             </span>
           </button>
         ))}
+        {range && (
+          <button
+            className="chip shrink-0"
+            data-selected
+            onClick={() => setRange(null)}
+            aria-label={`Show all of ${monthLabel(month)}, not only ${range.label}`}
+          >
+            {range.label} ×
+          </button>
+        )}
         {activeFilters > 0 && (
           <button className="tag shrink-0 ml-auto" onClick={clearFilters}>
             Clear all ×
@@ -346,24 +417,25 @@ function Transactions() {
                 </h2>
                 <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {clusters.map((c) => (
-                    <TransactionRow
-                      key={c.key}
-                      tx={c.lead}
-                      amountMinor={c.totalMinor}
-                      count={c.items.length}
-                      onOpen={() => setOpenCluster({ cluster: c, date })}
-                      onDelete={c.items.length === 1 ? () => remove(c.lead) : undefined}
-                      /* Lent and borrowed rows had a Delete and no Edit, so a
-                         wrong amount meant delete-and-retype. Expenses open
-                         the add sheet themselves; these need the ledger form. */
-                      onEdit={
-                        c.items.length === 1 && c.lead.kind !== 'expense'
-                          ? () => setEditingLedger(c.lead.id)
-                          : undefined
-                      }
-                      onFilterCategory={(id) => setCategoryIds([id])}
-                      onFilterPerson={(id) => setPersonIds([id])}
-                    />
+                    <div key={c.key} className={fresh.has(sigOf(c)) ? 'wash' : undefined}>
+                      <TransactionRow
+                        tx={c.lead}
+                        amountMinor={c.totalMinor}
+                        count={c.items.length}
+                        onOpen={() => setOpenCluster({ cluster: c, date })}
+                        onDelete={c.items.length === 1 ? () => remove(c.lead) : undefined}
+                        /* Lent and borrowed rows had a Delete and no Edit, so a
+                           wrong amount meant delete-and-retype. Expenses open
+                           the add sheet themselves; these need the ledger form. */
+                        onEdit={
+                          c.items.length === 1 && c.lead.kind !== 'expense'
+                            ? () => setEditingLedger(c.lead.id)
+                            : undefined
+                        }
+                        onFilterCategory={(id) => setCategoryIds([id])}
+                        onFilterPerson={(id) => setPersonIds([id])}
+                      />
+                    </div>
                   ))}
                 </div>
               </section>

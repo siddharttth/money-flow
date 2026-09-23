@@ -1,19 +1,23 @@
 'use client';
 
 import { ReactNode, useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { formatINR } from '@/lib/money';
+import { Collapse, CountMoney } from './motion';
 
 export function Card({
   children,
   className = '',
   style,
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   style?: React.CSSProperties;
-}) {
+} & Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'style'>) {
+  /* Extra attributes pass through — `data-pulse` from the motion layer. */
   return (
-    <div className={`card p-4 sm:p-5 ${className}`} style={style}>
+    <div className={`card p-4 sm:p-5 ${className}`} style={style} {...rest}>
       {children}
     </div>
   );
@@ -93,7 +97,7 @@ export function HeroFigure({
     <div>
       <p className="label mb-2">{label}</p>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Money minor={minor} className="text-[2.6rem] sm:text-5xl font-semibold leading-none tracking-tight" />
+        <CountMoney minor={minor} className="text-[2.6rem] sm:text-5xl font-semibold leading-none tracking-tight" />
         {delta}
       </div>
       {note && <p className="muted text-[13px] mt-2.5">{note}</p>}
@@ -169,6 +173,12 @@ export function StatStrip({
     /** Anything the figure needs beneath it that is not a sub-line — a
         second amount, a link — when a card's detail folds into its cell. */
     extra?: ReactNode;
+    /** Where the figure leads: the whole cell becomes the link. */
+    href?: string;
+    /** Or what it does — a filter it switches on. */
+    onClick?: () => void;
+    /** Pressed state, for a cell that toggles something. */
+    active?: boolean;
   }[];
   cols?: 2 | 3 | 4;
   split?: boolean;
@@ -190,7 +200,12 @@ export function StatStrip({
      the hairline background shows through. */
   const oddLast = (i: number) => (i === items.length - 1 && items.length % 2 === 1 ? 'max-sm:col-span-2' : '');
 
-  const cells = items.map((it, i) => (
+  const cells = items.map((it, i) => {
+    const pressable = it.href || it.onClick;
+    const cls = `${split ? 'card !p-4 min-w-0' : 'px-3.5 py-3 sm:px-5 sm:py-4 min-w-0'} ${oddLast(i)} ${
+      pressable ? 'row block text-left w-full' : ''
+    }`;
+    const inner = (
     /*
      * Labels wrap rather than truncate — "Monthly avera…" is worse than two
      * lines — and the label block reserves two lines whether it needs them or
@@ -199,16 +214,13 @@ export function StatStrip({
      * not the same thing once one cell has a sub-line and its neighbour does
      * not.
      */
-    <div
-      key={it.label}
-      className={`${split ? 'card !p-4 min-w-0' : 'px-3.5 py-3 sm:px-5 sm:py-4 min-w-0'} ${oddLast(i)}`}
-    >
+      <>
       <div className="flex items-start justify-between gap-2">
         <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem]">{it.label}</p>
         {it.icon && <span className="muted shrink-0 mt-[-2px]">{it.icon}</span>}
       </div>
       {it.minor !== undefined ? (
-        <Money
+        <CountMoney
           minor={it.minor}
           className="text-[17px] sm:text-xl font-semibold"
           style={it.tone ? { color: it.tone } : undefined}
@@ -237,8 +249,36 @@ export function StatStrip({
           />
         </span>
       )}
-    </div>
-  ));
+      </>
+    );
+    if (it.href)
+      return (
+        <Link key={it.label} href={it.href} className={cls} style={it.active ? { background: 'var(--accent-soft)' } : undefined}>
+          {inner}
+        </Link>
+      );
+    if (it.onClick)
+      return (
+        <button
+          key={it.label}
+          type="button"
+          /* flex-col from the top: a button centres its contents vertically
+             when the row stretches it, which dropped these figures below
+             their neighbours'. */
+          className={`${cls} flex flex-col justify-start`}
+          onClick={it.onClick}
+          aria-pressed={it.active}
+          style={it.active ? { background: 'var(--accent-soft)' } : undefined}
+        >
+          {inner}
+        </button>
+      );
+    return (
+      <div key={it.label} className={cls}>
+        {inner}
+      </div>
+    );
+  });
 
   if (split) return <div className={`grid grid-cols-2 ${wide} gap-4`}>{cells}</div>;
 
@@ -342,11 +382,9 @@ export function Disclosure({
           </svg>
         </span>
       </button>
-      {open && (
-        <div id={id} className="px-4 sm:px-5 pb-5 pt-1">
-          {children}
-        </div>
-      )}
+      <Collapse open={open} id={id}>
+        <div className="px-4 sm:px-5 pb-5 pt-1">{children}</div>
+      </Collapse>
     </div>
   );
 }

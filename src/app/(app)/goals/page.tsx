@@ -28,6 +28,7 @@ import { CategoryIcon } from '@/components/icons';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { FundCard, GoalsRollup } from '@/components/plan-cards';
+import { Collapse, useGrowClass } from '@/components/motion';
 
 /**
  * Where the money that is not spending goes.
@@ -43,6 +44,7 @@ import { FundCard, GoalsRollup } from '@/components/plan-cards';
 export default function InvestmentsPage() {
   const [month, setMonth] = useState(currentMonth());
   const [allContributions, setAllContributions] = useState(false);
+  const grow = useGrowClass();
   const { openAdd } = useShell();
   const { openCategory } = useInspector();
 
@@ -52,6 +54,20 @@ export default function InvestmentsPage() {
   if (error) return <ErrorState message={error.message} onRetry={() => mutate()} />;
 
   const monthName = monthLabel(month).split(' ')[0];
+  const folds = (data?.recent.length ?? 0) > RECENT + 2;
+  const renderContribution = (e: InvestmentSummary['recent'][number]) => (
+    <li key={e.id} className="flex items-center gap-3 px-3.5 sm:px-4 py-3">
+      <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
+        <p className="micro mt-0.5">
+          {dayLabel(e.date)}
+          {e.note ? ` · ${e.category.name}` : ''}
+        </p>
+      </div>
+      <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
+    </li>
+  );
   const outgoings = data ? data.monthMinor + data.monthSpendingMinor : 0;
   const investedShare = outgoings > 0 ? (data?.monthMinor ?? 0) / outgoings : 0;
   const deltaPct =
@@ -122,8 +138,8 @@ export default function InvestmentsPage() {
                     </span>
                   </div>
                   <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5" style={{ background: 'var(--surface-2)' }}>
-                    <span style={{ width: `${investedShare * 100}%`, background: 'var(--credit)' }} />
-                    <span style={{ width: `${(1 - investedShare) * 100}%`, background: 'var(--text-muted)' }} />
+                    <span className={grow} style={{ width: `${investedShare * 100}%`, background: 'var(--credit)' }} />
+                    <span className={grow} style={{ width: `${(1 - investedShare) * 100}%`, background: 'var(--text-muted)' }} />
                   </div>
                   <div className="flex items-baseline justify-between gap-3 mt-2">
                     <span className="micro">Inflow allocation</span>
@@ -228,6 +244,8 @@ export default function InvestmentsPage() {
                         ? Math.min(1, data.previousMonthMinor / Math.max(data.monthMinor, data.previousMonthMinor))
                         : undefined,
                     meterTone: 'var(--text-muted)',
+                    /* The month it describes, one tap away. */
+                    onClick: () => setMonth(shiftMonth(month, -1)),
                   },
                 ]}
               />
@@ -264,7 +282,7 @@ export default function InvestmentsPage() {
           <div className={`grid grid-cols-1 gap-5 ${goalCols(funds.data.items.length)}`}>
             {funds.data.items.map((f, i) => (
               <div key={f.categoryId} className={`grid ${goalSpan(i, funds.data!.items.length)}`}>
-                <FundCard fund={f} onAdd={() => openAdd()} />
+                <FundCard fund={f} onAdd={() => openAdd()} month={month} settled={!funds.isValidating} />
               </div>
             ))}
           </div>
@@ -345,25 +363,20 @@ export default function InvestmentsPage() {
               </div>
             ) : data.recent.length ? (
               <>
+                {/* The latest few, the rest a tap away and sliding open. The
+                    list is fifty deep and grows with every deposit; beside a
+                    two-line breakdown it was a column of empty page. */}
                 <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                  {/* The latest few, the rest a tap away. The list is fifty
-                      deep and grows with every deposit; beside a two-line
-                      breakdown it was a column of empty page. */}
-                  {(allContributions || data.recent.length <= RECENT + 2 ? data.recent : data.recent.slice(0, RECENT)).map((e) => (
-                    <li key={e.id} className="flex items-center gap-3 px-3.5 sm:px-4 py-3">
-                      <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
-                        <p className="micro mt-0.5">
-                          {dayLabel(e.date)}
-                          {e.note ? ` · ${e.category.name}` : ''}
-                        </p>
-                      </div>
-                      <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
-                    </li>
-                  ))}
+                  {(folds ? data.recent.slice(0, RECENT) : data.recent).map(renderContribution)}
                 </ul>
-                {data.recent.length > RECENT + 2 && (
+                {folds && (
+                  <Collapse open={allContributions}>
+                    <ul className="divide-y border-t" style={{ borderColor: 'var(--border)' }}>
+                      {data.recent.slice(RECENT).map(renderContribution)}
+                    </ul>
+                  </Collapse>
+                )}
+                {folds && (
                   <button
                     type="button"
                     className="row w-full text-left px-3.5 sm:px-4 py-3 border-t micro"

@@ -2,6 +2,7 @@
 
 import { SWRConfig } from 'swr';
 import { fetcher } from '@/lib/client';
+import { trackFetch } from './motion';
 import { ReactNode, useEffect } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -24,7 +25,8 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <SWRConfig
       value={{
-        fetcher,
+        /* Counted, so a figure can tell the page arriving from a real change. */
+        fetcher: (url: string) => trackFetch(fetcher(url)),
         revalidateOnFocus: false,
         shouldRetryOnError: false,
         dedupingInterval: 2000,
