@@ -9,10 +9,8 @@ import type { Category, CategoryStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
 import type { InvestmentSummary } from '@/lib/investments';
 import type { MonthlyPlan, Sweep } from '@/lib/plan';
-import type { IncomeOverview } from '@/lib/income';
 import type { Fund } from '@/lib/funds';
 import type { Transaction } from '@/lib/transactions';
-import { getAttention } from '@/lib/attention';
 import {
   Card,
   CardSection,
@@ -31,7 +29,6 @@ import {
 import { CategoryBubbles, FlowCurve } from '@/components/graph';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
-import { AttentionRows, useAttention } from '@/components/attention';
 import { NavIcon } from '@/components/icons';
 import {
   ActiveGoalCard,
@@ -78,7 +75,6 @@ export default function DashboardPage() {
   const peers = useSWR<PeerSummary>('/api/ledger');
   const recent = useSWR<{ items: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&limit=5`);
   const invest = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
-  const income = useSWR<IncomeOverview>(`/api/income?month=${month}`);
   const funds = useSWR<{ items: Fund[] }>(`/api/funds?month=${month}`);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const catStats = useSWR<{ items: CategoryStat[] }>(`/api/analytics/categories?month=${month}`);
@@ -88,34 +84,6 @@ export default function DashboardPage() {
   const f = flow.data;
   const net = peers.data?.netMinor ?? 0;
   const monthName = monthLabel(month).split(' ')[0];
-
-  /*
-   * Every rule reads a figure the app was already computing. Nothing here is
-   * new data — it is the same numbers, finally addressed to someone.
-   */
-  const attention = useMemo(() => {
-    const spendById = new Map((catStats.data?.items ?? []).map((c) => [c.categoryId, c.totalMinor]));
-    return getAttention({
-      plan: plan.data,
-      flow: f,
-      funds: funds.data?.items ?? [],
-      income: income.data,
-      budgets: (cats.data?.items ?? [])
-        .filter((c) => c.kind === 'expense' && c.monthlyBudgetMinor)
-        .map((c) => ({
-          categoryId: c.id,
-          name: c.name,
-          spentMinor: spendById.get(c.id) ?? 0,
-          budgetMinor: c.monthlyBudgetMinor ?? 0,
-        })),
-      peers: (peers.data?.balances ?? []).map((b) => ({
-        personId: b.personId,
-        name: b.name,
-        balanceMinor: b.balanceMinor,
-        sinceDate: b.lastEntryDate,
-      })),
-    });
-  }, [plan.data, f, funds.data, income.data, cats.data, catStats.data, peers.data]);
 
   /* How far through the month's total budget the spending is — the one
      number the header pill needs, and already on screen in Budgets. */
@@ -129,7 +97,6 @@ export default function DashboardPage() {
   }, [cats.data, catStats.data]);
 
   const t = plan.data?.tally;
-  const att = useAttention(attention, month);
   const goalCount = funds.data?.items.length ?? 0;
 
   if (summary.error) return <ErrorState message={summary.error.message} onRetry={() => summary.mutate()} />;
@@ -193,9 +160,12 @@ export default function DashboardPage() {
         xl they stack in that order, so the phone reading is the desktop
         reading flattened.
       */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-5 items-start">
-        <Card className="!p-5 sm:!p-6 glow-card bloom-lg min-w-0">
-          <div className="relative">
+      {/* The month card is as tall as the column beside it: the curve takes
+          whatever height is left, so the card never ends a third of the way
+          down with the right-hand column still going. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-5">
+        <Card className="!p-5 sm:!p-6 glow-card bloom-lg min-w-0 flex flex-col">
+          <div className="relative flex flex-col flex-1">
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 md:gap-6">
               {/* The figure you came for. The largest number on the page. */}
               {t?.known ? (
@@ -289,13 +259,13 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <CardSection>
+            <CardSection className="flex-1 flex flex-col">
               <div className="mb-4">
                 <h2 className="text-[15px] font-semibold tracking-tight">Cumulative spend trajectory</h2>
                 <p className="muted text-[12px] mt-0.5">This month against the same days of last month</p>
               </div>
               {f && f.cumulative.length >= 2 ? (
-                <FlowCurve points={f.cumulative} monthDays={f.pace.monthDays} height={230} />
+                <FlowCurve fill points={f.cumulative} monthDays={f.pace.monthDays} height={230} />
               ) : (
                 <EmptyState
                   title="Not enough to draw yet"
@@ -361,28 +331,13 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <div className="space-y-5 min-w-0">
-        {/* What needs doing, and what the saving is for — both are "what
-            should I act on", so one card with a section each. Either half
-            steps aside when it has nothing to say, and so does the card. */}
-        {(att.visible.length > 0 || goalCount > 0) && (
-          <Card>
-            {att.visible.length > 0 && <AttentionRows bare visible={att.visible} onDismiss={att.dismiss} />}
-            {goalCount > 0 && (
-              <div
-                className={att.visible.length > 0 ? '-mx-4 sm:-mx-5 px-4 sm:px-5 mt-1 pt-4 border-t' : ''}
-                style={{ borderColor: 'var(--border)' }}
-              >
-                {/* One goal gets the card; several get the strip. */}
-                {goalCount === 1 ? (
-                  <ActiveGoalCard bare fund={funds.data!.items[0]} onAdd={() => openAdd()} />
-                ) : (
-                  <GoalsStrip bare funds={funds.data!.items} />
-                )}
-              </div>
-            )}
-          </Card>
-        )}
+        <div className="space-y-5 min-w-0 self-start">
+        {/* What the saving is for. One goal gets the card; several get the strip. */}
+        {goalCount === 1 ? (
+          <ActiveGoalCard fund={funds.data!.items[0]} onAdd={() => openAdd()} />
+        ) : goalCount > 1 ? (
+          <GoalsStrip funds={funds.data!.items} />
+        ) : null}
 
         {/* Spend by category, as proportional area. The donut lives on This
             month, where a precise reading is wanted; here the only question

@@ -489,13 +489,6 @@ h1, h2, h3 {
   .rise { animation: mf-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
   .wash { animation: mf-wash 900ms ease-out both; }
 
-  /* Attention rows arrive in sequence, so the list reads rather than lands. */
-  .attention-row { animation: mf-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .attention-row:nth-child(2) { animation-delay: 45ms; }
-  .attention-row:nth-child(3) { animation-delay: 90ms; }
-  .attention-row:nth-child(4) { animation-delay: 135ms; }
-  .attention-row:nth-child(n + 5) { animation-delay: 180ms; }
-
   /*
    * Month switching. The column slides in the direction of travel, which is
    * the cheapest possible way to say "this is a different month" — and removes
@@ -529,7 +522,6 @@ h1, h2, h3 {
 @media (prefers-reduced-motion: reduce) {
     .rise,
     .wash,
-    .attention-row,
     .month-back,
     .month-fwd {
       animation: none !important;

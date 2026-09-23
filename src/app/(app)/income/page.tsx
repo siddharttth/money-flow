@@ -56,6 +56,23 @@ export default function IncomePage() {
   const vsTypical =
     data && data.typicalMinor > 0 ? Math.round(((data.monthMinor - data.typicalMinor) / data.typicalMinor) * 100) : null;
 
+  /*
+   * TODO(income-average): this divides by all twelve months in the series,
+   * including months before income was ever logged, so a five-month history
+   * of ₹52,000 reads "₹21,667 average over 12 months". Kept exactly as it was
+   * during the layout pass by request — fix it as its own change, deciding
+   * whether the denominator should be months since the first payment. The
+   * same sum ÷ length also lives in MonthBars' default average (graph.tsx).
+   */
+  const series = data?.series ?? [];
+  const seriesAverage = {
+    minor: series.length ? Math.round(series.reduce((s, d) => s + d.totalMinor, 0) / series.length) : 0,
+    months: series.length,
+  };
+  const firstPaid = series.findIndex((d) => d.totalMinor > 0);
+  const chartSeries =
+    firstPaid <= 0 ? series : series.slice(Math.max(0, Math.min(firstPaid, series.length - 6)));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -129,7 +146,16 @@ export default function IncomePage() {
                 {data.activeMonths >= 2 ? (
                   <>
                     <p className="label mb-3">Month by month</p>
-                    <MonthBars data={data.series} activeMonth={month} onPick={setMonth} height={160} />
+                    {/* Drawn from the first month anything came in (six
+                        slots at least), not twelve with the front half
+                        empty. The dashed average is passed in unchanged. */}
+                    <MonthBars
+                      data={chartSeries}
+                      activeMonth={month}
+                      onPick={setMonth}
+                      height={160}
+                      average={seriesAverage}
+                    />
                   </>
                 ) : (
                   <EmptyState
@@ -188,9 +214,11 @@ export default function IncomePage() {
                     className="row px-3.5 sm:px-4 py-3.5"
                     onClick={() => openCategory(src.categoryId)}
                   >
-                    <div className="flex items-center gap-3">
+                    {/* Capped on a wide screen: the amount sits beside the
+                        name it belongs to, not a thousand pixels away. */}
+                    <div className="flex items-center gap-3 sm:gap-6">
                       <CategoryIcon icon={src.icon} color={src.color} size={34} />
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 sm:max-w-md">
                         <div className="flex items-baseline justify-between gap-3">
                           <span className="text-[13.5px] font-semibold truncate">{src.name}</span>
                           <Money
@@ -217,7 +245,7 @@ export default function IncomePage() {
 
                     {/* Only claimed once there is enough evidence for it. */}
                     {src.dayVariance != null && src.typicalDay != null && (
-                      <p className="muted text-[11px] mt-2 pl-[2.875rem] leading-relaxed">
+                      <p className="muted text-[11px] mt-2 pl-[2.875rem] sm:pl-[3.625rem] leading-relaxed">
                         {src.dayVariance <= 2 ? (
                           <>
                             Lands within {src.dayVariance === 0 ? 'the day' : `${src.dayVariance} days`} of the{' '}

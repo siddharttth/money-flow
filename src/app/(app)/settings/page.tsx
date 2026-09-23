@@ -289,27 +289,34 @@ export default function SettingsPage() {
       <section>
         <SectionHead label="Appearance" />
         <Card>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 max-w-sm">
+          {/* The two themes share the card's width. Capped at a small grid
+              they left two thirds of it empty; on a wider screen each tile
+              sets its miniature beside its name instead of above it. */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {THEMES.map((t) => (
               <button
                 key={t.value}
                 onClick={() => applyTheme(t.value)}
                 aria-pressed={theme === t.value}
-                className="text-left rounded-lg p-2 transition-colors"
+                className="text-left rounded-lg p-2 sm:p-2.5 transition-colors sm:flex sm:items-center sm:gap-4"
                 style={{
                   border: `1px solid ${theme === t.value ? 'var(--accent)' : 'var(--border)'}`,
                   background: theme === t.value ? 'var(--accent-soft)' : 'transparent',
                   transitionDuration: '150ms',
                 }}
               >
-                <ThemeSwatch kind={t.value} />
-                <span
-                  className="block text-[12.5px] font-semibold mt-2"
-                  style={{ color: theme === t.value ? 'var(--accent)' : 'var(--text)' }}
-                >
-                  {t.label}
+                <span className="block sm:w-36 sm:shrink-0">
+                  <ThemeSwatch kind={t.value} />
                 </span>
-                <span className="muted text-[11px] block leading-snug mt-0.5">{t.hint}</span>
+                <span className="block min-w-0">
+                  <span
+                    className="block text-[12.5px] font-semibold mt-2 sm:mt-0"
+                    style={{ color: theme === t.value ? 'var(--accent)' : 'var(--text)' }}
+                  >
+                    {t.label}
+                  </span>
+                  <span className="muted text-[11px] block leading-snug mt-0.5">{t.hint}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -413,11 +420,13 @@ function SwatchHalf({
   );
 }
 
+/* A label column and the value beside it. Pushed to opposite edges of a
+   full-width card, "Email" and its address sat a thousand pixels apart. */
 function Field({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+    <div className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] sm:grid-cols-[9rem_minmax(0,1fr)] gap-4 py-2.5 first:pt-0 last:pb-0">
       <dt className="muted text-[13px]">{label}</dt>
-      <dd className="text-[13px] font-medium truncate">{value ?? '—'}</dd>
+      <dd className="text-[13px] font-medium truncate text-right sm:text-left">{value ?? '—'}</dd>
     </div>
   );
 }

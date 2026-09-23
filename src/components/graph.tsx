@@ -49,11 +49,15 @@ export function FlowCurve({
    * every other number on the page.
    */
   dated = false,
+  fill = false,
 }: {
   points: FlowPoint[];
   monthDays: number;
   height?: number;
   dated?: boolean;
+  /** Grow to the height of the container, with `height` as the floor. The
+      plot is drawn with preserveAspectRatio="none", so it stretches cleanly. */
+  fill?: boolean;
 }) {
   const gid = useId().replace(/:/g, '');
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -99,7 +103,7 @@ export function FlowCurve({
   }
 
   return (
-    <div className="relative select-none" ref={wrapRef}>
+    <div className={`relative select-none ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`} ref={wrapRef}>
       {/*
         No readout block above the plot. It duplicated the legend the card
         already prints and pushed the chart down by a row; the reference puts
@@ -110,17 +114,17 @@ export function FlowCurve({
         one beside it, not as a series of values off an axis — and the exact
         figure is on the marker. The gridlines alone give the eye its levels.
       */}
-      <div className="relative">
+      <div className={`relative ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        height={height}
+        height={fill ? undefined : height}
         preserveAspectRatio="none"
         role="img"
         aria-label="Cumulative spending this month compared with last month"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
-        style={{ touchAction: 'pan-y', display: 'block' }}
+        style={{ touchAction: 'pan-y', display: 'block', ...(fill ? { flex: '1 1 auto', minHeight: height } : null) }}
         onPointerDown={(e) => {
           // A deliberate tap still reads the curve; a scroll past it does not.
           if (e.pointerType === 'mouse') return;
@@ -471,6 +475,7 @@ export function MonthBars({
   averageLabel,
   fill = false,
   maxHeight,
+  average: averageOverride,
 }: {
   data: { month: string; totalMinor: number }[];
   activeMonth?: string;
@@ -482,9 +487,18 @@ export function MonthBars({
       `maxHeight` as the ceiling. */
   fill?: boolean;
   maxHeight?: number;
+  /**
+   * The dashed line's value and the month count its caption names, when the
+   * bars drawn are not the months it was taken over — so trimming the empty
+   * front of a chart cannot quietly change the figure.
+   */
+  average?: { minor: number; months: number };
 }) {
   const max = niceMax(Math.max(1, ...data.map((d) => d.totalMinor)));
-  const average = data.length ? Math.round(data.reduce((s, d) => s + d.totalMinor, 0) / data.length) : 0;
+  const average =
+    averageOverride?.minor ??
+    (data.length ? Math.round(data.reduce((s, d) => s + d.totalMinor, 0) / data.length) : 0);
+  const averageMonths = averageOverride?.months ?? data.length;
   /* Three gridlines and the baseline — enough to read a height against, few
      enough to stay out of the way of the bars. Exact thirds, not 0.66/0.33:
      a ₹15,000 scale must read 15K · 10K · 5K · 0, not 15K · 9.9K · 5K. */
@@ -603,7 +617,7 @@ export function MonthBars({
 
       {average > 0 && !detailed && (
         <p className="micro text-center mt-3">
-          dashed line: {formatINR(average)} average over {data.length} months
+          dashed line: {formatINR(average)} average over {averageMonths} months
         </p>
       )}
     </div>
