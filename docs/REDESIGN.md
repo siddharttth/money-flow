@@ -1,5 +1,9 @@
 # Money Flow — architecture and experience review
 
+> **Superseded in places — see `REFERENCE.md` for the app as it is now.** This
+> is the design argument as written; later UX passes regrouped the screens,
+> removed "Needs your attention", and renamed Ink to Obsidian.
+
 An end-to-end review of the app as it stands, and a proposal for what it should
 become. Written against `docs/SCREENS.md` and verified against the source, not
 taken on trust — several figures the app prints today are wrong, and two of
