@@ -70,19 +70,20 @@ export default function IncomePage() {
     data && data.typicalMinor > 0 ? Math.round(((data.monthMinor - data.typicalMinor) / data.typicalMinor) * 100) : null;
 
   /*
-   * TODO(income-average): this divides by all twelve months in the series,
-   * including months before income was ever logged, so a five-month history
-   * of ₹52,000 reads "₹21,667 average over 12 months". Kept exactly as it was
-   * during the layout pass by request — fix it as its own change, deciding
-   * whether the denominator should be months since the first payment. The
-   * same sum ÷ length also lives in MonthBars' default average (graph.tsx).
+   * The dashed average is over the months since the first payment. It used to
+   * divide by all twelve months in the window, so five months of ₹52,000 read
+   * "₹21,667 average over 12 months" — the months before income was ever
+   * logged are not lean months, they are no months. Months after the first
+   * payment with nothing in them do count: a gap in pay is real. (MonthBars'
+   * own default average follows the same rule.)
    */
   const series = data?.series ?? [];
-  const seriesAverage = {
-    minor: series.length ? Math.round(series.reduce((s, d) => s + d.totalMinor, 0) / series.length) : 0,
-    months: series.length,
-  };
   const firstPaid = series.findIndex((d) => d.totalMinor > 0);
+  const sincePaid = firstPaid < 0 ? [] : series.slice(firstPaid);
+  const seriesAverage = {
+    minor: sincePaid.length ? Math.round(sincePaid.reduce((s, d) => s + d.totalMinor, 0) / sincePaid.length) : 0,
+    months: sincePaid.length,
+  };
   /* The most recent month in the series with exactly this total. */
   const monthOf = (minor: number) =>
     minor > 0 ? [...series].reverse().find((d) => d.totalMinor === minor)?.month : undefined;

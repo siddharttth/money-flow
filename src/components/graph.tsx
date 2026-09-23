@@ -524,10 +524,18 @@ export function MonthBars({
   average?: { minor: number; months: number };
 }) {
   const max = niceMax(Math.max(1, ...data.map((d) => d.totalMinor)));
+  /*
+   * The average runs from the first month with anything in it, not from the
+   * start of the window: months before tracking began are not zero months,
+   * they are no months. Empty months after that first one still count — a
+   * gap is real.
+   */
+  const firstActive = data.findIndex((d) => d.totalMinor > 0);
+  const counted = firstActive < 0 ? [] : data.slice(firstActive);
   const average =
     averageOverride?.minor ??
-    (data.length ? Math.round(data.reduce((s, d) => s + d.totalMinor, 0) / data.length) : 0);
-  const averageMonths = averageOverride?.months ?? data.length;
+    (counted.length ? Math.round(counted.reduce((s, d) => s + d.totalMinor, 0) / counted.length) : 0);
+  const averageMonths = averageOverride?.months ?? counted.length;
   /* Three gridlines and the baseline — enough to read a height against, few
      enough to stay out of the way of the bars. Exact thirds, not 0.66/0.33:
      a ₹15,000 scale must read 15K · 10K · 5K · 0, not 15K · 9.9K · 5K. */

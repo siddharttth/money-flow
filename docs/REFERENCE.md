@@ -208,7 +208,7 @@ Month picker · **+ Source** (primary button → income sheet).
 | Delta | `(month − previousMonth) / previousMonth × 100`, **inverted** (up is good) | Green-up pill |
 | vs typical | `(monthMinor − typicalMinor) / typicalMinor × 100` where `typicalMinor` = **median of months that had any income** — median, so one good month does not redefine normal | "18% above your typical ₹42,000" |
 | **When it landed** — current month only | `landedDays` = distinct `DAY(expense_date)` with income this month | A dot per calendar day; filled green on days money arrived, surface-2 otherwise |
-| **Month by month** | 12-month series. Drawn from the **first month with income** (at least 6 slots), not twelve with the front half empty. The dashed average is still `Σ series / 12` — including the months before income was ever logged (marked `TODO(income-average)` for a separate `src/lib` change). Needs ≥ 2 active months. | Bar chart, tap a bar to jump to that month. "Dashed line: ₹X average over 12 months". |
+| **Month by month** | 12-month series. Drawn from the **first month with income** (at least 6 slots), not twelve with the front half empty. The dashed average is over the **months since the first payment**: months before income was ever logged are not counted, empty months after it are. Needs ≥ 2 active months. | Bar chart, tap a bar to jump to that month. "Dashed line: ₹X average over N months". |
 
 ### Stat strip
 | Tile | Calculation |
