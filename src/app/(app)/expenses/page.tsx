@@ -23,7 +23,6 @@ import { MonthPicker } from '@/components/month-picker';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { CategoryIcon, NavIcon, PersonMark } from '@/components/icons';
-import { Badge, MetricCard } from '@/components/plan-cards';
 import { LedgerForm, type LedgerEntry } from '@/components/ledger-form';
 
 const KINDS: { key: TxKind; label: string }[] = [
@@ -191,92 +190,63 @@ function Transactions() {
       </div>
 
       {/*
-        FOUR CARDS, NOT A STRIP.
-        The reference gives each figure an icon tile, a badge and a line of
-        context — a bare four-column strip could not say "3 people" or "daily
-        average ₹720" beside the number it qualifies.
+        ONE STRIP, FOUR FIGURES.
+        These were four cards, each with an icon tile, a badge and a line of
+        context — at full height even when two of them read ₹0. The context
+        stays, as the sub-lines under each figure; the four boxes become one
+        surface split by hairlines, because they are four readings of one
+        month's filter rather than four separate things.
       */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <MetricCard
-          bloom="quiet"
-          icon={<NavIcon name="ledger" size={20} />}
-          label="Total spent"
-          badge={<Badge tone="neutral">{totals.spentCount} entries</Badge>}
-          note={
-            dailyAverageMinor > 0 ? (
-              <>
-                Daily average <span className="num">{formatINR(dailyAverageMinor)}</span>
-              </>
-            ) : undefined
-          }
-        >
-          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
-            {formatINR(totals.spentMinor)}
-          </span>
-        </MetricCard>
-
-        <MetricCard
-          glow={totals.incomeMinor > 0}
-          bloom="credit"
-          icon={<NavIcon name="cash" size={20} />}
-          label={totals.incomeMinor > 0 ? 'Income received' : 'Invested'}
-          badge={totals.incomeMinor > 0 ? <Badge tone="good">came in</Badge> : <Badge tone="neutral">not spending</Badge>}
-          note={totals.incomeMinor > 0 && totals.investedMinor > 0 ? (
-            <>
-              <span className="num">{formatINR(totals.investedMinor)}</span> also went into investments
-            </>
-          ) : undefined}
-        >
-          <span
-            className="num text-[1.9rem] font-bold leading-none tracking-tight"
-            style={{ color: totals.incomeMinor > 0 ? 'var(--hi)' : undefined }}
-          >
-            {formatINR(totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor)}
-          </span>
-        </MetricCard>
-
-        <MetricCard
-          bloom="danger"
-          icon={<span className="text-[17px] font-bold">↑</span>}
-          label="Lent out"
-          badge={
-            totals.lentPeople > 0 ? (
-              <Badge tone="neutral">
-                {totals.lentPeople} {totals.lentPeople === 1 ? 'person' : 'people'}
-              </Badge>
-            ) : undefined
-          }
-          note="receivable"
-        >
-          <span
-            className="num text-[1.9rem] font-bold leading-none tracking-tight"
-            style={totals.lentMinor ? { color: 'var(--rule-red)' } : undefined}
-          >
-            {formatINR(totals.lentMinor)}
-          </span>
-        </MetricCard>
-
-        <MetricCard
-          bloom="credit"
-          icon={<span className="text-[17px] font-bold">↓</span>}
-          label="Borrowed"
-          badge={
-            totals.borrowedPeople > 0 ? (
-              <Badge tone="neutral">
-                {totals.borrowedPeople} {totals.borrowedPeople === 1 ? 'person' : 'people'}
-              </Badge>
-            ) : undefined
-          }
-          note="payable"
-        >
-          <span
-            className="num text-[1.9rem] font-bold leading-none tracking-tight"
-            style={totals.borrowedMinor ? { color: 'var(--credit)' } : undefined}
-          >
-            {formatINR(totals.borrowedMinor)}
-          </span>
-        </MetricCard>
-      </div>
+      <StatStrip
+        glow=""
+        items={[
+          {
+            label: 'Total spent',
+            minor: totals.spentMinor,
+            icon: <NavIcon name="ledger" size={16} />,
+            sub: `${totals.spentCount} ${totals.spentCount === 1 ? 'entry' : 'entries'}`,
+            extra:
+              dailyAverageMinor > 0 ? (
+                <p className="muted text-[11px] mt-0.5 truncate">
+                  Daily average <span className="num">{formatINR(dailyAverageMinor)}</span>
+                </p>
+              ) : undefined,
+          },
+          {
+            label: totals.incomeMinor > 0 ? 'Income received' : 'Invested',
+            minor: totals.incomeMinor > 0 ? totals.incomeMinor : totals.investedMinor,
+            tone: totals.incomeMinor > 0 ? 'var(--hi)' : undefined,
+            icon: <NavIcon name="cash" size={16} />,
+            sub: totals.incomeMinor > 0 ? 'came in' : 'not spending',
+            extra:
+              totals.incomeMinor > 0 && totals.investedMinor > 0 ? (
+                <p className="muted text-[11px] mt-0.5 truncate">
+                  <span className="num">{formatINR(totals.investedMinor)}</span> also went into investments
+                </p>
+              ) : undefined,
+          },
+          {
+            label: 'Lent out',
+            minor: totals.lentMinor,
+            tone: totals.lentMinor ? 'var(--rule-red)' : undefined,
+            icon: <span className="text-[13px] font-bold">↑</span>,
+            sub:
+              totals.lentPeople > 0
+                ? `receivable · ${totals.lentPeople} ${totals.lentPeople === 1 ? 'person' : 'people'}`
+                : 'receivable',
+          },
+          {
+            label: 'Borrowed',
+            minor: totals.borrowedMinor,
+            tone: totals.borrowedMinor ? 'var(--credit)' : undefined,
+            icon: <span className="text-[13px] font-bold">↓</span>,
+            sub:
+              totals.borrowedPeople > 0
+                ? `payable · ${totals.borrowedPeople} ${totals.borrowedPeople === 1 ? 'person' : 'people'}`
+                : 'payable',
+          },
+        ]}
+      />
 
       {/* The filter people reach for most is one tap, not one sheet. */}
       <div className="scroll-x flex items-center gap-2 -mx-1 px-1 pb-1">

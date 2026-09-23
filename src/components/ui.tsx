@@ -153,6 +153,7 @@ export function StatStrip({
    */
   split = false,
   bare = false,
+  glow,
 }: {
   items: {
     label: string;
@@ -176,10 +177,20 @@ export function StatStrip({
    * Wrap it in a CardStrip so the hairlines run to the card's edges.
    */
   bare?: boolean;
+  /**
+   * The ambient bloom, for a strip that is the page's headline rather than a
+   * footnote under one. Pass the tint class ('' for the accent). Medium, not
+   * large: on a card this short the large disc is cut off into a patch.
+   */
+  glow?: string;
 }) {
   const wide = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' }[cols];
 
-  const cells = items.map((it) => (
+  /* An odd last cell spans the row at two-up, rather than leaving a hole
+     the hairline background shows through. */
+  const oddLast = (i: number) => (i === items.length - 1 && items.length % 2 === 1 ? 'max-sm:col-span-2' : '');
+
+  const cells = items.map((it, i) => (
     /*
      * Labels wrap rather than truncate — "Monthly avera…" is worse than two
      * lines — and the label block reserves two lines whether it needs them or
@@ -190,7 +201,7 @@ export function StatStrip({
      */
     <div
       key={it.label}
-      className={split ? 'card !p-4 min-w-0' : 'px-3.5 py-3 sm:px-5 sm:py-4 min-w-0'}
+      className={`${split ? 'card !p-4 min-w-0' : 'px-3.5 py-3 sm:px-5 sm:py-4 min-w-0'} ${oddLast(i)}`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem]">{it.label}</p>
@@ -234,7 +245,7 @@ export function StatStrip({
   if (bare) return <div className={`grid grid-cols-2 ${wide} hair-grid`}>{cells}</div>;
 
   return (
-    <div className="card overflow-hidden">
+    <div className={`card overflow-hidden ${glow !== undefined ? `glow-card ${glow}` : ''}`}>
       <div className={`grid grid-cols-2 ${wide} hair-grid`}>{cells}</div>
     </div>
   );
@@ -277,7 +288,7 @@ export function CardSection({
 export function CardStrip({ children, pad = 'md' }: { children: ReactNode; pad?: 'md' | 'lg' }) {
   const bleed = pad === 'lg' ? '-mx-5 -mb-5 sm:-mx-6 sm:-mb-6' : '-mx-4 -mb-4 sm:-mx-5 sm:-mb-5';
   return (
-    <div className={`mt-5 border-t overflow-hidden rounded-b-[0.875rem] ${bleed}`} style={{ borderColor: 'var(--border)' }}>
+    <div className={`relative mt-5 border-t overflow-hidden rounded-b-[0.875rem] ${bleed}`} style={{ borderColor: 'var(--border)' }}>
       {children}
     </div>
   );
@@ -405,11 +416,27 @@ export function EmptyState({
   title,
   hint,
   action,
+  compact = false,
 }: {
   title: string;
   hint?: string;
   action?: ReactNode;
+  /**
+   * One quiet line, no mark — for an empty half of a paired or tabbed card,
+   * where the full block would make the empty side taller than the full one.
+   */
+  compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className="py-3">
+        <p className="text-[13px] font-semibold">{title}</p>
+        {hint && <p className="muted text-[12px] mt-0.5 leading-relaxed">{hint}</p>}
+        {action && <div className="mt-3">{action}</div>}
+      </div>
+    );
+  }
+
   return (
     <div className="text-center py-10 px-4">
       <svg

@@ -9,6 +9,7 @@ import { formatINR } from '@/lib/money';
 import type { Person, PersonStat } from '@/lib/types';
 import {
   Card,
+  CardStrip,
   EmptyState,
   ErrorState,
   HeroFigure,
@@ -17,6 +18,7 @@ import {
   Money,
   PageHeader,
   Segmented,
+  StatStrip,
 } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
 import { ShareBar } from '@/components/graph';
@@ -25,7 +27,6 @@ import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { NavIcon, PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
-import { Badge, MetricCard } from '@/components/plan-cards';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
@@ -253,81 +254,84 @@ function PeopleHub() {
             </div>
           )}
 
+          {/* One line each, even at a phone's half-width — "I borrowed money"
+              wrapped to two and the pair came out different heights. */}
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 w-full lg:w-52 shrink-0">
-            <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'out' })}>
+            <button
+              className="btn btn-ghost whitespace-nowrap max-sm:!px-3 max-sm:text-[13px]"
+              onClick={() => setLedgerFor({ direction: 'out' })}
+            >
               ↗ I lent money
             </button>
-            <button className="btn btn-ghost" onClick={() => setLedgerFor({ direction: 'in' })}>
+            <button
+              className="btn btn-ghost whitespace-nowrap max-sm:!px-3 max-sm:text-[13px]"
+              onClick={() => setLedgerFor({ direction: 'in' })}
+            >
               ↙ I borrowed money
             </button>
           </div>
         </div>
+
+        {/* Three facts about the ledger as a whole. These were three more
+            cards at hero weight under the hero; they are its footer row, each
+            badge and note kept as the line under its figure. */}
+        <CardStrip pad="lg">
+          <StatStrip
+            bare
+            cols={3}
+            items={[
+              {
+                label: 'Active ledgers',
+                value: `${rows.length} ${rows.length === 1 ? 'contact' : 'contacts'}`,
+                icon: <NavIcon name="people" size={16} />,
+                sub: openCount > 0 ? `${openCount} outstanding` : 'all clear',
+                extra: (
+                  <p className="muted text-[11px] mt-0.5 truncate">
+                    {settledCount} fully balanced{openCount ? '' : ' — nothing outstanding'}
+                  </p>
+                ),
+              },
+              {
+                label: 'Most shared with',
+                minor: topSharer?.spendMinor ?? 0,
+                icon: <NavIcon name="analytics" size={16} />,
+                sub: topSharer
+                  ? `${topSharer.person.name} · ${topSharer.count} ${
+                      topSharer.count === 1 ? 'transaction' : 'transactions'
+                    }`
+                  : 'Tag someone on an expense to see this.',
+                extra: topSharer ? (
+                  <p className="muted text-[11px] mt-0.5 truncate">
+                    {Math.round(topSharer.share * 100)}% of spend
+                  </p>
+                ) : undefined,
+              },
+              biggestDebt
+                ? {
+                    label: 'Next settlement',
+                    minor: Math.abs(biggestDebt.balanceMinor),
+                    tone: biggestDebt.balanceMinor < 0 ? 'var(--rule-red)' : 'var(--credit)',
+                    icon: <NavIcon name="target" size={16} />,
+                    sub: `${biggestDebt.person.name} · largest open`,
+                    extra: (
+                      <p className="muted text-[11px] mt-0.5 truncate">
+                        {biggestDebt.balanceMinor < 0
+                          ? 'You owe this one — settle to clear it.'
+                          : 'Owed to you — a nudge is one tap away.'}
+                      </p>
+                    ),
+                  }
+                : {
+                    label: 'Next settlement',
+                    value: '—',
+                    icon: <NavIcon name="target" size={16} />,
+                    sub: 'nothing due',
+                    extra: <p className="muted text-[11px] mt-0.5 truncate">Every balance is settled.</p>,
+                  },
+            ]}
+          />
+        </CardStrip>
       </Card>
-
-      {/* Three facts about the ledger as a whole, each a card. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard
-          bloom="quiet"
-          icon={<NavIcon name="people" size={20} />}
-          label="Active ledgers"
-          badge={
-            openCount > 0 ? (
-              <Badge tone="up">{openCount} outstanding</Badge>
-            ) : (
-              <Badge tone="good">all clear</Badge>
-            )
-          }
-          note={`${settledCount} fully balanced${openCount ? '' : ' — nothing outstanding'}`}
-        >
-          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
-            {rows.length} {rows.length === 1 ? 'contact' : 'contacts'}
-          </span>
-        </MetricCard>
-
-        <MetricCard
-          bloom="credit"
-          icon={<NavIcon name="analytics" size={20} />}
-          label="Most shared with"
-          badge={topSharer ? <Badge tone="neutral">{Math.round(topSharer.share * 100)}% of spend</Badge> : undefined}
-          note={
-            topSharer
-              ? `${topSharer.person.name} · ${topSharer.count} ${topSharer.count === 1 ? 'transaction' : 'transactions'}`
-              : 'Tag someone on an expense to see this.'
-          }
-        >
-          <span className="num text-[1.9rem] font-bold leading-none tracking-tight">
-            {formatINR(topSharer?.spendMinor ?? 0)}
-          </span>
-        </MetricCard>
-
-        <MetricCard
-          bloom={biggestDebt ? 'danger' : 'quiet'}
-          icon={<NavIcon name="target" size={20} />}
-          label="Next settlement"
-          badge={biggestDebt ? <Badge tone="up">largest open</Badge> : <Badge tone="good">nothing due</Badge>}
-          note={
-            biggestDebt
-              ? biggestDebt.balanceMinor < 0
-                ? 'You owe this one — settle to clear it.'
-                : 'Owed to you — a nudge is one tap away.'
-              : 'Every balance is settled.'
-          }
-        >
-          {biggestDebt ? (
-            <span className="min-w-0">
-              <span className="text-[15px] font-semibold truncate block">{biggestDebt.person.name}</span>
-              <span
-                className="num text-[1.5rem] font-bold leading-none"
-                style={{ color: biggestDebt.balanceMinor < 0 ? 'var(--rule-red)' : 'var(--credit)' }}
-              >
-                {formatINR(Math.abs(biggestDebt.balanceMinor))}
-              </span>
-            </span>
-          ) : (
-            <span className="num text-[1.9rem] font-bold leading-none tracking-tight">—</span>
-          )}
-        </MetricCard>
-      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented

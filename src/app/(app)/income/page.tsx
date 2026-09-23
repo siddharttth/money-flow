@@ -89,8 +89,8 @@ export default function IncomePage() {
         </Card>
       ) : (
         <>
-          <Card className="!p-5 sm:!p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+          <Card className="!p-5 sm:!p-6 glow-card bloom-lg bloom-credit">
+            <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
               <div>
                 <HeroFigure
                   label={`Received in ${monthName}`}

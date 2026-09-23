@@ -70,6 +70,42 @@ export function TransactionRow({
    */
   const Tag = clustered ? 'button' : 'div';
 
+  /* Actions reveal on hover with a pointer, and are always present for
+     touch — a hidden action on a phone is no action at all. The count already
+     sits next to the amount on a cluster, so that only has to say it opens.
+     On a phone the words become marks, named for a screen reader and on
+     long-press: the column they share with the amount is narrow, and at full
+     width they pushed a second tag onto its own line. */
+  const edit = async () => {
+    const full = await api.get<never>(`/api/expenses/${tx.id}`);
+    openAdd(full);
+  };
+  const renderActions = (compact: boolean) =>
+    clustered ? (
+      <span className="micro" style={{ color: 'var(--accent)' }}>
+        View →
+      </span>
+    ) : onDelete ? (
+      <span className="reveal flex items-center gap-1">
+        {(tx.kind === 'expense' || (isLedger && onEdit)) && (
+          <PressableTag onPress={tx.kind === 'expense' ? edit : onEdit!} label="Edit" title={compact ? 'Edit' : undefined}>
+            {compact ? <ActionMark d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" /> : 'Edit'}
+          </PressableTag>
+        )}
+        <PressableTag tone="var(--rule-red)" onPress={onDelete} label="Delete" title={compact ? 'Delete' : undefined}>
+          {compact ? <ActionMark d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" /> : 'Delete'}
+        </PressableTag>
+      </span>
+    ) : null;
+
+  const amount = (
+    <Money
+      minor={shown}
+      className="text-[13.5px] font-semibold shrink-0"
+      style={incoming ? { color: 'var(--credit)' } : undefined}
+    />
+  );
+
   return (
     <Tag
       {...(clustered ? { type: 'button' as const, onClick: onOpen } : {})}
@@ -115,11 +151,7 @@ export function TransactionRow({
               ×{count}
             </span>
           )}
-          <Money
-            minor={shown}
-            className="text-[13.5px] font-semibold shrink-0"
-            style={incoming ? { color: 'var(--credit)' } : undefined}
-          />
+          <span className="max-sm:hidden shrink-0">{amount}</span>
         </div>
 
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -171,35 +203,16 @@ export function TransactionRow({
             </span>
           )}
 
-          {/* Actions reveal on hover with a pointer, and are always present for
-              touch — a hidden action on a phone is no action at all. */}
-          {/* The count already sits next to the amount, so this only has to
-              say that the row opens. */}
-          {clustered && (
-            <span className="micro ml-auto" style={{ color: 'var(--accent)' }}>
-              View →
-            </span>
-          )}
-
-          {!clustered && onDelete && (
-            <span className="reveal ml-auto flex items-center gap-1">
-              {tx.kind === 'expense' && (
-                <PressableTag
-                  onPress={async () => {
-                    const full = await api.get<never>(`/api/expenses/${tx.id}`);
-                    openAdd(full);
-                  }}
-                >
-                  Edit
-                </PressableTag>
-              )}
-              {isLedger && onEdit && <PressableTag onPress={onEdit}>Edit</PressableTag>}
-              <PressableTag tone="var(--rule-red)" onPress={onDelete}>
-                Delete
-              </PressableTag>
-            </span>
-          )}
+          {(clustered || onDelete) && <span className="max-sm:hidden ml-auto">{renderActions(false)}</span>}
         </div>
+      </div>
+
+      {/* On a phone the amount and its actions are a column of their own.
+          Sharing the tag line, Edit and Delete wrapped under a second tag and
+          every row came out a different height. */}
+      <div className="sm:hidden flex flex-col items-end gap-1.5 shrink-0">
+        {amount}
+        {renderActions(true)}
       </div>
     </Tag>
   );
@@ -219,17 +232,21 @@ function PressableTag({
   onPress,
   title,
   tone,
+  label,
 }: {
   children: ReactNode;
   onPress: (shiftKey: boolean) => void;
   title?: string;
   tone?: string;
+  /** The accessible name, when the visible content is an icon. */
+  label?: string;
 }) {
   return (
     <span
       role="button"
       tabIndex={0}
       title={title}
+      aria-label={label}
       className="tag"
       style={tone ? { color: tone } : undefined}
       onClick={(e) => {
@@ -246,5 +263,14 @@ function PressableTag({
     >
       {children}
     </span>
+  );
+}
+
+/** A 14px stroke mark for an action that has no room for its word. */
+function ActionMark({ d }: { d: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

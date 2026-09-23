@@ -313,14 +313,27 @@ export function DayBars({
   data,
   monthDays,
   height = 120,
+  days,
+  fill = false,
 }: {
   data: { date: string; totalMinor: number }[];
   monthDays: number;
   height?: number;
+  /**
+   * How many days to draw — the days that have happened, in a month still
+   * running. The days still to come are a count at the end of the axis, not
+   * a row of empty slots squeezing the real bars into the first few columns.
+   * Never fewer than the last day that has spending, so nothing is cut off.
+   */
+  days?: number;
+  /** Grow to the height of the container, with `height` as the floor. */
+  fill?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
 
   const byDay = new Map(data.map((d) => [Number(d.date.slice(8, 10)), d.totalMinor]));
+  const lastDataDay = Math.max(0, ...[...byDay.entries()].filter(([, m]) => m > 0).map(([d]) => d));
+  const drawn = Math.min(monthDays, Math.max(days ?? monthDays, lastDataDay, 1));
   const max = niceMax(Math.max(1, ...data.map((d) => d.totalMinor)));
   const peak = Math.max(0, ...data.map((d) => d.totalMinor));
   const peakDay = [...byDay.entries()].find(([, minor]) => minor === peak && peak > 0)?.[0] ?? null;
@@ -330,7 +343,7 @@ export function DayBars({
   const shownMinor = shown === null ? 0 : (byDay.get(shown) ?? 0);
 
   return (
-    <div>
+    <div className={fill ? 'flex flex-col flex-1 min-h-0' : undefined}>
       {/*
         A fixed-height readout above the bars. It shows the heaviest day until
         a bar is pointed at, so the row carries something either way and the
@@ -349,8 +362,12 @@ export function DayBars({
         )}
       </div>
 
-      <div className="flex items-end gap-[2px]" style={{ height }} onMouseLeave={() => setHover(null)}>
-        {Array.from({ length: monthDays }, (_, i) => {
+      <div
+        className={`flex items-stretch gap-[2px] ${fill ? 'flex-1' : ''}`}
+        style={fill ? { minHeight: height } : { height }}
+        onMouseLeave={() => setHover(null)}
+      >
+        {Array.from({ length: drawn }, (_, i) => {
           const day = i + 1;
           const minor = byDay.get(day) ?? 0;
           const isPeak = minor > 0 && minor === peak;
@@ -360,7 +377,7 @@ export function DayBars({
                is two pixels wide and impossible to point at. */
             <div
               key={day}
-              className="flex-1 h-full flex items-end min-w-0 cursor-default"
+              className="flex-1 flex items-end min-w-0 cursor-default"
               onMouseEnter={() => setHover(day)}
               onPointerDown={(e) => {
                 if (e.pointerType !== 'mouse') setHover(day);
@@ -384,8 +401,11 @@ export function DayBars({
 
       <div className="flex justify-between mt-1.5">
         <span className="micro">1</span>
-        <span className="micro">{Math.round(monthDays / 2)}</span>
-        <span className="micro">{monthDays}</span>
+        <span className="micro">{Math.round(drawn / 2)}</span>
+        <span className="micro">
+          {drawn}
+          {drawn < monthDays && <span className="muted"> · {monthDays - drawn} days to go</span>}
+        </span>
       </div>
     </div>
   );
@@ -449,6 +469,8 @@ export function MonthBars({
    *  charts carry. Off by default — a sparkline-sized chart cannot hold them. */
   detailed = false,
   averageLabel,
+  fill = false,
+  maxHeight,
 }: {
   data: { month: string; totalMinor: number }[];
   activeMonth?: string;
@@ -456,6 +478,10 @@ export function MonthBars({
   height?: number;
   detailed?: boolean;
   averageLabel?: string;
+  /** Grow to the height of the container, with `height` as the floor and
+      `maxHeight` as the ceiling. */
+  fill?: boolean;
+  maxHeight?: number;
 }) {
   const max = niceMax(Math.max(1, ...data.map((d) => d.totalMinor)));
   const average = data.length ? Math.round(data.reduce((s, d) => s + d.totalMinor, 0) / data.length) : 0;
@@ -464,9 +490,18 @@ export function MonthBars({
      a ₹15,000 scale must read 15K · 10K · 5K · 0, not 15K · 9.9K · 5K. */
   const ticks = [max, (max * 2) / 3, max / 3, 0];
 
+  /*
+   * Bars are capped in width and centred. With a year of history they fill
+   * the row; with four months they must not become billboards — but at 3¼rem
+   * a short history sat in the middle 40% of the card with empty rails either
+   * side, so a short run gets a wider cap.
+   */
+  const slot = data.length <= 6 ? 'max-w-[5rem]' : 'max-w-[3.25rem]';
+  const barsStyle = fill ? { minHeight: height, maxHeight } : { height };
+
   return (
-    <div>
-      <div className={detailed ? 'flex gap-3' : undefined}>
+    <div className={fill ? 'flex flex-col flex-1 min-h-0' : undefined}>
+      <div className={`${detailed ? 'flex gap-3' : ''} ${fill ? 'flex-1 flex min-h-0' : ''}`}>
         {detailed && (
           <div className="flex flex-col justify-between shrink-0" style={{ height }}>
             {ticks.map((t) => (
@@ -477,10 +512,16 @@ export function MonthBars({
           </div>
         )}
 
-        <div className="flex-1 min-w-0">
-          {/* Bars are capped in width and centred. With a year of history they
-              fill the row; with four months they must not become billboards. */}
-          <div className="relative flex items-end justify-center gap-1.5 sm:gap-2" style={{ height }}>
+        <div className={`flex-1 min-w-0 ${fill ? 'flex flex-col' : ''}`}>
+          <div
+            /* In the detailed chart the average's tag sits at the right end of
+               its dashed line; the bars keep clear of it rather than printing
+               their own value through it. */
+            className={`relative flex items-stretch justify-center gap-1.5 sm:gap-2 ${fill ? 'flex-1' : ''} ${
+              detailed && average > 0 ? 'pr-20' : ''
+            }`}
+            style={barsStyle}
+          >
             {detailed &&
               ticks.slice(0, -1).map((t) => (
                 <div
@@ -513,7 +554,7 @@ export function MonthBars({
                 <Tag
                   key={d.month}
                   {...(onPick ? { onClick: () => onPick(d.month), type: 'button' as const } : {})}
-                  className="group relative flex-1 max-w-[3.25rem] h-full flex items-end min-w-0"
+                  className={`group relative flex-1 ${slot} flex items-end min-w-0`}
                   title={`${monthLabel(d.month)}: ${formatINR(d.totalMinor)}`}
                   aria-label={`${monthLabel(d.month)}, ${formatINR(d.totalMinor)}`}
                 >
@@ -546,11 +587,11 @@ export function MonthBars({
             })}
           </div>
 
-          <div className="flex justify-center gap-1.5 sm:gap-2 mt-1.5">
+          <div className={`flex justify-center gap-1.5 sm:gap-2 mt-1.5 ${detailed && average > 0 ? 'pr-20' : ''}`}>
             {data.map((d) => (
               <span
                 key={d.month}
-                className="flex-1 max-w-[3.25rem] micro text-center truncate"
+                className={`flex-1 ${slot} micro text-center truncate`}
                 style={{ color: d.month === activeMonth ? 'var(--text)' : undefined }}
               >
                 {monthLabel(d.month).slice(0, 3)}

@@ -6,6 +6,9 @@ import { formatINR } from '@/lib/money';
 import type { SavedMonth } from '@/lib/plan';
 import {
   Card,
+  CardSection,
+  CardStrip,
+  Disclosure,
   EmptyState,
   ErrorState,
   Insight,
@@ -77,6 +80,8 @@ export default function LifetimePage() {
     ? withIncome.reduce((a, b) => (b.savedMinor > a.savedMinor ? b : a))
     : null;
   const positiveStreak = longestPositiveRun(rows);
+  const years = yearsOf(rows);
+  const hasLending = !!peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0);
 
   return (
     <div className="space-y-6">
@@ -90,100 +95,123 @@ export default function LifetimePage() {
         sub="Every month added up. Nothing on this page moves when you change the month elsewhere."
       />
 
-      {/* ---------- Net position ---------- */}
-      <Card className="!p-5 sm:!p-6">
+      {/* ---------- Where you stand ----------
+          Net worth and the cash half of the same arithmetic are one question
+          asked two ways, so they share a card: the net position is the page's
+          one large figure, the lifetime in hand a step quieter beneath it, and
+          the four running tallies as the card's footer row. */}
+      <Card className={`!p-5 sm:!p-6 glow-card bloom-lg ${netMinor < 0 ? 'bloom-danger' : ''}`}>
         {!life ? (
           <ListSkeleton rows={4} />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
-            <div>
-              <p className="label mb-2">What you have built</p>
-              <span
-                className="num text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
-                style={netMinor < 0 ? { color: 'var(--rule-red)' } : undefined}
-              >
-                {netMinor < 0 && '−'}
-                {formatINR(Math.abs(netMinor))}
-              </span>
-              <p className="muted text-[13px] mt-2.5 leading-relaxed">
-                Cash, investments and the ledger together — the one figure the
-                app never showed.
-              </p>
+          <div className="relative">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,28rem)] lg:justify-between gap-6 lg:gap-8 items-start">
+              <div>
+                <p className="label mb-2">What you have built</p>
+                <span
+                  className="num text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
+                  style={netMinor < 0 ? { color: 'var(--rule-red)' } : undefined}
+                >
+                  {netMinor < 0 && '−'}
+                  {formatINR(Math.abs(netMinor))}
+                </span>
+                <p className="muted text-[13px] mt-2.5 leading-relaxed">
+                  Cash, investments and the ledger together — the one figure the
+                  app never showed.
+                </p>
+              </div>
+
+              {/* No wider than it takes to read a label across to its amount. */}
+              <div className="min-w-0">
+                <dl className="space-y-2">
+                  <PositionLine label="Cash in hand" minor={life.inHandMinor} href="#in-hand" />
+                  <PositionLine label="Invested" minor={life.investedMinor} href="/goals" tone="var(--credit)" />
+                  <PositionLine label="Owed to you" minor={peers.data?.owedToMeMinor ?? 0} href="/people" />
+                  <PositionLine
+                    label="You owe"
+                    minor={-(peers.data?.owedByMeMinor ?? 0)}
+                    href="/people"
+                    tone="var(--rule-red)"
+                  />
+                  <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                    <PositionLine label="Net position" minor={netMinor} strong />
+                  </div>
+                </dl>
+                <p className="muted text-[12px] mt-3.5 leading-relaxed">
+                  Investments are added back here — this is net worth, not cash.
+                  The section below is the cash half of the same arithmetic.
+                </p>
+              </div>
             </div>
 
-            <div className="min-w-0">
-              <dl className="space-y-2">
-                <PositionLine label="Cash in hand" minor={life.inHandMinor} href="#in-hand" />
-                <PositionLine label="Invested" minor={life.investedMinor} href="/goals" tone="var(--credit)" />
-                <PositionLine label="Owed to you" minor={peers.data?.owedToMeMinor ?? 0} href="/people" />
-                <PositionLine
-                  label="You owe"
-                  minor={-(peers.data?.owedByMeMinor ?? 0)}
-                  href="/people"
-                  tone="var(--rule-red)"
-                />
-                <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                  <PositionLine label="Net position" minor={netMinor} strong />
-                </div>
-              </dl>
-              <p className="muted text-[12px] mt-3.5 leading-relaxed">
-                Investments are added back here — this is net worth, not cash.
-                The card below is the cash half of the same arithmetic.
-              </p>
+            {/* ---------- Lifetime in hand ---------- */}
+            <div id="in-hand" className="scroll-mt-24">
+              <CardSection>
+                <LifetimeInHand bare data={life} />
+              </CardSection>
             </div>
+
+            <CardStrip pad="lg">
+              <StatStrip
+                bare
+                items={[
+                  { label: 'Months tracked', value: String(life.months ?? 0), sub: life.firstMonth ?? undefined },
+                  { label: 'Ever invested', minor: invest.data?.lifetimeMinor ?? 0, tone: 'var(--credit)' },
+                  {
+                    label: 'Best month kept',
+                    minor: best?.savedMinor ?? 0,
+                    sub: best ? monthName(best.month) : undefined,
+                  },
+                  {
+                    label: 'Positive streak',
+                    value: `${positiveStreak} ${positiveStreak === 1 ? 'month' : 'months'}`,
+                    sub: 'kept more than you spent',
+                  },
+                ]}
+              />
+            </CardStrip>
           </div>
         )}
       </Card>
 
-      {/* ---------- Lifetime in hand ---------- */}
-      <div id="in-hand">{life && <LifetimeInHand data={life} />}</div>
-
-      <StatStrip
-        items={[
-          { label: 'Months tracked', value: String(life?.months ?? 0), sub: life?.firstMonth ?? undefined },
-          { label: 'Ever invested', minor: invest.data?.lifetimeMinor ?? 0, tone: 'var(--credit)' },
-          {
-            label: 'Best month kept',
-            minor: best?.savedMinor ?? 0,
-            sub: best ? monthName(best.month) : undefined,
-          },
-          {
-            label: 'Positive streak',
-            value: `${positiveStreak} ${positiveStreak === 1 ? 'month' : 'months'}`,
-            sub: 'kept more than you spent',
-          },
-        ]}
-      />
-
-      {/* ---------- The two trends ---------- */}
+      {/* ---------- The two trends ----------
+          One card, two halves the same height. The spend chart takes the
+          height the savings list sets, so neither half ends early. */}
       <div>
         <SectionHead label="Over time" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <Card>
-            {(trends.data?.items.length ?? 0) >= 2 ? (
-              <>
-                <h3 className="text-[15px] font-semibold mb-1">What you spend</h3>
-                <p className="muted text-[12px] mb-4">Month by month. Tap a bar to open that month.</p>
-                <MonthBars
-                  data={trends.data!.items}
-                  activeMonth=""
-                  onPick={(m) => (window.location.href = `/analytics/month?month=${m}`)}
-                  height={150}
-                />
-              </>
-            ) : (
-              <EmptyState title="Not enough history yet" hint="A trend needs at least two months." />
-            )}
-          </Card>
+        <Card className="!p-0 overflow-clip">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="p-4 sm:p-5 min-w-0 flex flex-col">
+              {(trends.data?.items.length ?? 0) >= 2 ? (
+                <>
+                  <h3 className="text-[15px] font-semibold mb-1">What you spend</h3>
+                  <p className="muted text-[12px] mb-4">Month by month. Tap a bar to open that month.</p>
+                  <MonthBars
+                    fill
+                    data={trends.data!.items}
+                    activeMonth=""
+                    onPick={(m) => (window.location.href = `/analytics/month?month=${m}`)}
+                    height={150}
+                    maxHeight={280}
+                  />
+                </>
+              ) : (
+                <EmptyState compact title="Not enough history yet" hint="A trend needs at least two months." />
+              )}
+            </div>
 
-          {rows.length ? (
-            <SavingsHistory rows={rows} />
-          ) : (
-            <Card>
-              <EmptyState title="Nothing kept yet" hint="Log some income and this fills in." />
-            </Card>
-          )}
-        </div>
+            <div
+              className="p-4 sm:p-5 min-w-0 border-t lg:border-t-0 lg:border-l"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              {rows.some((r) => r.ratePct != null) ? (
+                <SavingsHistory bare rows={rows} recent={12} />
+              ) : (
+                <EmptyState compact title="Nothing kept yet" hint="Log some income and this fills in." />
+              )}
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* ---------- All-time categories ---------- */}
@@ -195,6 +223,7 @@ export default function LifetimePage() {
           ) : cats.data.items.length ? (
             <>
               <BreakdownList
+                columns
                 items={cats.data.items.map((c) => ({
                   id: c.categoryId,
                   name: c.name,
@@ -217,34 +246,57 @@ export default function LifetimePage() {
         </Card>
       </div>
 
-      {/* ---------- Lending, all time ---------- */}
-      {peers.data && (peers.data.owedToMeMinor > 0 || peers.data.owedByMeMinor > 0) && (
+      {/* ---------- More history ----------
+          The ledger's all-time totals and the year-on-year comparison are the
+          least-read things here, and the second needs two calendar years to
+          exist at all. Folded, with the answer on the closed header — each
+          still appears only on the evidence it always needed. */}
+      {(hasLending || years.length >= 2) && (
         <div>
-          <SectionHead
-            label="Lending, all time"
-            action={
-              <Link href="/people" className="micro micro-link" style={{ color: 'var(--accent)' }}>
-                Open
-              </Link>
-            }
-          />
-          <StatStrip
-            cols={3}
-            items={[
-              { label: 'Owed to you', minor: peers.data.owedToMeMinor, tone: 'var(--credit)' },
-              { label: 'You owe', minor: peers.data.owedByMeMinor, tone: 'var(--rule-red)' },
-              {
-                label: 'Net',
-                minor: Math.abs(peers.data.netMinor),
-                sub: peers.data.netMinor >= 0 ? 'in your favour' : 'against you',
-              },
-            ]}
-          />
+          <SectionHead label="More history" />
+          <Card className="!p-0 overflow-clip">
+            {hasLending && (
+              <Disclosure
+                title="Lending, all time"
+                summary={
+                  <>
+                    <span className="muted">Net </span>
+                    <Money minor={Math.abs(peers.data!.netMinor)} className="font-semibold" />
+                    <span className="muted">
+                      {' '}
+                      {peers.data!.netMinor >= 0 ? 'in your favour' : 'against you'}
+                    </span>
+                  </>
+                }
+              >
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                  <Figure label="Owed to you" minor={peers.data!.owedToMeMinor} tone="var(--credit)" />
+                  <Figure label="You owe" minor={peers.data!.owedByMeMinor} tone="var(--rule-red)" />
+                  <Figure
+                    label="Net"
+                    minor={Math.abs(peers.data!.netMinor)}
+                    sub={peers.data!.netMinor >= 0 ? 'in your favour' : 'against you'}
+                  />
+                </div>
+                <Link href="/people" className="micro micro-link inline-block mt-4" style={{ color: 'var(--accent)' }}>
+                  Open People →
+                </Link>
+              </Disclosure>
+            )}
+
+            {years.length >= 2 && (
+              <div className={hasLending ? 'border-t' : ''} style={{ borderColor: 'var(--border)' }}>
+                <Disclosure
+                  title="Year on year"
+                  summary={<span className="muted">{years.length} years</span>}
+                >
+                  <YearOverYear years={years} />
+                </Disclosure>
+              </div>
+            )}
+          </Card>
         </div>
       )}
-
-      {/* ---------- Year over year, once there is a year ---------- */}
-      <YearOverYear rows={rows} />
 
       {life && life.months >= 2 && (
         <Insight>
@@ -289,13 +341,16 @@ function PositionLine({
   );
 }
 
+type YearRow = [year: string, totals: { inMinor: number; outMinor: number; savedMinor: number }];
+
 /**
  * A full calendar year each side, and nothing at all below one.
  *
  * The same gate the app uses for goal pace: a "year on year" built out of five
- * months is a sentence with no year in it.
+ * months is a sentence with no year in it. The caller checks for two years
+ * before drawing anything.
  */
-function YearOverYear({ rows }: { rows: SavedMonth[] }) {
+function yearsOf(rows: SavedMonth[]): YearRow[] {
   const byYear = new Map<string, { inMinor: number; outMinor: number; savedMinor: number }>();
   for (const r of rows) {
     const y = r.month.slice(0, 4);
@@ -305,32 +360,41 @@ function YearOverYear({ rows }: { rows: SavedMonth[] }) {
     acc.savedMinor += r.savedMinor;
     byYear.set(y, acc);
   }
-  if (byYear.size < 2) return null;
+  return [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
 
-  const years = [...byYear.entries()].sort(([a], [b]) => a.localeCompare(b));
+function YearOverYear({ years }: { years: YearRow[] }) {
   const max = Math.max(...years.map(([, v]) => Math.max(v.inMinor, v.outMinor)), 1);
 
   return (
-    <div>
-      <SectionHead label="Year on year" />
-      <Card>
-        <ul className="space-y-4">
-          {years.map(([year, v]) => (
-            <li key={year}>
-              <div className="flex items-baseline justify-between gap-3 mb-2">
-                <span className="text-[13.5px] font-semibold num">{year}</span>
-                <span className="muted text-[12px]">
-                  kept <Money minor={v.savedMinor} className="num font-semibold" />
-                </span>
-              </div>
-              <div className="space-y-1">
-                <YearBar label="In" minor={v.inMinor} max={max} color="var(--credit)" />
-                <YearBar label="Out" minor={v.outMinor} max={max} color="var(--text-muted)" />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
+    /* Capped: a year's in-and-out bar a thousand pixels long is harder to
+       compare against the next year's, not easier. */
+    <ul className="space-y-4 max-w-2xl">
+      {years.map(([year, v]) => (
+        <li key={year}>
+          <div className="flex items-baseline justify-between gap-3 mb-2">
+            <span className="text-[13.5px] font-semibold num">{year}</span>
+            <span className="muted text-[12px]">
+              kept <Money minor={v.savedMinor} className="num font-semibold" />
+            </span>
+          </div>
+          <div className="space-y-1">
+            <YearBar label="In" minor={v.inMinor} max={max} color="var(--credit)" />
+            <YearBar label="Out" minor={v.outMinor} max={max} color="var(--text-muted)" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A figure with its label, for a section of a card rather than a strip. */
+function Figure({ label, minor, sub, tone }: { label: string; minor: number; sub?: string; tone?: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem] sm:min-h-0">{label}</p>
+      <Money minor={minor} className="text-[17px] sm:text-xl font-semibold" style={tone ? { color: tone } : undefined} />
+      {sub && <p className="muted text-[11px] mt-1 truncate">{sub}</p>}
     </div>
   );
 }

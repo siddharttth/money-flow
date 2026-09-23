@@ -9,6 +9,7 @@ import type { InvestmentSummary } from '@/lib/investments';
 import type { Fund } from '@/lib/funds';
 import {
   Card,
+  CardStrip,
   Delta,
   EmptyState,
   ErrorState,
@@ -41,6 +42,7 @@ import { FundCard, GoalsRollup } from '@/components/plan-cards';
  */
 export default function InvestmentsPage() {
   const [month, setMonth] = useState(currentMonth());
+  const [allContributions, setAllContributions] = useState(false);
   const { openAdd } = useShell();
   const { openCategory } = useInspector();
 
@@ -71,9 +73,18 @@ export default function InvestmentsPage() {
         about the whole plan — whether the sum of what you have promised
         yourself is a thing a month can actually carry.
       */}
-      {funds.data?.items.length ? <GoalsRollup funds={funds.data.items} /> : null}
+      <Card className="!p-5 sm:!p-6 glow-card bloom-lg bloom-credit">
+        <div className="relative">
+        {/* The whole plan as one summary band. It used to be a card of its own
+            above this one, in the page's largest type; the figure this card
+            is about is what went in this month, so the plan steps down to a
+            caption and the hero keeps the one large number. */}
+        {funds.data?.items.length ? (
+          <div className="mb-5 pb-5 border-b" style={{ borderColor: 'var(--border)' }}>
+            <GoalsRollup compact funds={funds.data.items} />
+          </div>
+        ) : null}
 
-      <Card className="!p-5 sm:!p-6">
         {data ? (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
             <div>
@@ -141,7 +152,9 @@ export default function InvestmentsPage() {
                     averageLabel={`Avg ${formatINR(data.averageMonthMinor)}`}
                   />
                   {data.previousMonthMinor > 0 && (
-                    <div className="flex items-baseline justify-between gap-3 mt-4">
+                    /* Stacked on a phone: side by side, both captions wrapped
+                       to two lines each. */
+                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 sm:gap-3 mt-4">
                       <span
                         className="text-[12px]"
                         style={{
@@ -179,6 +192,47 @@ export default function InvestmentsPage() {
         ) : (
           <ListSkeleton rows={5} />
         )}
+
+        {/* The four running tallies behind the figure, as the card's footer. */}
+        <CardStrip pad="lg">
+              <StatStrip
+                bare
+                items={[
+                  {
+                    label: 'Lifetime capital',
+                    minor: data?.lifetimeMinor ?? 0,
+                    sub: 'total deposits',
+                    meter: 1,
+                    meterTone: 'var(--accent)',
+                  },
+                  {
+                    label: 'Monthly average',
+                    minor: data?.averageMonthMinor ?? 0,
+                    sub: data ? `over ${data.activeMonths} active ${data.activeMonths === 1 ? 'month' : 'months'}` : undefined,
+                    meter:
+                      data && data.lifetimeMinor > 0 ? data.averageMonthMinor / data.lifetimeMinor : undefined,
+                    meterTone: 'var(--credit)',
+                  },
+                  {
+                    label: 'Contributions',
+                    value: `${data?.contributionCount ?? 0} deposits`,
+                    sub: data?.firstDate ? `since ${dayLabel(data.firstDate)}` : undefined,
+                    meter: data && data.contributionCount > 0 ? Math.min(1, data.contributionCount / 12) : undefined,
+                  },
+                  {
+                    label: 'Last month',
+                    minor: data?.previousMonthMinor ?? 0,
+                    sub: `closed in ${monthLabel(shiftMonth(month, -1))}`,
+                    meter:
+                      data && data.monthMinor > 0 && data.previousMonthMinor > 0
+                        ? Math.min(1, data.previousMonthMinor / Math.max(data.monthMinor, data.previousMonthMinor))
+                        : undefined,
+                    meterTone: 'var(--text-muted)',
+                  },
+                ]}
+              />
+        </CardStrip>
+        </div>
       </Card>
 
       {/*
@@ -200,9 +254,18 @@ export default function InvestmentsPage() {
           }
         />
         {funds.data?.items.length ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
-            {funds.data.items.map((f) => (
-              <FundCard key={f.categoryId} fund={f} onAdd={() => openAdd()} />
+          /*
+            Laid out by how many there are. A fixed two-up grid left one goal
+            with half a row of nothing beside it, and a third goal alone on
+            its row. One goal takes the row (and turns itself into two
+            columns); a multiple of three goes three-up where there is room;
+            an odd one out spans the row rather than sitting beside a hole.
+          */
+          <div className={`grid grid-cols-1 gap-5 ${goalCols(funds.data.items.length)}`}>
+            {funds.data.items.map((f, i) => (
+              <div key={f.categoryId} className={`grid ${goalSpan(i, funds.data!.items.length)}`}>
+                <FundCard fund={f} onAdd={() => openAdd()} />
+              </div>
             ))}
           </div>
         ) : (
@@ -220,47 +283,12 @@ export default function InvestmentsPage() {
         )}
       </div>
 
-      <StatStrip
-        split
-        items={[
-          {
-            label: 'Lifetime capital',
-            minor: data?.lifetimeMinor ?? 0,
-            sub: 'total deposits',
-            meter: 1,
-            meterTone: 'var(--accent)',
-          },
-          {
-            label: 'Monthly average',
-            minor: data?.averageMonthMinor ?? 0,
-            sub: data ? `over ${data.activeMonths} active ${data.activeMonths === 1 ? 'month' : 'months'}` : undefined,
-            meter:
-              data && data.lifetimeMinor > 0 ? data.averageMonthMinor / data.lifetimeMinor : undefined,
-            meterTone: 'var(--credit)',
-          },
-          {
-            label: 'Contributions',
-            value: `${data?.contributionCount ?? 0} deposits`,
-            sub: data?.firstDate ? `since ${dayLabel(data.firstDate)}` : undefined,
-            meter: data && data.contributionCount > 0 ? Math.min(1, data.contributionCount / 12) : undefined,
-          },
-          {
-            label: 'Last month',
-            minor: data?.previousMonthMinor ?? 0,
-            sub: `closed in ${monthLabel(shiftMonth(month, -1))}`,
-            meter:
-              data && data.monthMinor > 0 && data.previousMonthMinor > 0
-                ? Math.min(1, data.previousMonthMinor / Math.max(data.monthMinor, data.previousMonthMinor))
-                : undefined,
-            meterTone: 'var(--text-muted)',
-          },
-        ]}
-      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        <div>
+      {/* Two cards the same height, each section heading above its own. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="flex flex-col">
           <SectionHead label="Where it is going" />
-          <Card>
+          <Card className="flex-1">
             {!data ? (
               <ListSkeleton rows={4} />
             ) : data.byCategory.length ? (
@@ -308,29 +336,45 @@ export default function InvestmentsPage() {
           </Card>
         </div>
 
-        <div>
+        <div className="flex flex-col">
           <SectionHead label="Every contribution" />
-          <Card className="!p-0 overflow-clip">
+          <Card className="!p-0 overflow-clip flex-1">
             {!data ? (
               <div className="p-4">
                 <ListSkeleton rows={5} />
               </div>
             ) : data.recent.length ? (
-              <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                {data.recent.map((e) => (
-                  <li key={e.id} className="flex items-center gap-3 px-3.5 sm:px-4 py-3">
-                    <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
-                      <p className="micro mt-0.5">
-                        {dayLabel(e.date)}
-                        {e.note ? ` · ${e.category.name}` : ''}
-                      </p>
-                    </div>
-                    <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                  {/* The latest few, the rest a tap away. The list is fifty
+                      deep and grows with every deposit; beside a two-line
+                      breakdown it was a column of empty page. */}
+                  {(allContributions || data.recent.length <= RECENT + 2 ? data.recent : data.recent.slice(0, RECENT)).map((e) => (
+                    <li key={e.id} className="flex items-center gap-3 px-3.5 sm:px-4 py-3">
+                      <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
+                        <p className="micro mt-0.5">
+                          {dayLabel(e.date)}
+                          {e.note ? ` · ${e.category.name}` : ''}
+                        </p>
+                      </div>
+                      <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
+                    </li>
+                  ))}
+                </ul>
+                {data.recent.length > RECENT + 2 && (
+                  <button
+                    type="button"
+                    className="row w-full text-left px-3.5 sm:px-4 py-3 border-t micro"
+                    style={{ borderColor: 'var(--border)', color: 'var(--accent)' }}
+                    aria-expanded={allContributions}
+                    onClick={() => setAllContributions((v) => !v)}
+                  >
+                    {allContributions ? 'Show fewer' : `Show ${data.recent.length - RECENT} more`}
+                  </button>
+                )}
+              </>
             ) : (
               <EmptyState
                 title="Nothing recorded"
@@ -355,4 +399,22 @@ export default function InvestmentsPage() {
       )}
     </div>
   );
+}
+
+/**
+ * How many contributions show before "Show more". The list only folds when
+ * that hides at least three — a button to reveal one row is a row with extra
+ * steps.
+ */
+const RECENT = 6;
+
+function goalCols(n: number): string {
+  if (n <= 1) return '';
+  return n % 3 === 0 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2';
+}
+
+/** The odd card out spans the row — only at the widths where it would be odd. */
+function goalSpan(i: number, n: number): string {
+  if (n <= 1 || i !== n - 1 || n % 2 === 0) return '';
+  return n % 3 === 0 ? 'sm:col-span-2 xl:col-span-1' : 'sm:col-span-2';
 }

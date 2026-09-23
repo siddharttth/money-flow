@@ -164,96 +164,120 @@ function monthName(month: string): string {
 export function FundCard({ fund, onAdd }: { fund: Fund; onAdd?: () => void }) {
   const ahead = (fund.paceDeltaMinor ?? 0) >= 0;
 
+  /*
+   * Laid out by the card's own width, not the screen's. One goal gets the
+   * full row, and a narrow stack of figures a thousand pixels wide is mostly
+   * air — so past 42rem the card turns into two columns: the goal and its
+   * progress on the left, what it asks for and where it is heading on the
+   * right. The same card in a three-up grid stays stacked.
+   */
   return (
-    <Card>
-      <div className="flex items-start gap-3">
-        <CategoryIcon icon={fund.icon} color={fund.color} size={36} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-[15px] font-semibold truncate">{fund.name}</h3>
-            {fund.isComplete && (
-              <span className="micro px-1.5 py-0.5 rounded" style={{ background: 'var(--credit-soft)', color: 'var(--credit)' }}>
-                done
-              </span>
-            )}
-          </div>
-          <p className="muted text-[12px] mt-0.5">
-            <span className="num">{formatINR(fund.savedMinor)}</span> of{' '}
-            <span className="num">{formatINR(fund.targetMinor)}</span>
-            {fund.targetDate && ` · by ${targetLabel(fund.targetDate)}`}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} spring />
-        <div className="flex items-baseline justify-between gap-3 mt-2">
-          <span className="num text-[12px] font-semibold">{Math.round(fund.progress * 100)}%</span>
-          {!fund.isComplete && (
-            <span className="num text-[12px] muted">{formatINR(fund.remainingMinor)} to go</span>
-          )}
-        </div>
-      </div>
-
-      {!fund.isComplete && (
-        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-          <div>
-            <p className="label mb-1">Needs a month</p>
-            <Money minor={fund.requiredPerMonthMinor ?? 0} className="text-[15px] font-semibold" />
-            {fund.monthsLeft != null && (
-              <p className="muted text-[11px] mt-0.5">
-                {fund.monthsLeft} {fund.monthsLeft === 1 ? 'month' : 'months'} left
+    /* A small bloom in the goal's own colour — the card glows in the colour of
+       what it is about, and a finished goal in the colour of money kept. */
+    <Card
+      className="@container glow-card bloom-sm"
+      style={{ '--bloom': fund.isComplete ? 'var(--credit)' : fund.color } as React.CSSProperties}
+    >
+      <div className="relative @2xl:grid @2xl:grid-cols-2 @2xl:gap-8 @2xl:items-start">
+        <div>
+          <div className="flex items-start gap-3">
+            <CategoryIcon icon={fund.icon} color={fund.color} size={36} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-[15px] font-semibold truncate">{fund.name}</h3>
+                {fund.isComplete && (
+                  <span
+                    className="micro px-1.5 py-0.5 rounded"
+                    style={{ background: 'var(--credit-soft)', color: 'var(--credit)' }}
+                  >
+                    done
+                  </span>
+                )}
+              </div>
+              <p className="muted text-[12px] mt-0.5">
+                <span className="num">{formatINR(fund.savedMinor)}</span> of{' '}
+                <span className="num">{formatINR(fund.targetMinor)}</span>
+                {fund.targetDate && ` · by ${targetLabel(fund.targetDate)}`}
               </p>
-            )}
+            </div>
           </div>
-          <div>
-            <p className="label mb-1">Pace</p>
-            {fund.paceDeltaMinor == null ? (
-              <p className="text-[15px] font-semibold muted">No date set</p>
-            ) : !fund.paceConfident ? (
-              /* One deposit last week is not a pace. Saying so is better than
-                 a confident "₹6,857 ahead of plan" built out of nothing. */
-              <>
-                <p className="text-[15px] font-semibold muted">Just started</p>
-                <p className="muted text-[11px] mt-0.5">pace after a few weeks</p>
-              </>
-            ) : (
-              <>
-                <p
-                  className="num text-[15px] font-semibold"
-                  style={{ color: ahead ? 'var(--credit)' : 'var(--rule-red)' }}
-                >
-                  {ahead ? '+' : '−'}
-                  {formatINR(Math.abs(fund.paceDeltaMinor))}
-                </p>
-                <p className="muted text-[11px] mt-0.5">{ahead ? 'ahead of plan' : 'behind plan'}</p>
-              </>
-            )}
+
+          <div className="mt-4">
+            <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} spring />
+            <div className="flex items-baseline justify-between gap-3 mt-2">
+              <span className="num text-[12px] font-semibold">{Math.round(fund.progress * 100)}%</span>
+              {!fund.isComplete && (
+                <span className="num text-[12px] muted">{formatINR(fund.remainingMinor)} to go</span>
+              )}
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Computed since this feature shipped and never once rendered. It is
-          the honest counterweight to the plan: what the plan asks for, and
-          where the money is actually heading. */}
-      {fund.projectedDate && !fund.isComplete && (
-        <p className="muted text-[12px] mt-3.5 leading-relaxed">
-          At the rate so far you get there around <strong>{targetLabel(fund.projectedDate)}</strong>
-          {fund.targetDate && (
-            <>
-              {' '}
-              — {fund.projectedDate <= fund.targetDate ? 'ahead of' : 'later than'} the {targetLabel(fund.targetDate)}{' '}
-              target.
-            </>
+        <div className="@2xl:border-l @2xl:pl-8" style={{ borderColor: 'var(--border)' }}>
+          {!fund.isComplete && (
+            <div
+              className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t @2xl:mt-0 @2xl:pt-0 @2xl:border-t-0"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div>
+                <p className="label mb-1">Needs a month</p>
+                <Money minor={fund.requiredPerMonthMinor ?? 0} className="text-[15px] font-semibold" />
+                {fund.monthsLeft != null && (
+                  <p className="muted text-[11px] mt-0.5">
+                    {fund.monthsLeft} {fund.monthsLeft === 1 ? 'month' : 'months'} left
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="label mb-1">Pace</p>
+                {fund.paceDeltaMinor == null ? (
+                  <p className="text-[15px] font-semibold muted">No date set</p>
+                ) : !fund.paceConfident ? (
+                  /* One deposit last week is not a pace. Saying so is better than
+                     a confident "₹6,857 ahead of plan" built out of nothing. */
+                  <>
+                    <p className="text-[15px] font-semibold muted">Just started</p>
+                    <p className="muted text-[11px] mt-0.5">pace after a few weeks</p>
+                  </>
+                ) : (
+                  <>
+                    <p
+                      className="num text-[15px] font-semibold"
+                      style={{ color: ahead ? 'var(--credit)' : 'var(--rule-red)' }}
+                    >
+                      {ahead ? '+' : '−'}
+                      {formatINR(Math.abs(fund.paceDeltaMinor))}
+                    </p>
+                    <p className="muted text-[11px] mt-0.5">{ahead ? 'ahead of plan' : 'behind plan'}</p>
+                  </>
+                )}
+              </div>
+            </div>
           )}
-        </p>
-      )}
 
-      {onAdd && !fund.isComplete && (
-        <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
-          Add to this goal
-        </button>
-      )}
+          {/* Computed since this feature shipped and never once rendered. It is
+              the honest counterweight to the plan: what the plan asks for, and
+              where the money is actually heading. */}
+          {fund.projectedDate && !fund.isComplete && (
+            <p className="muted text-[12px] mt-3.5 leading-relaxed">
+              At the rate so far you get there around <strong>{targetLabel(fund.projectedDate)}</strong>
+              {fund.targetDate && (
+                <>
+                  {' '}
+                  — {fund.projectedDate <= fund.targetDate ? 'ahead of' : 'later than'} the{' '}
+                  {targetLabel(fund.targetDate)} target.
+                </>
+              )}
+            </p>
+          )}
+
+          {onAdd && !fund.isComplete && (
+            <button className="btn btn-ghost w-full mt-4" onClick={onAdd}>
+              Add to this goal
+            </button>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -375,9 +399,27 @@ export type SavedMonthRow = {
  * a missing month is information and silently skipping it would flatter the
  * average sitting underneath.
  */
-export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
+export function SavingsHistory({
+  rows,
+  bare = false,
+  recent,
+}: {
+  rows: SavedMonthRow[];
+  /** A half of a card it shares — no card of its own. */
+  bare?: boolean;
+  /**
+   * Show only the latest N months until asked for the rest. The list grows a
+   * row a month; after two years it is a column four times the height of the
+   * chart beside it. The average underneath still covers every month.
+   */
+  recent?: number;
+}) {
+  const [showAll, setShowAll] = useState(false);
   const withIncome = rows.filter((r) => r.ratePct != null);
   if (withIncome.length === 0) return null;
+
+  const hidden = recent && !showAll ? Math.max(0, rows.length - recent) : 0;
+  const shown = hidden ? rows.slice(hidden) : rows;
 
   /*
    * POOLED, NOT AVERAGED.
@@ -391,15 +433,21 @@ export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
   const pooledSaved = withIncome.reduce((s, r) => s + r.savedMinor, 0);
   const avg = pooledIn > 0 ? (pooledSaved / pooledIn) * 100 : 0;
 
-  return (
-    <Card>
+  const body = (
+    <>
       <h3 className="text-[15px] font-semibold mb-1">What you keep</h3>
       <p className="muted text-[12px] mb-4">
         Of everything that came in each month, the share that did not go back out.
       </p>
 
+      {hidden > 0 && (
+        <button type="button" className="micro micro-link mb-3" style={{ color: 'var(--accent)' }} onClick={() => setShowAll(true)}>
+          Show {hidden} earlier {hidden === 1 ? 'month' : 'months'}
+        </button>
+      )}
+
       <ul className="space-y-3">
-        {rows.map((r) => {
+        {shown.map((r) => {
           const negative = r.savedMinor < 0;
           return (
             <li key={r.month}>
@@ -447,8 +495,10 @@ export function SavingsHistory({ rows }: { rows: SavedMonthRow[] }) {
         Averaging <strong className="num">{Math.round(avg)}%</strong> kept across{' '}
         {withIncome.length === 1 ? 'the one month' : `${withIncome.length} months`} with income logged.
       </p>
-    </Card>
+    </>
   );
+
+  return bare ? <div>{body}</div> : <Card>{body}</Card>;
 }
 
 /* ------------------------------------------------------------------ *
@@ -510,7 +560,7 @@ export function LifetimeInHand({
   const down = data.inHandMinor < 0;
 
   const body = (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-5 lg:gap-8 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,28rem)] lg:justify-between gap-5 lg:gap-8 items-start">
       <div>
         <div className="flex items-baseline justify-between gap-3">
           <p className="label mb-0">Lifetime in hand</p>

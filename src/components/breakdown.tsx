@@ -21,6 +21,7 @@ export function BreakdownList({
   onPick,
   showBar = true,
   max: maxOverride,
+  columns = false,
 }: {
   items: {
     id: string;
@@ -35,15 +36,21 @@ export function BreakdownList({
   onPick?: (id: string) => void;
   showBar?: boolean;
   max?: number;
+  /**
+   * Two columns on a wide screen. A full-width row at 1440px puts the bar a
+   * thousand pixels long and the amount a long way from its name; the ranking
+   * reads down the first column and carries on in the second.
+   */
+  columns?: boolean;
 }) {
   const max = maxOverride ?? Math.max(1, ...items.map((i) => i.totalMinor));
 
   return (
-    <ul className="flex flex-col">
+    <ul className={columns ? 'xl:columns-2 xl:gap-x-8' : 'flex flex-col'}>
       {items.map((it) => {
         const Tag = onPick ? 'button' : 'div';
         return (
-          <li key={it.id}>
+          <li key={it.id} className={columns ? 'break-inside-avoid' : undefined}>
             <Tag
               {...(onPick ? { type: 'button' as const, onClick: () => onPick(it.id) } : {})}
               className="row w-full text-left flex items-center gap-3 px-2 py-2.5 rounded-lg"

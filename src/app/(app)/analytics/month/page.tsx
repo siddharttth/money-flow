@@ -21,6 +21,7 @@ import {
   Money,
   PageHeader,
   SectionHead,
+  Segmented,
   StatStrip,
 } from '@/components/ui';
 import { MonthPicker } from '@/components/month-picker';
@@ -90,9 +91,16 @@ function AnalyticsInner() {
         actions={<MonthPicker month={month} onChange={setMonth} />}
       />
 
-      {/* ---------- The month, and its pace ---------- */}
-      <Card className="!p-5 sm:!p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+      {/* ---------- The month, and its pace ----------
+          The bloom takes the colour of the comparison beside the figure:
+          coral when the month is running ahead of the last, green when it is
+          running behind. */}
+      <Card
+        className={`!p-5 sm:!p-6 glow-card bloom-lg ${
+          f?.pace.deltaPct == null ? '' : f.pace.deltaPct > 0 ? 'bloom-danger' : 'bloom-credit'
+        }`}
+      >
+        <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
           <div>
             {f ? (
               <>
@@ -252,9 +260,10 @@ function AnalyticsInner() {
         </div>
       </Card>
 
-      {/* ---------- Headline figures ---------- */}
+      {/* ---------- Headline figures ----------
+          One surface split by hairlines. Four separate cards read as four
+          unrelated things; these are four readings of the same month. */}
       <StatStrip
-        split
         items={[
           {
             label: 'Daily average',
@@ -298,50 +307,11 @@ function AnalyticsInner() {
       */}
       <BudgetSection month={month} />
 
-      {/* ---------- Rhythm ---------- */}
-      <div>
-        <SectionHead label="Rhythm" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <Card>
-            <h3 className="text-[15px] font-semibold mb-1">What a weekday costs</h3>
-            {/* The denominator is every Thursday that has happened, not the
-                Thursdays you spent on — see the note in flow.ts. The caption
-                described the old, wrong one. */}
-            <p className="muted text-[12px] mb-4">
-              Total on each weekday, divided by how many of them have happened this month.
-            </p>
-            {f && f.weekday.some((w) => w.avgMinor > 0) ? (
-              <>
-                <PeakWeekday flow={f} lead />
-                <WeekdayBars data={f.weekday} />
-              </>
-            ) : (
-              <EmptyState title="No spending to place yet" />
-            )}
-          </Card>
-
-          <Card>
-            <h3 className="text-[15px] font-semibold mb-1">Day by day</h3>
-            <p className="muted text-[12px] mb-4">
-              Each bar is one calendar day; the gold one is the heaviest.
-            </p>
-            {f && daily.data?.items.length ? (
-              <>
-                <DayBars data={daily.data.items} monthDays={f.pace.monthDays} height={104} />
-                <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-                  <Mini label="Days spent" value={String(f.cadence.spendDays)} />
-                  <Mini label="Quiet days" value={String(f.cadence.quietDays)} />
-                  <Mini label="Longest quiet run" value={`${f.cadence.longestQuietRun}d`} />
-                </div>
-              </>
-            ) : (
-              <EmptyState title="Nothing logged this month" />
-            )}
-          </Card>
-        </div>
-      </div>
-
-      {/* ---------- Where it went ---------- */}
+      {/* ---------- Where it went ----------
+          Category and person are two ways of slicing the same month, so they
+          share one card — each half as tall as the taller, rather than two
+          cards ending at different heights. The person chips reshape the
+          category half only; they sit on it, not above both. */}
       <div>
         <SectionHead
           label="Where it went"
@@ -353,150 +323,379 @@ function AnalyticsInner() {
             ) : undefined
           }
         />
-
-        {/* The person filter reshapes the category view — the one place where
-            crossing the two dimensions is a question worth asking. */}
-        <div className="scroll-x flex gap-2 pb-2 mb-3 -mx-1 px-1">
-          <button className="chip shrink-0" data-selected={!filtered} onClick={() => setPersonIds([])}>
-            Everyone
-          </button>
-          {people.data?.items.map((p) => (
-            <button
-              key={p.id}
-              className="chip shrink-0"
-              data-selected={personIds.includes(p.id)}
-              onClick={() => setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))}
-            >
-              {p.name}
-            </button>
-          ))}
-          <button
-            className="chip shrink-0"
-            data-selected={personIds.includes('none')}
-            onClick={() =>
-              setPersonIds((x) => (x.includes('none') ? x.filter((y) => y !== 'none') : [...x, 'none']))
-            }
-          >
-            Nobody tagged
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <Card>
-            {!cats.data ? (
-              <ListSkeleton rows={5} />
-            ) : cats.data?.items.length ? (
-              <>
-                <div className="flex items-start justify-between gap-3 mb-5">
-                  <div>
-                    <h3 className="text-[15px] font-semibold">Where it went</h3>
-                    <p className="muted text-[12px] mt-0.5">Category distribution breakdown</p>
-                  </div>
-                  <span className="micro shrink-0">
-                    Top {Math.min(5, cats.data.items.length)} segments
-                  </span>
+        <Card className="!p-0 overflow-clip">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="p-4 sm:p-5 min-w-0">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-[15px] font-semibold">By category</h3>
+                  <p className="muted text-[12px] mt-0.5">Category distribution breakdown</p>
                 </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-7">
-                  <Donut
-                    ranked
-                    data={cats.data.items.slice(0, 6).map((c) => ({
-                      name: c.name,
-                      totalMinor: c.totalMinor,
-                      color: c.color,
-                    }))}
-                    size={160}
-                    centreLabel={filtered ? 'Filtered' : '100%'}
-                  />
-                  <SegmentLegend
-                    items={cats.data.items.slice(0, 5).map((c) => ({
-                      id: c.categoryId,
-                      name: c.name,
-                      totalMinor: c.totalMinor,
-                      share: c.share,
-                    }))}
-                    onPick={(id) => setDrill(cats.data!.items.find((c) => c.categoryId === id) ?? null)}
-                  />
-                </div>
-
-                {f && !filtered && (
-                  <div className="mt-5 pt-4 border-t space-y-3" style={{ borderColor: 'var(--border)' }}>
-                    <Insight tone={f.concentration.top3Share > 0.8 ? 'warn' : undefined}>
-                      Three categories carry{' '}
-                      <span className="num">{Math.round(f.concentration.top3Share * 100)}%</span> of the month, spread
-                      across <span className="num">{f.concentration.activeCategories}</span> in use.
-                    </Insight>
-                    <p className="muted text-[12px]">Tap a category to see the transactions behind it.</p>
-                  </div>
+                {cats.data && cats.data.items.length > 0 && (
+                  <span className="micro shrink-0">Top {Math.min(5, cats.data.items.length)} segments</span>
                 )}
-              </>
-            ) : (
-              <EmptyState title="No data for this period" />
-            )}
-          </Card>
+              </div>
 
-          {/*
-            ---------- Momentum ----------
-            Hidden in a first month. With nothing to compare against, every
-            category is "NEW" and the card is a list of the same word seven
-            times pretending to be an insight.
-          */}
-          {f && f.momentum.some((m) => !m.isNew) && (
-          <Card>
+              {/* The person filter reshapes the category view — the one place
+                  where crossing the two dimensions is a question worth asking. */}
+              <div className="scroll-x flex gap-2 pb-2 mb-4 -mx-1 px-1">
+                <button className="chip shrink-0" data-selected={!filtered} onClick={() => setPersonIds([])}>
+                  Everyone
+                </button>
+                {people.data?.items.map((p) => (
+                  <button
+                    key={p.id}
+                    className="chip shrink-0"
+                    data-selected={personIds.includes(p.id)}
+                    onClick={() =>
+                      setPersonIds((x) => (x.includes(p.id) ? x.filter((y) => y !== p.id) : [...x, p.id]))
+                    }
+                  >
+                    {p.name}
+                  </button>
+                ))}
+                <button
+                  className="chip shrink-0"
+                  data-selected={personIds.includes('none')}
+                  onClick={() =>
+                    setPersonIds((x) => (x.includes('none') ? x.filter((y) => y !== 'none') : [...x, 'none']))
+                  }
+                >
+                  Nobody tagged
+                </button>
+              </div>
+
+              {!cats.data ? (
+                <ListSkeleton rows={5} />
+              ) : cats.data.items.length ? (
+                <>
+                  <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-7">
+                    <Donut
+                      ranked
+                      data={cats.data.items.slice(0, 6).map((c) => ({
+                        name: c.name,
+                        totalMinor: c.totalMinor,
+                        color: c.color,
+                      }))}
+                      size={160}
+                      centreLabel={filtered ? 'Filtered' : '100%'}
+                    />
+                    <SegmentLegend
+                      items={cats.data.items.slice(0, 5).map((c) => ({
+                        id: c.categoryId,
+                        name: c.name,
+                        totalMinor: c.totalMinor,
+                        share: c.share,
+                      }))}
+                      onPick={(id) => setDrill(cats.data!.items.find((c) => c.categoryId === id) ?? null)}
+                    />
+                  </div>
+
+                  {f && !filtered && (
+                    <div className="mt-5 pt-4 border-t space-y-3" style={{ borderColor: 'var(--border)' }}>
+                      <Insight tone={f.concentration.top3Share > 0.8 ? 'warn' : undefined}>
+                        Three categories carry{' '}
+                        <span className="num">{Math.round(f.concentration.top3Share * 100)}%</span> of the month,
+                        spread across <span className="num">{f.concentration.activeCategories}</span> in use.
+                      </Insight>
+                      <p className="muted text-[12px]">Tap a category to see the transactions behind it.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <EmptyState compact title="No data for this period" />
+              )}
+            </div>
+
+            {/* ---------- Who it was with ---------- */}
+            <div
+              className="p-4 sm:p-5 min-w-0 border-t lg:border-t-0 lg:border-l"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <h3 className="text-[15px] font-semibold">Who it was with</h3>
+              <p className="muted text-[12px] mt-0.5 mb-4">Each person&rsquo;s share of the month</p>
+              {!ppl.data ? (
+                <ListSkeleton rows={5} />
+              ) : ppl.data.people.length ? (
+                <>
+                  <BreakdownList
+                    items={ppl.data.people.map((p) => ({
+                      id: p.personId,
+                      name: p.name,
+                      color: p.color,
+                      totalMinor: p.totalMinor,
+                      count: p.count,
+                    }))}
+                    onPick={openPerson}
+                  />
+                  {ppl.data.unassignedMinor > 0 && (
+                    <div
+                      className="flex items-baseline justify-between gap-3 mt-3 pt-3 border-t"
+                      style={{ borderColor: 'var(--border)' }}
+                    >
+                      <span className="text-[13px] muted">Nobody tagged</span>
+                      <Money minor={ppl.data.unassignedMinor} className="text-[13px] font-semibold" />
+                    </div>
+                  )}
+                  <p className="muted text-[12px] mt-4 leading-relaxed">
+                    Each person's share of the same{' '}
+                    <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. Category and person are two ways
+                    of slicing one month, and both partition it — a ₹75 dinner with three people puts ₹25 against each.
+                  </p>
+                </>
+              ) : (
+                <EmptyState compact title="No people tagged yet" />
+              )}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ---------- A closer look ----------
+          The weekday rhythm, the category trends and the ticket sizes are the
+          deeper reading of the month — asked less often than the hero or the
+          budgets, so they share one card and show one at a time. Each tab
+          keeps the gate its section always had. */}
+      <CloserLook flow={f} daily={daily.data?.items} openCategory={openCategory} />
+
+      {/* ---------- Money that is not spending ----------
+          Investing and lending are both kept out of every figure above, for
+          the same reason, so they explain themselves in one card. Each half
+          still appears only when there is something to report. */}
+      {((invest.data?.monthMinor ?? 0) > 0 || (f && f.ledger.entryCount > 0)) && (
+        <div>
+          <SectionHead label="Kept out of spending" />
+          <Card className="glow-card bloom-sm bloom-credit">
+            <div className="relative">
+            {(invest.data?.monthMinor ?? 0) > 0 && (
+              <div>
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <span className="label mb-0">Investing, separately</span>
+                  <Link href="/investments" className="micro micro-link" style={{ color: 'var(--accent)' }}>
+                    Open
+                  </Link>
+                </div>
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                  <Figure
+                    label={`Put in during ${monthLabel(month).split(' ')[0]}`}
+                    value={formatINR(invest.data!.monthMinor)}
+                    tone="var(--credit)"
+                  />
+                  <Figure label="Lifetime" value={formatINR(invest.data!.lifetimeMinor)} />
+                  <Figure
+                    label="Share of outgoings"
+                    value={`${Math.round(
+                      (invest.data!.monthMinor /
+                        Math.max(1, invest.data!.monthMinor + invest.data!.monthSpendingMinor)) *
+                        100,
+                    )}%`}
+                    sub="of everything that left"
+                  />
+                </div>
+                <p className="muted text-[12px] mt-3 leading-relaxed max-w-2xl">
+                  Excluded from every figure above. Money into an investment left the current account but not your net
+                  worth, so counting it as spending would make the pace, the projection and the month-over-month
+                  comparison all wrong.
+                </p>
+              </div>
+            )}
+
+            {f && f.ledger.entryCount > 0 && (
+              <div
+                className={(invest.data?.monthMinor ?? 0) > 0 ? 'mt-5 pt-4 border-t' : ''}
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="label mb-3 block">Lending, separately</span>
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                  <Figure label="Lent out" value={formatINR(f.ledger.lentMinor)} tone="var(--rule-red)" />
+                  <Figure label="Received" value={formatINR(f.ledger.borrowedMinor)} tone="var(--credit)" />
+                  <Figure
+                    label="Net movement"
+                    value={formatINR(Math.abs(f.ledger.netMinor))}
+                    sub={f.ledger.netMinor >= 0 ? 'out of pocket' : 'into pocket'}
+                  />
+                </div>
+                <p className="muted text-[12px] mt-3 leading-relaxed max-w-2xl">
+                  None of this is counted as spending. Money lent is still yours, and money borrowed was never yours —
+                  mixing either into a month total is how a spreadsheet starts lying.
+                </p>
+              </div>
+            )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* The long view moved to /analytics/lifetime — twelve months of bars and
+          six months of savings rate were never month-scoped, and stranding them
+          on a page with a month picker made the picker look broken. A pointer,
+          not a section, so it is drawn as one line. */}
+      <Link
+        href="/analytics/lifetime"
+        className="row flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 px-4 py-3 rounded-xl"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      >
+        <span className="min-w-0">
+          <span className="label mb-0 block">Trends live on their own page</span>
+          <span className="muted text-[12px] block mt-0.5 leading-relaxed">
+            Spending by month, what you keep, category totals and year-on-year — none of it changes with the month
+            picker, so none of it belongs here.
+          </span>
+        </span>
+        <span className="micro shrink-0" style={{ color: 'var(--accent)' }}>
+          Open Lifetime →
+        </span>
+      </Link>
+
+      <CategoryDrilldown
+        category={drill}
+        start={start}
+        end={end}
+        personIds={personIds}
+        onClose={() => setDrill(null)}
+      />
+    </div>
+  );
+}
+
+
+/**
+ * The deeper reading of the month, one tab at a time. A tab exists only when
+ * its section would have been drawn — Category trends is withheld in a first
+ * month, Entry sizes in a month with no entries — so a tab is never a door
+ * to an empty room.
+ */
+function CloserLook({
+  flow: f,
+  daily,
+  openCategory,
+}: {
+  flow: Flow | undefined;
+  daily: { date: string; totalMinor: number }[] | undefined;
+  openCategory: (id: string) => void;
+}) {
+  type Tab = 'rhythm' | 'trends' | 'sizes';
+  const [tab, setTab] = useState<Tab>('rhythm');
+
+  const options: { value: Tab; label: string }[] = [{ value: 'rhythm', label: 'Rhythm' }];
+  if (f && f.momentum.some((m) => !m.isNew)) options.push({ value: 'trends', label: 'Category trends' });
+  if (f && f.tickets.count > 0) options.push({ value: 'sizes', label: 'Entry sizes' });
+  // A month change can take the open tab away; fall back rather than go blank.
+  const active: Tab = options.some((o) => o.value === tab) ? tab : 'rhythm';
+
+  return (
+    <div>
+      <SectionHead label="A closer look" />
+      <Card className="!p-0 overflow-clip">
+        {options.length > 1 && (
+          <div className="px-4 sm:px-5 pt-4 sm:pt-5 scroll-x">
+            <Segmented options={options} value={active} onChange={setTab} />
+          </div>
+        )}
+
+        {active === 'rhythm' && (
+          /* Two halves of one card, stretched to the same height. The chart
+             takes whatever height is left over, so the figures under it sit
+             on the same line as the weekday axis instead of floating under a
+             short chart with a gap below. */
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="p-4 sm:p-5 min-w-0 flex flex-col">
+              <h3 className="text-[15px] font-semibold mb-1">What a weekday costs</h3>
+              {/* The denominator is every Thursday that has happened, not the
+                  Thursdays you spent on — see the note in flow.ts. */}
+              <p className="muted text-[12px] mb-4">
+                Total on each weekday, divided by how many of them have happened this month.
+              </p>
+              {f && f.weekday.some((w) => w.avgMinor > 0) ? (
+                <div className="mt-auto">
+                  <PeakWeekday flow={f} lead />
+                  <WeekdayBars data={f.weekday} />
+                </div>
+              ) : (
+                <EmptyState compact title="No spending to place yet" />
+              )}
+            </div>
+
+            <div
+              className="p-4 sm:p-5 min-w-0 flex flex-col border-t lg:border-t-0 lg:border-l"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <h3 className="text-[15px] font-semibold mb-1">Day by day</h3>
+              <p className="muted text-[12px] mb-4">Each bar is one calendar day; the gold one is the heaviest.</p>
+              {f && daily?.length ? (
+                <>
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <DayBars
+                      fill
+                      data={daily}
+                      monthDays={f.pace.monthDays}
+                      days={f.isCurrentMonth ? f.pace.elapsedDays : f.pace.monthDays}
+                      /* A handful of spending days does not need a tall chart
+                         to say so; the floor drops rather than the canvas
+                         standing mostly empty. */
+                      height={f.cadence.spendDays <= 5 ? 64 : 104}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                    <Mini label="Days spent" value={String(f.cadence.spendDays)} />
+                    <Mini label="Quiet days" value={String(f.cadence.quietDays)} />
+                    <Mini label="Longest quiet run" value={`${f.cadence.longestQuietRun}d`} />
+                  </div>
+                </>
+              ) : (
+                <EmptyState compact title="Nothing logged this month" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {active === 'trends' && f && (
+          <div className="p-4 sm:p-5">
             <h3 className="text-[15px] font-semibold mb-1">Heating up, cooling down</h3>
             <p className="muted text-[12px] mb-4">
               This month against the average of the three before it. Right of the line is more than usual.
             </p>
-            {f?.momentum.length ? (
-              <ul className="space-y-3">
-                {f.momentum.slice(0, 7).map((m) => {
-                  const max = Math.max(...f.momentum.map((x) => Math.abs(x.deltaMinor)), 1);
-                  return (
-                    <li key={m.categoryId}>
-                      <button
-                        className="w-full text-left group"
-                        onClick={() => openCategory(m.categoryId)}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <CategoryIcon icon={m.icon} color={m.color} size={22} />
-                          <span className="text-[13px] font-medium truncate flex-1">{m.name}</span>
-                          {m.isNew ? (
-                            <span className="micro" style={{ color: 'var(--hi)' }}>
-                              new
-                            </span>
-                          ) : (
-                            <Delta pct={m.deltaPct} />
-                          )}
-                          <span
-                            className="num text-[12px] font-semibold w-20 text-right"
-                            style={{ color: m.deltaMinor > 0 ? 'var(--rule-red)' : 'var(--credit)' }}
-                          >
-                            {m.deltaMinor > 0 ? '+' : '−'}
-                            {formatINR(Math.abs(m.deltaMinor))}
+            <ul className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-3">
+              {f.momentum.slice(0, 7).map((m) => {
+                const max = Math.max(...f.momentum.map((x) => Math.abs(x.deltaMinor)), 1);
+                return (
+                  <li key={m.categoryId}>
+                    <button
+                      className="w-full text-left group"
+                      onClick={() => openCategory(m.categoryId)}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <CategoryIcon icon={m.icon} color={m.color} size={22} />
+                        <span className="text-[13px] font-medium truncate flex-1">{m.name}</span>
+                        {m.isNew ? (
+                          <span className="micro" style={{ color: 'var(--hi)' }}>
+                            new
                           </span>
-                        </div>
-                        <div className="mt-1.5">
-                          <DeltaBar value={m.deltaMinor} max={max} />
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <EmptyState title="Nothing to compare yet" hint="Momentum needs a month or two of history." />
-            )}
-          </Card>
-          )}
-        </div>
-      </div>
+                        ) : (
+                          <Delta pct={m.deltaPct} />
+                        )}
+                        <span
+                          className="num text-[12px] font-semibold w-20 text-right"
+                          style={{ color: m.deltaMinor > 0 ? 'var(--rule-red)' : 'var(--credit)' }}
+                        >
+                          {m.deltaMinor > 0 ? '+' : '−'}
+                          {formatINR(Math.abs(m.deltaMinor))}
+                        </span>
+                      </div>
+                      <div className="mt-1.5">
+                        <DeltaBar value={m.deltaMinor} max={max} />
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
-      {/* ---------- Ticket sizes ---------- */}
-      {f && f.tickets.count > 0 && (
-        <div>
-          <SectionHead label="How the money leaves" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-            <Card>
+        {active === 'sizes' && f && (
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="p-4 sm:p-5 min-w-0">
               <div className="grid grid-cols-2 gap-5">
                 <div>
                   <p className="label mb-1.5">Typical entry</p>
@@ -540,11 +739,14 @@ function AnalyticsInner() {
                   of the money.
                 </p>
               </div>
-            </Card>
+            </div>
 
-            <Card>
+            <div
+              className="p-4 sm:p-5 min-w-0 border-t lg:border-t-0 lg:border-l"
+              style={{ borderColor: 'var(--border)' }}
+            >
               <h3 className="text-[15px] font-semibold mb-1">Things you bought more than once</h3>
-              <p className="muted text-[12px] mb-4">Matched on the note, ignoring case.</p>
+              <p className="muted text-[12px] mb-3">Matched on the note, ignoring case.</p>
               {f.repeats.length ? (
                 <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
                   {f.repeats.map((r) => (
@@ -560,142 +762,36 @@ function AnalyticsInner() {
                   ))}
                 </ul>
               ) : (
-                <EmptyState title="No repeats this month" hint="Notes that appear twice or more show up here." />
+                <EmptyState compact title="No repeats this month" hint="Notes that appear twice or more show up here." />
               )}
-            </Card>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* ---------- Who it was with ---------- */}
-      <div>
-        <SectionHead label="Who it was with" />
-        <Card>
-          {!ppl.data ? (
-            <ListSkeleton rows={5} />
-          ) : ppl.data?.people.length ? (
-            <>
-              <BreakdownList
-                items={ppl.data.people.map((p) => ({
-                  id: p.personId,
-                  name: p.name,
-                  color: p.color,
-                  totalMinor: p.totalMinor,
-                  count: p.count,
-                }))}
-                onPick={openPerson}
-              />
-              {ppl.data.unassignedMinor > 0 && (
-                <div
-                  className="flex items-baseline justify-between gap-3 mt-3 pt-3 border-t"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <span className="text-[13px] muted">Nobody tagged</span>
-                  <Money minor={ppl.data.unassignedMinor} className="text-[13px] font-semibold" />
-                </div>
-              )}
-              <p className="muted text-[12px] mt-4 leading-relaxed">
-                Each person's share of the same{' '}
-                <span className="num">{formatINR(ppl.data.grandTotalMinor)}</span>. Category and person are two ways
-                of slicing one month, and both partition it — a ₹75 dinner with three people puts ₹25 against each.
-              </p>
-            </>
-          ) : (
-            <EmptyState title="No people tagged yet" />
-          )}
-        </Card>
-      </div>
-
-      {/* ---------- Money that is not spending ---------- */}
-      {(invest.data?.monthMinor ?? 0) > 0 && (
-        <div>
-          <SectionHead
-            label="Investing, separately"
-            action={
-              <Link href="/investments" className="micro micro-link" style={{ color: 'var(--accent)' }}>
-                Open
-              </Link>
-            }
-          />
-          <StatStrip
-            cols={3}
-            items={[
-              { label: `Put in during ${monthLabel(month).split(' ')[0]}`, minor: invest.data!.monthMinor, tone: 'var(--credit)' },
-              { label: 'Lifetime', minor: invest.data!.lifetimeMinor },
-              {
-                label: 'Share of outgoings',
-                value: `${Math.round(
-                  (invest.data!.monthMinor / Math.max(1, invest.data!.monthMinor + invest.data!.monthSpendingMinor)) *
-                    100,
-                )}%`,
-                sub: 'of everything that left',
-              },
-            ]}
-          />
-          <p className="muted text-[12px] mt-3 leading-relaxed max-w-2xl">
-            Excluded from every figure above. Money into an investment left the current account but not your net
-            worth, so counting it as spending would make the pace, the projection and the month-over-month comparison
-            all wrong.
-          </p>
-        </div>
-      )}
-
-      {f && f.ledger.entryCount > 0 && (
-        <div>
-          <SectionHead label="Lending, separately" />
-          <StatStrip
-            cols={3}
-            items={[
-              { label: 'Lent out', minor: f.ledger.lentMinor, tone: 'var(--rule-red)' },
-              { label: 'Received', minor: f.ledger.borrowedMinor, tone: 'var(--credit)' },
-              {
-                label: 'Net movement',
-                minor: Math.abs(f.ledger.netMinor),
-                sub: f.ledger.netMinor >= 0 ? 'out of pocket' : 'into pocket',
-              },
-            ]}
-          />
-          <p className="muted text-[12px] mt-3 leading-relaxed max-w-2xl">
-            None of this is counted as spending. Money lent is still yours, and money borrowed was never yours — mixing
-            either into a month total is how a spreadsheet starts lying.
-          </p>
-        </div>
-      )}
-
-      {/* The long view moved to /analytics/lifetime — twelve months of bars and
-          six months of savings rate were never month-scoped, and stranding them
-          on a page with a month picker made the picker look broken. */}
-      <div>
-        <SectionHead label="The longer view" />
-        <Card>
-          <EmptyState
-            title="Trends live on their own page"
-            hint="Spending by month, what you keep, category totals and year-on-year — none of it changes with the month picker, so none of it belongs here."
-            action={
-              <Link href="/analytics/lifetime" className="btn btn-primary">
-                Open Lifetime
-              </Link>
-            }
-          />
-        </Card>
-      </div>
-
-      <CategoryDrilldown
-        category={drill}
-        start={start}
-        end={end}
-        personIds={personIds}
-        onClose={() => setDrill(null)}
-      />
+        )}
+      </Card>
     </div>
   );
 }
 
+/** A figure with its label, for a section of a card rather than a strip. */
+function Figure({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="min-w-0">
+      {/* Two lines reserved on a phone, where labels wrap at two columns. */}
+      <p className="label mb-1.5 leading-[1.35] min-h-[1.85rem] sm:min-h-0">{label}</p>
+      <p className="num text-[17px] sm:text-xl font-semibold truncate" style={tone ? { color: tone } : undefined}>
+        {value}
+      </p>
+      {sub && <p className="muted text-[11px] mt-1 truncate">{sub}</p>}
+    </div>
+  );
+}
 
 function Mini({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="label mb-1">{label}</p>
+    <div className="min-w-0">
+      {/* Two lines reserved whether needed or not — "Longest quiet run" wraps
+          on a phone, and its figure should not drop below its neighbours'. */}
+      <p className="label mb-1 leading-[1.35] min-h-[1.85rem]">{label}</p>
       <p className="num text-lg font-semibold">{value}</p>
     </div>
   );
