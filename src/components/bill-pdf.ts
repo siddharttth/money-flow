@@ -330,9 +330,10 @@ async function render(s: Statement): Promise<void> {
   doc.saveGraphicsState();
   doc.setGState(new GState({ opacity: 0.85 }));
   doc.setFillColor(...LEAF);
-  doc.lines([[34, 0], [-40, 58], [-34, 0]], PAGE_W - M - 58, 118, [1, 1], 'F', true);
+  // Same top and bottom as the left-hand shapes, so the band reads as one.
+  doc.lines([[34, 0], [-46, sh], [-34, 0]], PAGE_W - M - 58, sy, [1, 1], 'F', true);
   doc.setFillColor(...BLUSH);
-  doc.triangle(PAGE_W - M, 118, PAGE_W - M, 176, PAGE_W - M - 34, 176, 'F');
+  doc.triangle(PAGE_W - M, sy, PAGE_W - M, sy + sh, PAGE_W - M - 38, sy + sh, 'F');
   doc.restoreGraphicsState();
 
   /* ---------- the headline, as the equation it is ---------- */
@@ -398,6 +399,7 @@ async function render(s: Statement): Promise<void> {
   font('normal', 7.5, FAINT);
   const labelSlot = Math.max(0, ...rows.map((r) => doc.getTextWidth(r.label)));
   const labelGap = labelSlot ? AMT.labelGap : 0;
+  const everyRowLabelled = rows.every((r) => r.label);
   font('bold', 10, INK);
   const widestFigure = Math.max(...rows.map((r) => doc.getTextWidth(r.figure)));
   const amountColW = Math.max(112, AMT.pad * 2 + AMT.markW + AMT.markGap + widestFigure + labelGap + labelSlot);
@@ -480,9 +482,12 @@ async function render(s: Statement): Promise<void> {
       const figureRight = labelX - labelGap; // every figure ends here
       const markX = figureRight - widestFigure - AMT.markGap; // one column of marks
       if (d.section === 'head') {
-        // Centred over mark, figure and label together.
+        // Centred over what every row has: mark, figure, and the label only
+        // when every row carries one ("got"/"gave"). An occasional "₹520 ÷ 2"
+        // would otherwise pull the heading over mostly empty space.
+        const right = everyRowLabelled ? labelX + labelSlot : figureRight;
         font('bold', 8.5, INK);
-        doc.text(s.amountHead, (markX - AMT.markW / 2 + labelX + labelSlot) / 2, mid + 3, { align: 'center' });
+        doc.text(s.amountHead, (markX - AMT.markW / 2 + right) / 2, mid + 3, { align: 'center' });
         return;
       }
       if (d.section !== 'body') return;
