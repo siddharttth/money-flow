@@ -1,9 +1,9 @@
 'use client';
 
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
-import { useGrowClass } from './motion';
+import { useGrowClass, useReducedMotion } from './motion';
 
 /**
  * Every chart in the app, hand-drawn in SVG.
@@ -673,10 +673,22 @@ export function MonthBars({
  * one is obviously the biggest. AREA is proportional to the amount, not
  * radius, or a category twice the size would look four times as big.
  *
- * Laid out deterministically rather than by a force simulation: the leader
- * sits centred and the rest ring it clockwise by size. A simulation would move
- * on every render and animate for no reason.
+ * They start laid out deterministically — the leader centred, the rest
+ * ringing it clockwise by size — and stay still until touched. Then they are
+ * things to play with: grab one and throw it, or flick it with a passing
+ * cursor, and it bounces off the walls of its box and off the others, then
+ * settles. The loop runs only while something moves and writes transforms
+ * straight to the DOM, so a thrown bubble never re-renders the dashboard.
+ * Reduced motion keeps the dragging and drops the throw and the flick.
  */
+type Bubble = { name: string; totalMinor: number; color: string; r: number; x: number; y: number };
+type Body = { x: number; y: number; vx: number; vy: number; r: number; m: number };
+
+const FRAME = 1000 / 60; // velocities are in px per 60 Hz frame
+const BOUNCE = 0.82; // energy kept off a wall or another bubble
+const DRAG_AIR = 0.985; // per frame; a throw crosses the box, then settles
+const MAX_SPEED = 38;
+
 export function CategoryBubbles({
   data,
   size = 240,
@@ -684,69 +696,293 @@ export function CategoryBubbles({
   data: { name: string; totalMinor: number; color: string }[];
   size?: number;
 }) {
+  const reduced = useReducedMotion();
   const top = data.filter((d) => d.totalMinor > 0).slice(0, 5);
   const total = top.reduce((s, d) => s + d.totalMinor, 0);
-  if (!top.length || total <= 0) return null;
 
-  const [lead, ...rest] = top;
-  const cx = size / 2;
-  const cy = size / 2;
-  const leadR = size * 0.235;
+  /* x is measured from the box's centre line, y from its top, so the layout
+     is right before the box has been measured — and stays centred after. */
+  const bubbles: Bubble[] = [];
+  if (top.length && total > 0) {
+    const [lead, ...rest] = top;
+    const leadR = size * 0.235;
+    /* Radius from area: r = R·√(share / leadShare), floored so a 2% slice is
+       still a legible disc rather than a dot. */
+    const radiusFor = (minor: number) =>
+      Math.max(size * 0.085, leadR * Math.sqrt(minor / lead.totalMinor));
+    const orbit = size * 0.375;
+    rest.forEach((d, i) => {
+      const angle = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(rest.length, 1) + Math.PI / 5;
+      bubbles.push({ ...d, r: radiusFor(d.totalMinor), x: Math.cos(angle) * orbit, y: size / 2 + Math.sin(angle) * orbit });
+    });
+    // The leader last, so it layers above anything that crowds it.
+    bubbles.push({ ...lead, r: leadR, x: 0, y: size / 2 });
+  }
+  const layoutKey = `${size}|${bubbles.map((b) => `${b.name}:${b.totalMinor}`).join('|')}`;
 
-  /* Radius from area: r = R·√(share / leadShare), floored so a 2% slice is
-     still a legible disc rather than a dot. */
-  const radiusFor = (minor: number) =>
-    Math.max(size * 0.085, leadR * Math.sqrt(minor / lead.totalMinor));
+  const box = useRef<HTMLDivElement>(null);
+  const nodes = useRef<(HTMLSpanElement | null)[]>([]);
+  const bodies = useRef<Body[]>([]);
+  const frame = useRef(0);
+  const last = useRef(0);
+  const held = useRef<{ i: number; ox: number; oy: number; px: number; py: number; t: number; vx: number; vy: number } | null>(null);
+  const hover = useRef<{ px: number; py: number; t: number } | null>(null);
 
-  const orbit = size * 0.375;
-  const placed = rest.map((d, i) => {
-    const angle = (-Math.PI / 2) + (i * 2 * Math.PI) / Math.max(rest.length, 1) + Math.PI / 5;
-    return { ...d, r: radiusFor(d.totalMinor), x: cx + Math.cos(angle) * orbit, y: cy + Math.sin(angle) * orbit };
-  });
+  // New numbers, new layout: the bodies start over from it, as the DOM does.
+  useEffect(() => {
+    bodies.current = bubbles.map((b) => ({ x: b.x, y: b.y, vx: 0, vy: 0, r: b.r, m: b.r * b.r }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialised layout
+  }, [layoutKey]);
 
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // A narrower box pulls stray bubbles back inside it.
+    const ro = new ResizeObserver(() => wake());
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once; wake reads only refs
+  }, []);
+
+  function wake() {
+    if (frame.current) return;
+    last.current = performance.now();
+    frame.current = requestAnimationFrame(tick);
+  }
+
+  function walls() {
+    const el = box.current!;
+    return { half: el.clientWidth / 2, height: el.clientHeight };
+  }
+
+  function place(i: number) {
+    const b = bodies.current[i];
+    const node = nodes.current[i];
+    if (node) node.style.transform = `translate(${b.x - b.r}px, ${b.y - b.r}px)`;
+  }
+
+  function tick(now: number) {
+    const bs = bodies.current;
+    if (!box.current || !bs.length) {
+      frame.current = 0;
+      return;
+    }
+    const dt = Math.min(2, (now - last.current) / FRAME);
+    last.current = now;
+    const { half, height } = walls();
+    const grabbed = held.current?.i ?? -1;
+    const air = Math.pow(DRAG_AIR, dt);
+
+    bs.forEach((b, i) => {
+      if (i === grabbed) return;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      // Slow bubbles drag harder, so a throw ends in a settle, not a creep.
+      const k = Math.hypot(b.vx, b.vy) < 1.5 ? air * Math.pow(0.93, dt) : air;
+      b.vx *= k;
+      b.vy *= k;
+    });
+
+    // Bubble against bubble: pushed apart by mass, then an elastic bounce
+    // along the line between centres. A held bubble is immovable — it
+    // shoves, it is not shoved.
+    let crowded = false;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let a = 0; a < bs.length; a++) {
+        for (let c = a + 1; c < bs.length; c++) {
+          const A = bs[a];
+          const C = bs[c];
+          const dx = C.x - A.x;
+          const dy = C.y - A.y;
+          const dist = Math.hypot(dx, dy) || 0.01;
+          const overlap = A.r + C.r - dist;
+          if (overlap <= 0) continue;
+          if (overlap > 0.5) crowded = true;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const ia = a === grabbed ? 0 : 1 / A.m;
+          const ic = c === grabbed ? 0 : 1 / C.m;
+          const sum = ia + ic;
+          if (!sum) continue;
+          A.x -= (nx * overlap * ia) / sum;
+          A.y -= (ny * overlap * ia) / sum;
+          C.x += (nx * overlap * ic) / sum;
+          C.y += (ny * overlap * ic) / sum;
+          const closing = (C.vx - A.vx) * nx + (C.vy - A.vy) * ny;
+          if (pass === 0 && closing < 0) {
+            const j = (-(1 + BOUNCE) * closing) / sum;
+            A.vx -= j * ia * nx;
+            A.vy -= j * ia * ny;
+            C.vx += j * ic * nx;
+            C.vy += j * ic * ny;
+          }
+        }
+      }
+    }
+
+    let moving = grabbed >= 0 || crowded;
+    bs.forEach((b, i) => {
+      if (i !== grabbed) {
+        if (b.x - b.r < -half) { b.x = -half + b.r; b.vx = Math.abs(b.vx) * BOUNCE; }
+        if (b.x + b.r > half) { b.x = half - b.r; b.vx = -Math.abs(b.vx) * BOUNCE; }
+        if (b.y - b.r < 0) { b.y = b.r; b.vy = Math.abs(b.vy) * BOUNCE; }
+        if (b.y + b.r > height) { b.y = height - b.r; b.vy = -Math.abs(b.vy) * BOUNCE; }
+        if (Math.hypot(b.vx, b.vy) < 0.04) { b.vx = 0; b.vy = 0; } else moving = true;
+      }
+      place(i);
+    });
+
+    frame.current = moving ? requestAnimationFrame(tick) : 0;
+  }
+
+  /** The pointer, in body coordinates. */
+  function at(e: React.PointerEvent) {
+    const r = box.current!.getBoundingClientRect();
+    return { px: e.clientX - r.left - r.width / 2, py: e.clientY - r.top };
+  }
+
+  function grab(i: number, e: React.PointerEvent<HTMLSpanElement>) {
+    const b = bodies.current[i];
+    if (!b || e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const { px, py } = at(e);
+    held.current = { i, ox: b.x - px, oy: b.y - py, px, py, t: e.timeStamp, vx: 0, vy: 0 };
+    b.vx = 0;
+    b.vy = 0;
+    const node = nodes.current[i];
+    if (node) {
+      node.dataset.held = '';
+      node.style.zIndex = '2';
+    }
+    wake();
+  }
+
+  function move(i: number, e: React.PointerEvent<HTMLSpanElement>) {
+    const h = held.current;
+    if (!h || h.i !== i) return;
+    const b = bodies.current[i];
+    const { px, py } = at(e);
+    const { half, height } = walls();
+    // Throw speed is the pointer's, smoothed over the last few moves.
+    const k = FRAME / Math.max(1, e.timeStamp - h.t);
+    h.vx = h.vx * 0.4 + (px - h.px) * k * 0.6;
+    h.vy = h.vy * 0.4 + (py - h.py) * k * 0.6;
+    h.px = px;
+    h.py = py;
+    h.t = e.timeStamp;
+    b.x = Math.min(half - b.r, Math.max(-half + b.r, px + h.ox));
+    b.y = Math.min(height - b.r, Math.max(b.r, py + h.oy));
+    b.vx = h.vx;
+    b.vy = h.vy;
+    wake();
+  }
+
+  function release(i: number, e: React.PointerEvent<HTMLSpanElement>) {
+    const h = held.current;
+    if (!h || h.i !== i) return;
+    const b = bodies.current[i];
+    // Held still before letting go is a drop, not a throw.
+    const paused = e.timeStamp - h.t > 80;
+    const speed = Math.hypot(h.vx, h.vy);
+    const scale = reduced || paused ? 0 : Math.min(1, MAX_SPEED / (speed || 1));
+    b.vx = h.vx * scale;
+    b.vy = h.vy * scale;
+    held.current = null;
+    const node = nodes.current[i];
+    if (node) {
+      delete node.dataset.held;
+      node.style.zIndex = '';
+    }
+    wake();
+  }
+
+  // A cursor passing through a bubble nudges it along the way it was going.
+  function flick(e: React.PointerEvent<HTMLDivElement>) {
+    if (reduced || held.current || e.pointerType !== 'mouse') return;
+    const { px, py } = at(e);
+    const prev = hover.current;
+    hover.current = { px, py, t: e.timeStamp };
+    if (!prev) return;
+    const k = FRAME / Math.max(1, e.timeStamp - prev.t);
+    const vx = (px - prev.px) * k;
+    const vy = (py - prev.py) * k;
+    if (Math.hypot(vx, vy) < 1.5) return;
+    let nudged = false;
+    for (const b of bodies.current) {
+      if (Math.hypot(px - b.x, py - b.y) > b.r) continue;
+      b.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vx + vx * 0.3));
+      b.vy = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, b.vy + vy * 0.3));
+      nudged = true;
+    }
+    if (nudged) wake();
+  }
+
+  if (!bubbles.length) return null;
+  const leadIndex = bubbles.length - 1;
   const pct = (minor: number) => Math.round((minor / total) * 100);
 
   return (
-    <div className="relative mx-auto shrink-0" style={{ width: size, height: size }}>
-      {placed.map((d) => (
-        <span
-          key={d.name}
-          title={`${d.name}: ${formatINR(d.totalMinor)}`}
-          className="absolute rounded-full flex flex-col items-center justify-center text-center leading-none"
-          style={{
-            width: d.r * 2,
-            height: d.r * 2,
-            left: d.x - d.r,
-            top: d.y - d.r,
-            background: `color-mix(in oklab, ${d.color} 26%, var(--surface-2))`,
-            border: `1px solid color-mix(in oklab, ${d.color} 45%, transparent)`,
-          }}
-        >
-          <span className="num text-[12px] font-bold">{pct(d.totalMinor)}%</span>
-          <span className="text-[9px] muted truncate max-w-[85%] mt-0.5">{d.name}</span>
-        </span>
-      ))}
-
-      {/* The leader last, so it layers above anything that crowds it. */}
-      <span
-        title={`${lead.name}: ${formatINR(lead.totalMinor)}`}
-        className="absolute rounded-full flex flex-col items-center justify-center text-center leading-none"
-        style={{
-          width: leadR * 2,
-          height: leadR * 2,
-          left: cx - leadR,
-          top: cy - leadR,
-          background: `color-mix(in oklab, ${lead.color} 55%, var(--surface))`,
-          border: `1px solid ${lead.color}`,
-          boxShadow: `0 0 28px -6px color-mix(in oklab, ${lead.color} 55%, transparent)`,
-        }}
-      >
-        <span className="num text-[20px] font-bold">{pct(lead.totalMinor)}%</span>
-        <span className="text-[10px] font-semibold truncate max-w-[80%] mt-0.5">{lead.name}</span>
-        <span className="num text-[10px] muted mt-0.5">
-          {formatINR(lead.totalMinor, { compact: lead.totalMinor > 99_999 })}
-        </span>
-      </span>
+    <div
+      ref={box}
+      className="relative w-full select-none"
+      style={{ height: size }}
+      onPointerMove={flick}
+      onPointerLeave={() => (hover.current = null)}
+    >
+      {bubbles.map((d, i) => {
+        const isLead = i === leadIndex;
+        return (
+          <span
+            key={d.name}
+            ref={(n) => {
+              nodes.current[i] = n;
+            }}
+            title={`${d.name}: ${formatINR(d.totalMinor)}`}
+            className="group absolute left-1/2 top-0 cursor-grab data-[held]:cursor-grabbing will-change-transform"
+            style={{ width: d.r * 2, height: d.r * 2, transform: `translate(${d.x - d.r}px, ${d.y - d.r}px)`, touchAction: 'none' }}
+            onPointerDown={(e) => grab(i, e)}
+            onPointerMove={(e) => move(i, e)}
+            onPointerUp={(e) => release(i, e)}
+            onPointerCancel={(e) => release(i, e)}
+          >
+            <span
+              className="w-full h-full rounded-full flex flex-col items-center justify-center text-center leading-none transition-transform duration-200 group-hover:scale-[1.04] group-data-[held]:scale-[1.08]"
+              style={
+                isLead
+                  ? {
+                      background: `color-mix(in oklab, ${d.color} 55%, var(--surface))`,
+                      border: `1px solid ${d.color}`,
+                      boxShadow: `0 0 28px -6px color-mix(in oklab, ${d.color} 55%, transparent)`,
+                    }
+                  : {
+                      background: `color-mix(in oklab, ${d.color} 26%, var(--surface-2))`,
+                      border: `1px solid color-mix(in oklab, ${d.color} 45%, transparent)`,
+                    }
+              }
+            >
+              {isLead ? (
+                <>
+                  <span className="num text-[20px] font-bold">{pct(d.totalMinor)}%</span>
+                  <span className="text-[10px] font-semibold truncate max-w-[80%] mt-0.5">{d.name}</span>
+                  <span className="num text-[10px] muted mt-0.5">
+                    {formatINR(d.totalMinor, { compact: d.totalMinor > 99_999 })}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="num text-[12px] font-bold">{pct(d.totalMinor)}%</span>
+                  <span className="text-[9px] muted truncate max-w-[85%] mt-0.5">{d.name}</span>
+                </>
+              )}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }
