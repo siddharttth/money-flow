@@ -109,6 +109,7 @@ const M = 44;
 const SIDE_W = 128; // the particulars column
 const MAIN_X = M + SIDE_W + 18; // where the statement proper begins
 const FOOT = 60; // reserved at the bottom of every page
+const TABLE_TOP = 70; // where a continued page starts
 
 /** One line of the table. The amount cell is drawn by hand from these parts. */
 type Row = {
@@ -185,7 +186,7 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
       const out = e.direction === 'out';
       return {
         date: e.entryDate,
-        subject: e.note?.trim() || (out ? 'Lent' : 'Borrowed'),
+        subject: capitalise(e.note?.trim() || (out ? 'Lent' : 'Borrowed')),
         figure: formatINR(e.amountMinor),
         label: out ? 'gave' : 'got',
         mark: { kind: 'arrow', up: out, color: out ? RED : GREEN },
@@ -243,8 +244,8 @@ export async function downloadExpenseBill(input: ExpenseBillInput): Promise<void
     amountHead: 'Share',
     rows: rows.map((e) => ({
       date: e.expenseDate,
-      subject: e.category.name,
-      detail: e.note?.trim() || undefined,
+      subject: capitalise(e.category.name),
+      detail: capitalise(e.note?.trim() ?? '') || undefined,
       figure: formatINR(e.shareMinor),
       label: e.participants > 1 ? `${formatINR(e.amountMinor)} ÷ ${e.participants}` : '',
       mark: { kind: 'dot', color: /^#[0-9a-f]{6}$/i.test(e.category.color) ? hex(e.category.color) : FAINT },
@@ -396,7 +397,7 @@ async function render(s: Statement): Promise<void> {
    * widest figure in the statement — not each hugging its own.
    */
   const AMT = { pad: 10, labelGap: 7, markGap: 11, markW: 7 };
-  font('normal', 7.5, FAINT);
+  font('normal', 7.5, MUTED);
   const labelSlot = Math.max(0, ...rows.map((r) => doc.getTextWidth(r.label)));
   const labelGap = labelSlot ? AMT.labelGap : 0;
   const everyRowLabelled = rows.every((r) => r.label);
@@ -405,10 +406,11 @@ async function render(s: Statement): Promise<void> {
   const amountColW = Math.max(112, AMT.pad * 2 + AMT.markW + AMT.markGap + widestFigure + labelGap + labelSlot);
   const SUBJECT = { size: 9.5, lead: 9.5 * 1.15 };
   const subjectLines = new Map<number, { lines: string[]; strong: number }>();
+  const tableBottom = new Map<number, number>(); // page → where the table stops on it
 
   autoTable(doc, {
     startY: secY + 22,
-    margin: { left: tableX, right: M, top: 70, bottom: FOOT + 10 },
+    margin: { left: tableX, right: M, top: TABLE_TOP, bottom: FOOT + 10 },
     head: [['S.No', 'Date', 'Subject', s.amountHead]],
     // The subject and the amount are drawn by hand (two tones in one cell);
     // their cell text is only there to size the row.
@@ -466,6 +468,8 @@ async function render(s: Statement): Promise<void> {
       }
     },
     didDrawCell: (d) => {
+      const page = doc.getCurrentPageInfo().pageNumber;
+      tableBottom.set(page, Math.max(tableBottom.get(page) ?? 0, d.cell.y + d.cell.height));
       if (d.section === 'body' && d.column.index === 2) {
         const t = subjectLines.get(d.row.index);
         if (!t) return;
@@ -494,7 +498,7 @@ async function render(s: Statement): Promise<void> {
       const r = rows[d.row.index];
       if (!r) return;
       if (r.label) {
-        font('normal', 7.5, FAINT);
+        font('normal', 7.5, MUTED);
         doc.text(r.label, labelX, mid + 3);
       }
       font('bold', 10, INK);
@@ -511,7 +515,7 @@ async function render(s: Statement): Promise<void> {
   let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
   if (y + s.totals.length * 26 + 10 > PAGE_H - FOOT - 10) {
     doc.addPage();
-    y = 70;
+    y = TABLE_TOP;
   }
   const totalsX = tableX + tableW * 0.38;
   for (const t of s.totals) {
@@ -528,13 +532,14 @@ async function render(s: Statement): Promise<void> {
 
   // The bracket down the left of the section, across however many pages it
   // runs to: curved in at the title, then one gradient from lime into green
-  // spread over the whole run, and a diamond at its end.
+  // spread over the whole run, and a diamond at its end. On every page it
+  // spans exactly the table there — from the table's top to its last row.
   const segs: { p: number; top: number; bottom: number }[] = [];
   for (let p = firstPage; p <= endPage; p++) {
     segs.push({
       p,
-      top: p === firstPage ? secY + 10 : 60,
-      bottom: p === endPage ? endY : PAGE_H - FOOT - 8,
+      top: p === firstPage ? secY + 10 : TABLE_TOP,
+      bottom: p === endPage ? endY : (tableBottom.get(p) ?? PAGE_H - FOOT - 8),
     });
   }
   const run = segs.reduce((n, g) => n + (g.bottom - g.top), 0) || 1;
@@ -666,21 +671,23 @@ async function fetchBase64(url: string): Promise<string> {
   return btoa(binary);
 }
 
-/** "23 Sept 2026" — the year always, since a bill outlives the month. */
+/*
+ * Dates are spelled out here, not by toLocaleDateString: browsers ship
+ * different locale data ("Sep" in one, "Sept" in another), and the same bill
+ * should read the same whichever one printed it.
+ */
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "23 Sep 2026" — the year always, since a bill outlives the month. */
 function longDate(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return `${d} ${MONTHS[m - 1].slice(0, 3)} ${y}`;
 }
 
 /** "September 2026". */
 function longMonth(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return `${MONTHS[m - 1]} ${y}`;
 }
 
 function capitalise(s: string): string {
