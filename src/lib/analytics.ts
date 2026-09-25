@@ -323,8 +323,10 @@ export type PersonExpense = {
  * dividing in the client — two implementations of the remainder rule is one
  * too many, and the drawer's rows have to add up to the drawer's total.
  */
-export async function listPersonExpenses(f: Filters & { personId: string; limit?: number }): Promise<PersonExpense[]> {
-  const rows = await db
+export async function listPersonExpenses(
+  f: Filters & { personId: string; /** null: every row, for a statement. */ limit?: number | null },
+): Promise<PersonExpense[]> {
+  const q = db
     .select({
       id: expenses.id,
       share: personShareExpr,
@@ -342,7 +344,8 @@ export async function listPersonExpenses(f: Filters & { personId: string; limit?
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .where(and(whereAll(f), eq(expensePeople.personId, f.personId)))
     .orderBy(desc(expenses.expenseDate), desc(expenses.createdAt))
-    .limit(Math.min(f.limit ?? 100, 300));
+    .$dynamic();
+  const rows = await (f.limit === null ? q : q.limit(Math.min(f.limit ?? 100, 300)));
 
   return rows.map((r) => ({
     id: r.id,

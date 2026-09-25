@@ -230,7 +230,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
     if (!data || !data.ledger.length) return;
     setPrinting(true);
     try {
-      const { downloadLedgerBill } = await import('./ledger-bill');
+      const { downloadLedgerBill } = await import('./bill-pdf');
       await downloadLedgerBill({
         name: data.person.name,
         relationship: data.person.relationshipType,
@@ -238,6 +238,35 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
         lentMinor: data.lentMinor,
         borrowedMinor: data.borrowedMinor,
         entries: data.ledger,
+      });
+    } catch (err) {
+      console.error('Print bill failed', err);
+      toast('Could not prepare the bill', 'error');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  /**
+   * The same, for the Expenses tab. The rows are fetched whole on the click:
+   * the drawer's list stops at 60, and a statement has to reach the lifetime
+   * total printed above it.
+   */
+  async function printExpenseBill() {
+    if (!data || !data.expenses.length) return;
+    setPrinting(true);
+    try {
+      const [{ downloadExpenseBill }, { items }] = await Promise.all([
+        import('./bill-pdf'),
+        api.get<{ items: PersonExpense[] }>(`/api/insights/person/${id}/expenses`),
+      ]);
+      await downloadExpenseBill({
+        name: data.person.name,
+        relationship: data.person.relationshipType,
+        lifetimeMinor: data.lifetimeMinor,
+        monthMinor: data.monthMinor,
+        month: data.month,
+        entries: items,
       });
     } catch (err) {
       console.error('Print bill failed', err);
@@ -313,11 +342,19 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
 
           {/*
             The tab's actions sit above its history rather than under it, so a
-            long list never has to be scrolled to reach them. Only here while
-            there is something to act on.
+            long list never has to be scrolled to reach them. Each is only
+            here while there is something to act on.
           */}
-          {tab !== 'Expenses' &&
-            data.ledger.length > 0 &&
+          {tab === 'Expenses'
+            ? data.expenses.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {/* Every expense they were part of and their share, as a PDF. */}
+                  <button className="tag" onClick={printExpenseBill} disabled={printing} aria-busy={printing}>
+                    {printing ? 'Preparing…' : 'Print bill'}
+                  </button>
+                </div>
+              )
+            : data.ledger.length > 0 &&
               (confirmClear ? (
                 <div className="well px-3.5 py-3 mb-3">
                   <p className="text-[13px] leading-relaxed">

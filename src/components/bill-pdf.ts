@@ -4,16 +4,20 @@ import { formatINR } from '@/lib/money';
 import { todayISO } from '@/lib/dates';
 
 /*
- * THE LENDING BILL.
+ * THE BILLS.
  *
- * One person's lent-and-borrowed history as a PDF: who, the net balance as the
- * inspector states it, and every entry, oldest first, numbered. Nothing here
- * computes money — the balance and the Gave/Got totals arrive from the same
- * response the inspector draws, so the page and the paper cannot disagree.
+ * One person's history as a PDF, in two kinds. The lending bill is their
+ * lent-and-borrowed ledger, with the net balance as the inspector states it.
+ * The expense bill is every expense they were part of, with the share they
+ * carried. Both put every entry in oldest first, numbered. Nothing here
+ * computes money beyond adding up the rows: the balance and the lifetime
+ * total arrive from the same responses the inspector draws, so the page and
+ * the paper cannot disagree.
  *
- * Laid out like a payslip: a letterhead, the balance written as the equation
- * it is (net = got − gave, or the other way round), a column of particulars on
- * the left, and the entries as a bracketed section that ends in its totals.
+ * Both are laid out the same way, like a payslip: a letterhead, the headline
+ * figure written as the equation it is, a column of particulars on the left,
+ * and the entries as a bracketed section that ends in its totals. Each kind
+ * only supplies the words and the rows (`Statement`); `render` draws either.
  *
  * Everything heavy is fetched on the click, not the page load: jsPDF and its
  * table plugin, the logo, and the font. The font matters — the PDF standard
@@ -39,6 +43,28 @@ export type LedgerBillInput = {
   borrowedMinor: number;
   /** As the inspector holds them — newest first. */
   entries: LedgerBillEntry[];
+};
+
+export type ExpenseBillEntry = {
+  id: string;
+  shareMinor: number;
+  amountMinor: number;
+  participants: number;
+  expenseDate: string;
+  note: string | null;
+  category: { name: string; color: string };
+};
+
+export type ExpenseBillInput = {
+  name: string;
+  relationship: string;
+  /** The drawer's "Spent · lifetime" — the total the rows must reach. */
+  lifetimeMinor: number;
+  monthMinor: number;
+  /** YYYY-MM, the month `monthMinor` belongs to. */
+  month: string;
+  /** Every expense, newest first, as the API lists them. */
+  entries: ExpenseBillEntry[];
 };
 
 type RGB = [number, number, number];
@@ -82,10 +108,167 @@ const PAGE_H = 841.89;
 const M = 44;
 const SIDE_W = 128; // the particulars column
 const MAIN_X = M + SIDE_W + 18; // where the statement proper begins
-const MAIN_W = PAGE_W - M - MAIN_X;
 const FOOT = 60; // reserved at the bottom of every page
 
+/** One line of the table. The amount cell is drawn by hand from these parts. */
+type Row = {
+  date: string;
+  subject: string;
+  /** A second, muted line under the subject. */
+  detail?: string;
+  figure: string;
+  /** Small and faint, after the figure — "gave", "₹750 ÷ 3", or nothing. */
+  label: string;
+  mark: { kind: 'arrow'; up: boolean; color: RGB } | { kind: 'dot'; color: RGB };
+};
+
+/** Everything that differs between the two bills. */
+type Statement = {
+  title: string;
+  net: { label: string; value: string; phrase: string; phraseColor: RGB };
+  /** The right-hand side of the equation, signs included. */
+  terms: { label: string; value: string; from: RGB; to: RGB }[];
+  particulars: [string, string][];
+  section: { title: string; note: string };
+  amountHead: string;
+  /** Oldest first. */
+  rows: Row[];
+  totals: { label: string; value: string; wash: RGB; strong?: boolean }[];
+  filename: string;
+};
+
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> {
+  const today = todayISO();
+  // The inspector's list is newest-first (oldest-first reversed), so reversing
+  // it again gives the order it was recorded in, same-day ties included.
+  const rows = [...input.entries].reverse();
+  const bal = input.balanceMinor;
+  const tone: RGB = bal === 0 ? INK : bal > 0 ? GREEN : RED;
+  const toneWash: RGB = bal === 0 ? SETTLED_WASH : bal > 0 ? OWED_WASH : OWE_WASH;
+  const netPhrase = bal === 0 ? 'settled' : bal > 0 ? 'owed to you' : 'you owe';
+  const lentCount = rows.filter((e) => e.direction === 'out').length;
+  const balance = bal === 0 ? 'Settled' : `${formatINR(Math.abs(bal))} ${netPhrase}`;
+
+  // Owing is got − gave; being owed is gave − got. The larger side goes
+  // first with a +, so the equation reads the way the balance was reached.
+  const gotFirst = bal <= 0;
+  const terms = [
+    { label: 'Got', value: `${gotFirst ? '+' : '-'} ${formatINR(input.borrowedMinor)}`, from: GOT_FROM, to: GOT_TO },
+    { label: 'Gave', value: `${gotFirst ? '-' : '+'} ${formatINR(input.lentMinor)}`, from: GAVE_FROM, to: GAVE_TO },
+  ];
+  if (!gotFirst) terms.reverse();
+
+  await render({
+    title: `Lending statement: ${input.name}`,
+    net: {
+      label: 'Net balance',
+      value: bal === 0 ? 'Settled' : formatINR(Math.abs(bal)),
+      phrase: bal === 0 ? 'nothing open' : netPhrase,
+      phraseColor: tone,
+    },
+    terms,
+    particulars: [
+      ['Contact', input.name],
+      ['Relationship', capitalise(input.relationship)],
+      ...period(rows.map((e) => e.entryDate)),
+      ['Entries', String(rows.length)],
+      ['Money you gave', `${count(lentCount, 'entry', 'entries')} · ${formatINR(input.lentMinor)}`],
+      ['Money you got', `${count(rows.length - lentCount, 'entry', 'entries')} · ${formatINR(input.borrowedMinor)}`],
+      ['Balance', balance],
+      ['Generated on', longDate(today)],
+    ],
+    section: { title: 'Entries', note: 'Every amount lent and borrowed, oldest first' },
+    amountHead: 'Amount',
+    rows: rows.map((e) => {
+      const out = e.direction === 'out';
+      return {
+        date: e.entryDate,
+        subject: e.note?.trim() || (out ? 'Lent' : 'Borrowed'),
+        figure: formatINR(e.amountMinor),
+        label: out ? 'gave' : 'got',
+        mark: { kind: 'arrow', up: out, color: out ? RED : GREEN },
+      };
+    }),
+    totals: [
+      { label: 'Total gave', value: `- ${formatINR(input.lentMinor)}`, wash: GAVE_WASH },
+      { label: 'Total got', value: `+ ${formatINR(input.borrowedMinor)}`, wash: GOT_WASH },
+      { label: 'Net balance', value: balance, wash: toneWash, strong: true },
+    ],
+    filename: `moneyflow-ledger-${slug(input.name)}-${today}.pdf`,
+  });
+}
+
+/**
+ * Every expense the person was part of, and the share they carried. The
+ * headline is the drawer's lifetime figure, split into what they paid for
+ * alone and their shares of bills split with others — the same shares the
+ * drawer lists, so the rows add up to the headline.
+ */
+export async function downloadExpenseBill(input: ExpenseBillInput): Promise<void> {
+  const today = todayISO();
+  const rows = [...input.entries].reverse();
+  const solo = rows.filter((e) => e.participants <= 1);
+  const split = rows.filter((e) => e.participants > 1);
+  const sum = (list: ExpenseBillEntry[]) => list.reduce((s, e) => s + e.shareMinor, 0);
+  const soloMinor = sum(solo);
+  const splitMinor = sum(split);
+  const monthName = longMonth(input.month);
+
+  await render({
+    title: `Expense statement: ${input.name}`,
+    net: {
+      label: 'Total spent',
+      value: formatINR(input.lifetimeMinor),
+      phrase: `across ${count(rows.length, 'expense', 'expenses')}`,
+      phraseColor: MUTED,
+    },
+    terms: [
+      { label: 'Paid alone', value: `+ ${formatINR(soloMinor)}`, from: GOT_FROM, to: GOT_TO },
+      { label: 'Split shares', value: `+ ${formatINR(splitMinor)}`, from: GAVE_FROM, to: GAVE_TO },
+    ],
+    particulars: [
+      ['Contact', input.name],
+      ['Relationship', capitalise(input.relationship)],
+      ...period(rows.map((e) => e.expenseDate)),
+      ['Expenses', String(rows.length)],
+      ['Paid alone', `${count(solo.length, 'expense', 'expenses')} · ${formatINR(soloMinor)}`],
+      ['Split with others', `${count(split.length, 'expense', 'expenses')} · ${formatINR(splitMinor)}`],
+      [`Spent in ${monthName}`, formatINR(input.monthMinor)],
+      ['Total spent', formatINR(input.lifetimeMinor)],
+      ['Generated on', longDate(today)],
+    ],
+    section: { title: 'Expenses', note: 'Every expense and the share carried, oldest first' },
+    amountHead: 'Share',
+    rows: rows.map((e) => ({
+      date: e.expenseDate,
+      subject: e.category.name,
+      detail: e.note?.trim() || undefined,
+      figure: formatINR(e.shareMinor),
+      label: e.participants > 1 ? `${formatINR(e.amountMinor)} ÷ ${e.participants}` : '',
+      mark: { kind: 'dot', color: /^#[0-9a-f]{6}$/i.test(e.category.color) ? hex(e.category.color) : FAINT },
+    })),
+    totals: [
+      { label: 'Paid alone', value: `+ ${formatINR(soloMinor)}`, wash: GOT_WASH },
+      { label: 'Split shares', value: `+ ${formatINR(splitMinor)}`, wash: GAVE_WASH },
+      { label: 'Total spent', value: formatINR(input.lifetimeMinor), wash: OWED_WASH, strong: true },
+    ],
+    filename: `moneyflow-expenses-${slug(input.name)}-${today}.pdf`,
+  });
+}
+
+/** Period start and end, as two particulars. */
+function period(dates: string[]): [string, string][] {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return [
+    ['Period start', first ? longDate(first) : '—'],
+    ['Period end', last ? longDate(last) : '—'],
+  ];
+}
+
+async function render(s: Statement): Promise<void> {
   const [{ jsPDF, GState }, autoTableModule, regular, bold, logo] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
@@ -108,15 +291,7 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
   };
 
   const today = todayISO();
-  // The inspector's list is newest-first (oldest-first reversed), so reversing
-  // it again gives the order it was recorded in, same-day ties included.
-  const rows = [...input.entries].reverse();
-  const bal = input.balanceMinor;
-  const tone: RGB = bal === 0 ? INK : bal > 0 ? GREEN : RED;
-  const toneWash: RGB = bal === 0 ? SETTLED_WASH : bal > 0 ? OWED_WASH : OWE_WASH;
-  const netPhrase = bal === 0 ? 'settled' : bal > 0 ? 'owed to you' : 'you owe';
-  const lentCount = rows.filter((e) => e.direction === 'out').length;
-  const gotCount = rows.length - lentCount;
+  const rows = s.rows;
 
   /* ---------- letterhead ---------- */
   const logoH = 26;
@@ -130,9 +305,8 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
   doc.setLineWidth(0.8);
   doc.line(headX, 46, headX, 82);
   font('bold', 11, INK);
-  const title = `Lending statement: ${input.name}`;
-  doc.setFontSize(fitSize(doc, title, 158, 11, 8));
-  doc.text(title, headX + 12, 61);
+  doc.setFontSize(fitSize(doc, s.title, 158, 11, 8));
+  doc.text(s.title, headX + 12, 61);
   font('normal', 8, MUTED);
   doc.text(`Generated ${longDate(today)} by Money Flow`, headX + 12, 75);
 
@@ -161,59 +335,38 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
   doc.triangle(PAGE_W - M, 118, PAGE_W - M, 176, PAGE_W - M - 34, 176, 'F');
   doc.restoreGraphicsState();
 
-  /* ---------- the balance, as the equation it is ---------- */
-  // Owing is got − gave; being owed is gave − got. The larger side goes
-  // first with a +, so the equation reads the way the balance was reached.
+  /* ---------- the headline, as the equation it is ---------- */
   const eqY = 128;
   font('normal', 8.5, MUTED);
-  doc.text('Net balance', MAIN_X, eqY);
+  doc.text(s.net.label, MAIN_X, eqY);
   font('bold', 15, INK);
-  const net = bal === 0 ? 'Settled' : formatINR(Math.abs(bal));
-  doc.text(net, MAIN_X, eqY + 19);
-  font('bold', 8, tone);
-  doc.text(bal === 0 ? 'nothing open' : netPhrase, MAIN_X, eqY + 32);
+  doc.text(s.net.value, MAIN_X, eqY + 19);
+  font('bold', 8, s.net.phraseColor);
+  doc.text(s.net.phrase, MAIN_X, eqY + 32);
 
   const netW = Math.max(
-    (doc.setFont('NotoSans', 'bold'), doc.setFontSize(15), doc.getTextWidth(net)),
-    (doc.setFontSize(8.5), doc.getTextWidth('Net balance')),
+    (doc.setFont('NotoSans', 'bold'), doc.setFontSize(15), doc.getTextWidth(s.net.value)),
+    (doc.setFontSize(8), doc.getTextWidth(s.net.phrase)),
+    (doc.setFont('NotoSans', 'normal'), doc.setFontSize(8.5), doc.getTextWidth(s.net.label)),
   );
   const eqX = MAIN_X + netW + 16;
   font('normal', 16, MUTED);
   doc.text('=', eqX, eqY + 16);
 
-  const gotFirst = bal <= 0;
-  const terms = [
-    { label: 'Got', value: input.borrowedMinor, from: GOT_FROM, to: GOT_TO, sign: gotFirst ? '+' : '-' },
-    { label: 'Gave', value: input.lentMinor, from: GAVE_FROM, to: GAVE_TO, sign: gotFirst ? '-' : '+' },
-  ];
-  if (!gotFirst) terms.reverse();
   let tx = eqX + 22;
-  for (const t of terms) {
+  for (const t of s.terms) {
     gradRect(doc, tx, eqY - 9, 2.8, 34, t.from, t.to, 'v');
     font('normal', 8.5, MUTED);
     doc.text(t.label, tx + 9, eqY);
+    const labelW = doc.getTextWidth(t.label);
     font('bold', 12.5, INK);
-    const v = `${t.sign} ${formatINR(t.value)}`;
-    doc.text(v, tx + 9, eqY + 18);
-    tx += 9 + Math.max(doc.getTextWidth(v), 40) + 26;
+    doc.text(t.value, tx + 9, eqY + 18);
+    tx += 9 + Math.max(doc.getTextWidth(t.value), labelW, 40) + 26;
   }
 
   /* ---------- particulars, down the left ---------- */
-  const first = rows[0]?.entryDate;
-  const last = rows[rows.length - 1]?.entryDate;
-  const particulars: [string, string][] = [
-    ['Contact', input.name],
-    ['Relationship', capitalise(input.relationship)],
-    ['Period start', first ? longDate(first) : '—'],
-    ['Period end', last ? longDate(last) : '—'],
-    ['Entries', String(rows.length)],
-    ['Money you gave', `${lentCount} ${lentCount === 1 ? 'entry' : 'entries'} · ${formatINR(input.lentMinor)}`],
-    ['Money you got', `${gotCount} ${gotCount === 1 ? 'entry' : 'entries'} · ${formatINR(input.borrowedMinor)}`],
-    ['Balance', bal === 0 ? 'Settled' : `${formatINR(Math.abs(bal))} ${netPhrase}`],
-    ['Generated on', longDate(today)],
-  ];
   let py = 196;
-  for (const [label, value] of particulars) {
+  for (const [label, value] of s.particulars) {
     font('normal', 8.5, MUTED);
     doc.text(label, M, py);
     font('bold', 9.5, INK);
@@ -225,11 +378,11 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
   /* ---------- the entries, as a bracketed section ---------- */
   const secY = 196;
   font('bold', 11.5, INK);
-  doc.text('Entries', MAIN_X + 30, secY + 4);
-  const titleW = doc.getTextWidth('Entries');
+  doc.text(s.section.title, MAIN_X + 30, secY + 4);
+  const titleW = doc.getTextWidth(s.section.title);
   diamond(doc, MAIN_X + 30 + titleW + 10, secY, 3.6, GOT_FROM);
   font('normal', 8, MUTED);
-  doc.text('Every amount lent and borrowed, oldest first', MAIN_X + 30 + titleW + 21, secY + 3.5);
+  doc.text(s.section.note, MAIN_X + 30 + titleW + 21, secY + 3.5);
 
   const tableX = MAIN_X + 20;
   const tableW = PAGE_W - M - tableX;
@@ -237,31 +390,31 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
 
   /*
    * The amount column on a fixed grid, so every row lines up with the next:
-   * a label slot as wide as "gave" (the longer word) at the right edge, every
-   * figure ending at the same line before it, and the arrows in one column
-   * set by the widest figure in the statement — not each hugging its own.
+   * a label slot as wide as the widest label at the right edge, every figure
+   * ending at the same line before it, and the marks in one column set by the
+   * widest figure in the statement — not each hugging its own.
    */
-  const AMT = { pad: 10, labelGap: 7, arrowGap: 11, arrowW: 7 };
+  const AMT = { pad: 10, labelGap: 7, markGap: 11, markW: 7 };
   font('normal', 7.5, FAINT);
-  const labelSlot = doc.getTextWidth('gave');
+  const labelSlot = Math.max(0, ...rows.map((r) => doc.getTextWidth(r.label)));
+  const labelGap = labelSlot ? AMT.labelGap : 0;
   font('bold', 10, INK);
-  const widestAmount = Math.max(...rows.map((e) => doc.getTextWidth(formatINR(e.amountMinor))));
-  const amountColW = Math.max(
-    112,
-    AMT.pad * 2 + AMT.arrowW + AMT.arrowGap + widestAmount + AMT.labelGap + labelSlot,
-  );
+  const widestFigure = Math.max(...rows.map((r) => doc.getTextWidth(r.figure)));
+  const amountColW = Math.max(112, AMT.pad * 2 + AMT.markW + AMT.markGap + widestFigure + labelGap + labelSlot);
+  const SUBJECT = { size: 9.5, lead: 9.5 * 1.15 };
+  const subjectLines = new Map<number, { lines: string[]; strong: number }>();
 
   autoTable(doc, {
     startY: secY + 22,
     margin: { left: tableX, right: M, top: 70, bottom: FOOT + 10 },
-    head: [['S.No', 'Date', 'Subject', 'Amount']],
-    // The amount is drawn by hand (arrow, figure and a small label in two
-    // colours); its cell text is only there to size the column.
-    body: rows.map((e, i) => [
+    head: [['S.No', 'Date', 'Subject', s.amountHead]],
+    // The subject and the amount are drawn by hand (two tones in one cell);
+    // their cell text is only there to size the row.
+    body: rows.map((r, i) => [
       String(i + 1),
-      longDate(e.entryDate),
-      e.note?.trim() || (e.direction === 'out' ? 'Lent' : 'Borrowed'),
-      `${formatINR(e.amountMinor)} gave`,
+      longDate(r.date),
+      r.detail ? `${r.subject}\n${r.detail}` : r.subject,
+      '',
     ]),
     theme: 'plain',
     // A row moves whole to the next page rather than splitting: a bill line
@@ -269,7 +422,7 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
     rowPageBreak: 'avoid',
     styles: {
       font: 'NotoSans',
-      fontSize: 9.5,
+      fontSize: SUBJECT.size,
       textColor: INK,
       cellPadding: { top: 8, bottom: 8, left: 7, right: 7 },
       valign: 'middle',
@@ -283,66 +436,80 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
     columnStyles: {
       0: { cellWidth: 38, textColor: MUTED },
       1: { cellWidth: 76, textColor: MUTED, fontSize: 9 },
-      3: { cellWidth: amountColW, halign: 'right', cellPadding: { top: 8, bottom: 8, left: AMT.pad, right: AMT.pad } },
+      3: { cellWidth: amountColW, cellPadding: { top: 8, bottom: 8, left: AMT.pad, right: AMT.pad } },
     },
     didParseCell: (d) => {
-      // Both drawn by hand in didDrawCell; the header centres on what sits
-      // under it, not on the cell, whose spare width is all on the left.
-      if (d.column.index === 3) d.cell.text = [''];
+      // Drawn by hand in didDrawCell; the header centres on what sits under
+      // it, not on the cell, whose spare width is all on the left.
+      if (d.section === 'head' && d.column.index === 3) d.cell.text = [''];
     },
-    // The header's wash runs mint into white across the whole row; each cell
-    // paints its own slice of that one gradient, before its text goes on.
-    // Every other entry row carries a fainter version of the same wash.
     willDrawCell: (d) => {
+      // The header's wash runs mint into white across the whole row, and every
+      // other entry row carries a fainter version of it. Painted once per
+      // row, from its first cell, so no cell edge can show.
       const band = d.section === 'body' && d.row.index % 2 === 1;
-      // Painted once per row, from its first cell, so no cell edge can show.
-      if ((d.section !== 'head' && !band) || d.column.index !== 0) return;
-      const rowW = Object.values(d.row.cells).reduce((w, c) => w + c.width, 0);
-      gradRect(doc, d.cell.x, d.cell.y, rowW, d.cell.height, band ? BAND : MINT, mix(band ? BAND : MINT, WHITE, 0.9), 'h');
+      if ((d.section === 'head' || band) && d.column.index === 0) {
+        const rowW = Object.values(d.row.cells).reduce((w, c) => w + c.width, 0);
+        gradRect(doc, d.cell.x, d.cell.y, rowW, d.cell.height, band ? BAND : MINT, mix(band ? BAND : MINT, WHITE, 0.9), 'h');
+      }
+      // The subject, wrapped as the table sized it, taken off the cell to be
+      // drawn in two tones: the subject in ink, the detail muted beneath.
+      if (d.section === 'body' && d.column.index === 2) {
+        const r = rows[d.row.index];
+        if (!r) return;
+        font('normal', SUBJECT.size, INK);
+        const strong = (doc.splitTextToSize(r.subject, d.cell.width - 14) as string[]).length;
+        subjectLines.set(d.row.index, { lines: [...d.cell.text], strong });
+        d.cell.text = [];
+      }
     },
     didDrawCell: (d) => {
+      if (d.section === 'body' && d.column.index === 2) {
+        const t = subjectLines.get(d.row.index);
+        if (!t) return;
+        const top = d.cell.y + d.cell.height / 2 - (t.lines.length * SUBJECT.lead) / 2;
+        t.lines.forEach((line, i) => {
+          font('normal', i < t.strong ? SUBJECT.size : 8.5, i < t.strong ? INK : MUTED);
+          doc.text(line, d.cell.x + 7, top + SUBJECT.lead * (i + 0.5), { baseline: 'middle' });
+        });
+        return;
+      }
       if (d.column.index !== 3) return;
       const mid = d.cell.y + d.cell.height / 2;
       const labelX = d.cell.x + d.cell.width - AMT.pad - labelSlot; // label slot, left-aligned
-      const amountRight = labelX - AMT.labelGap; // every figure ends here
-      const arrowX = amountRight - widestAmount - AMT.arrowGap; // one column of arrows
+      const figureRight = labelX - labelGap; // every figure ends here
+      const markX = figureRight - widestFigure - AMT.markGap; // one column of marks
       if (d.section === 'head') {
-        // Centred over arrow, figure and label together.
+        // Centred over mark, figure and label together.
         font('bold', 8.5, INK);
-        doc.text('Amount', (arrowX - AMT.arrowW / 2 + labelX + labelSlot) / 2, mid + 3, { align: 'center' });
+        doc.text(s.amountHead, (markX - AMT.markW / 2 + labelX + labelSlot) / 2, mid + 3, { align: 'center' });
         return;
       }
       if (d.section !== 'body') return;
-      const e = rows[d.row.index];
-      if (!e) return;
-      const out = e.direction === 'out';
-
-      font('normal', 7.5, FAINT);
-      doc.text(out ? 'gave' : 'got', labelX, mid + 3);
+      const r = rows[d.row.index];
+      if (!r) return;
+      if (r.label) {
+        font('normal', 7.5, FAINT);
+        doc.text(r.label, labelX, mid + 3);
+      }
       font('bold', 10, INK);
-      doc.text(formatINR(e.amountMinor), amountRight, mid + 3.5, { align: 'right' });
-      drawArrow(doc, arrowX, mid, out, out ? RED : GREEN);
+      doc.text(r.figure, figureRight, mid + 3.5, { align: 'right' });
+      if (r.mark.kind === 'arrow') drawArrow(doc, markX, mid, r.mark.up, r.mark.color);
+      else {
+        doc.setFillColor(...r.mark.color);
+        doc.circle(markX, mid, 2.8, 'F');
+      }
     },
   });
 
   /* ---------- totals, as the reference closes a section ---------- */
   let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
-  if (y + 3 * 26 + 10 > PAGE_H - FOOT - 10) {
+  if (y + s.totals.length * 26 + 10 > PAGE_H - FOOT - 10) {
     doc.addPage();
     y = 70;
   }
   const totalsX = tableX + tableW * 0.38;
-  const totals: { label: string; value: string; wash: RGB; strong?: boolean }[] = [
-    { label: 'Total gave', value: `- ${formatINR(input.lentMinor)}`, wash: GAVE_WASH },
-    { label: 'Total got', value: `+ ${formatINR(input.borrowedMinor)}`, wash: GOT_WASH },
-    {
-      label: 'Net balance',
-      value: bal === 0 ? 'Settled' : `${formatINR(Math.abs(bal))} ${netPhrase}`,
-      wash: toneWash,
-      strong: true,
-    },
-  ];
-  for (const t of totals) {
+  for (const t of s.totals) {
     const h = t.strong ? 30 : 24;
     gradRect(doc, totalsX, y, PAGE_W - M - totalsX, h, WHITE, t.wash, 'h');
     font('bold', t.strong ? 10.5 : 9, INK);
@@ -394,7 +561,7 @@ export async function downloadLedgerBill(input: LedgerBillInput): Promise<void> 
     );
   }
 
-  doc.save(`moneyflow-ledger-${slug(input.name)}-${today}.pdf`);
+  doc.save(s.filename);
 }
 
 /** ↑ for money that went out (lent), ↓ for money that came in (borrowed). */
@@ -503,6 +670,12 @@ function longDate(iso: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/** "September 2026". */
+function longMonth(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 function capitalise(s: string): string {
