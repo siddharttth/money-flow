@@ -172,6 +172,7 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
   const [tab, setTab] = useState('Expenses');
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const { openCategory } = useInspector();
   const toast = useToast();
   const { mutate: mutateAll } = useSWRConfig();
@@ -221,6 +222,28 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
       toast('Could not clear the history', 'error');
     } finally {
       setClearing(false);
+    }
+  }
+
+  /** Renders this person's lending ledger to a PDF from what is already on screen. */
+  async function printBill() {
+    if (!data || !data.ledger.length) return;
+    setPrinting(true);
+    try {
+      const { downloadLedgerBill } = await import('./ledger-bill');
+      await downloadLedgerBill({
+        name: data.person.name,
+        relationship: data.person.relationshipType,
+        balanceMinor: data.balanceMinor,
+        lentMinor: data.lentMinor,
+        borrowedMinor: data.borrowedMinor,
+        entries: data.ledger,
+      });
+    } catch (err) {
+      console.error('Print bill failed', err);
+      toast('Could not prepare the bill', 'error');
+    } finally {
+      setPrinting(false);
     }
   }
 
@@ -379,13 +402,21 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
                   </div>
                 </div>
               ) : (
-                <button
-                  className="tag"
-                  style={{ color: 'var(--rule-red)' }}
-                  onClick={() => setConfirmClear(true)}
-                >
-                  Clear all lending history
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="tag"
+                    style={{ color: 'var(--rule-red)' }}
+                    onClick={() => setConfirmClear(true)}
+                  >
+                    Clear all lending history
+                  </button>
+                  {/* The same history as a PDF — only the lending ledger, never
+                      the expense shares. Only here while there is something
+                      to print (this row is gated on entries existing). */}
+                  <button className="tag" onClick={printBill} disabled={printing} aria-busy={printing}>
+                    {printing ? 'Preparing…' : 'Print bill'}
+                  </button>
+                </div>
               )}
             </div>
           )}
