@@ -182,7 +182,7 @@ export default function DashboardPage() {
               {t?.known ? (
                 <div className="min-w-0">
                   <div className="flex items-start justify-between gap-3 mb-4">
-                    <span className="icon-tile icon-tile-accent lit">
+                    <span className="icon-tile icon-tile-accent">
                       <NavIcon name="dashboard" size={20} />
                     </span>
                     {t.ratePct != null && t.inHandMinor >= 0 ? (
