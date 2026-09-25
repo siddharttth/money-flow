@@ -118,8 +118,10 @@ type Row = {
   /** A second, muted line under the subject. */
   detail?: string;
   figure: string;
-  /** Small and faint, after the figure — "gave", "₹750 ÷ 3", or nothing. */
+  /** Small and muted, after the figure — "gave", "got", or nothing. */
   label: string;
+  /** Or, for a split bill, the whole of it and how many ways: "₹750 ÷ 3". */
+  split?: { bill: string; ways: number };
   mark: { kind: 'arrow'; up: boolean; color: RGB } | { kind: 'dot'; color: RGB };
 };
 
@@ -247,7 +249,8 @@ export async function downloadExpenseBill(input: ExpenseBillInput): Promise<void
       subject: capitalise(e.category.name),
       detail: capitalise(e.note?.trim() ?? '') || undefined,
       figure: formatINR(e.shareMinor),
-      label: e.participants > 1 ? `${formatINR(e.amountMinor)} ÷ ${e.participants}` : '',
+      label: '',
+      split: e.participants > 1 ? { bill: formatINR(e.amountMinor), ways: e.participants } : undefined,
       mark: { kind: 'dot', color: /^#[0-9a-f]{6}$/i.test(e.category.color) ? hex(e.category.color) : FAINT },
     })),
     totals: [
@@ -270,7 +273,7 @@ function period(dates: string[]): [string, string][] {
 }
 
 async function render(s: Statement): Promise<void> {
-  const [{ jsPDF, GState }, autoTableModule, regular, bold, logo] = await Promise.all([
+  const [{ jsPDF, GState, ShadingPattern }, autoTableModule, regular, bold, logo] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
     fetchBase64('/fonts/NotoSans-Regular.ttf'),
@@ -278,6 +281,7 @@ async function render(s: Statement): Promise<void> {
     logoDataUrl(),
   ]);
   const autoTable = autoTableModule.default;
+  Shading = ShadingPattern;
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
   doc.addFileToVFS('NotoSans-Regular.ttf', regular);
@@ -391,22 +395,35 @@ async function render(s: Statement): Promise<void> {
   const firstPage = doc.getNumberOfPages();
 
   /*
-   * The amount column on a fixed grid, so every row lines up with the next:
-   * a label slot as wide as the widest label at the right edge, every figure
-   * ending at the same line before it, and the marks in one column set by the
-   * widest figure in the statement — not each hugging its own.
+   * The amount column on a fixed grid, laid out the way a bank statement is,
+   * so every part of every row sits on the same vertical line as the row
+   * above: the marks in one column; each ₹ in one column with its digits
+   * right-aligned, so units sit under units; then a label slot, where a split
+   * note keeps the same rule — its ₹ fixed, its digits right-aligned, and
+   * "÷ n" in a column of its own.
    */
-  const AMT = { pad: 10, labelGap: 7, markGap: 11, markW: 7 };
+  const AMT = { pad: 10, labelGap: 7, markGap: 11, markW: 7, divGap: 3 };
   font('normal', 7.5, MUTED);
-  const labelSlot = Math.max(0, ...rows.map((r) => doc.getTextWidth(r.label)));
+  const widestBill = Math.max(0, ...rows.map((r) => (r.split ? doc.getTextWidth(r.split.bill) : 0)));
+  const widestWays = Math.max(0, ...rows.map((r) => (r.split ? doc.getTextWidth(`÷ ${r.split.ways}`) : 0)));
+  const labelSlot = Math.max(
+    widestBill ? widestBill + AMT.divGap + widestWays : 0,
+    ...rows.map((r) => doc.getTextWidth(r.label)),
+  );
   const labelGap = labelSlot ? AMT.labelGap : 0;
-  const everyRowLabelled = rows.every((r) => r.label);
+  const everyRowLabelled = rows.every((r) => r.label || r.split);
   font('bold', 10, INK);
   const widestFigure = Math.max(...rows.map((r) => doc.getTextWidth(r.figure)));
   const amountColW = Math.max(112, AMT.pad * 2 + AMT.markW + AMT.markGap + widestFigure + labelGap + labelSlot);
   const SUBJECT = { size: 9.5, lead: 9.5 * 1.15 };
   const subjectLines = new Map<number, { lines: string[]; strong: number }>();
   const tableBottom = new Map<number, number>(); // page → where the table stops on it
+  /** "₹1,500" with the ₹ at `left` and the digits ending at `right`, in the current font. */
+  const money = (text: string, left: number, right: number, y: number) => {
+    if (!text.startsWith('₹')) return void doc.text(text, right, y, { align: 'right' });
+    doc.text('₹', left, y);
+    doc.text(text.slice(1), right, y, { align: 'right' });
+  };
 
   autoTable(doc, {
     startY: secY + 22,
@@ -497,12 +514,14 @@ async function render(s: Statement): Promise<void> {
       if (d.section !== 'body') return;
       const r = rows[d.row.index];
       if (!r) return;
-      if (r.label) {
-        font('normal', 7.5, MUTED);
-        doc.text(r.label, labelX, mid + 3);
+      font('normal', 7.5, MUTED);
+      if (r.label) doc.text(r.label, labelX, mid + 3);
+      if (r.split) {
+        money(r.split.bill, labelX, labelX + widestBill, mid + 3);
+        doc.text(`÷ ${r.split.ways}`, labelX + widestBill + AMT.divGap, mid + 3);
       }
       font('bold', 10, INK);
-      doc.text(r.figure, figureRight, mid + 3.5, { align: 'right' });
+      money(r.figure, figureRight - widestFigure, figureRight, mid + 3.5);
       if (r.mark.kind === 'arrow') drawArrow(doc, markX, mid, r.mark.up, r.mark.color);
       else {
         doc.setFillColor(...r.mark.color);
@@ -594,21 +613,24 @@ function drawArrow(doc: Doc, x: number, cy: number, up: boolean, color: RGB) {
 const mix = (a: RGB, b: RGB, t: number): RGB =>
   a.map((v, i) => Math.round(v + (b[i] - v) * Math.min(1, Math.max(0, t)))) as RGB;
 
+/** jsPDF's axial shading, set by `render` once jsPDF has loaded. */
+let Shading: typeof import('jspdf').ShadingPattern;
+let shadings = 0;
+
 /**
- * A linear gradient fill, drawn as fine strips of interpolated colour. jsPDF's
- * native shadings need its advanced API; strips print identically and cost a
- * few kilobytes. Each strip overlaps the next by a hair so no seam shows.
+ * A linear gradient fill, as a real PDF shading. It was once drawn as strips
+ * of interpolated colour, but jsPDF writes fill colours to two decimals, so a
+ * pale wash that moves only a few shades showed as visible steps. A shading is
+ * smooth at any zoom. Its axis is in the page's own coordinates, y down.
  */
 function gradRect(doc: Doc, x: number, y: number, w: number, h: number, from: RGB, to: RGB, dir: 'h' | 'v') {
-  const len = dir === 'h' ? w : h;
-  const steps = Math.max(6, Math.min(120, Math.ceil(len / 1.5)));
-  for (let i = 0; i < steps; i++) {
-    doc.setFillColor(...mix(from, to, steps === 1 ? 0 : i / (steps - 1)));
-    const a = (len * i) / steps;
-    const size = Math.min(len / steps + 0.5, len - a);
-    if (dir === 'h') doc.rect(x + a, y, size, h, 'F');
-    else doc.rect(x, y + a, w, size, 'F');
-  }
+  doc.advancedAPI((pdf) => {
+    const axis = dir === 'h' ? [x, y, x + w, y] : [x, y, x, y + h];
+    const key = `shade${++shadings}`;
+    pdf.addShadingPattern(key, new Shading('axial', axis, [{ offset: 0, color: from }, { offset: 1, color: to }]));
+    pdf.rect(x, y, w, h, null);
+    pdf.fill({ key, matrix: pdf.unitMatrix });
+  });
 }
 
 /** A vertical line whose colour runs from `from` at the top to `to` at the bottom. */
