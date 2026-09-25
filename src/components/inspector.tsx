@@ -311,6 +311,45 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
 
           <Tabs tabs={['Expenses', 'Lent & borrowed']} active={tab} onChange={setTab} />
 
+          {/*
+            The tab's actions sit above its history rather than under it, so a
+            long list never has to be scrolled to reach them. Only here while
+            there is something to act on.
+          */}
+          {tab !== 'Expenses' &&
+            data.ledger.length > 0 &&
+              (confirmClear ? (
+                <div className="well px-3.5 py-3 mb-3">
+                  <p className="text-[13px] leading-relaxed">
+                    Clear all {data.ledger.length} entries with {data.person.name}? The balance goes to settled and
+                    the history disappears from the app.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button className="btn btn-ghost flex-1" onClick={() => setConfirmClear(false)} disabled={clearing}>
+                      Keep them
+                    </button>
+                    <button className="btn btn-danger flex-1" onClick={clearLedger} disabled={clearing}>
+                      {clearing ? 'Clearing…' : 'Clear history'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {/* Wiping the slate asks first, and the toast offers it back. */}
+                  <button
+                    className="tag"
+                    style={{ color: 'var(--rule-red)' }}
+                    onClick={() => setConfirmClear(true)}
+                  >
+                    Clear all lending history
+                  </button>
+                  {/* The lending ledger alone as a PDF — never the expense shares. */}
+                  <button className="tag" onClick={printBill} disabled={printing} aria-busy={printing}>
+                    {printing ? 'Preparing…' : 'Print bill'}
+                  </button>
+                </div>
+              ))}
+
           {tab === 'Expenses' ? (
             data.expenses.length ? (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
@@ -379,47 +418,6 @@ function PersonInspector({ id, onClose }: { id: string; onClose: () => void }) {
             <EmptyState title="Nothing lent or borrowed" hint="Record it from the People screen." />
           )}
 
-          {/*
-            Wiping the slate. Sits under the entries rather than in the footer:
-            it belongs to this tab, and it should take a deliberate scroll to
-            reach rather than sitting next to the buttons people press often.
-          */}
-          {tab !== 'Expenses' && data.ledger.length > 0 && (
-            <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-              {confirmClear ? (
-                <div className="well px-3.5 py-3">
-                  <p className="text-[13px] leading-relaxed">
-                    Clear all {data.ledger.length} entries with {data.person.name}? The balance goes to settled and
-                    the history disappears from the app.
-                  </p>
-                  <div className="flex gap-2 mt-3">
-                    <button className="btn btn-ghost flex-1" onClick={() => setConfirmClear(false)} disabled={clearing}>
-                      Keep them
-                    </button>
-                    <button className="btn btn-danger flex-1" onClick={clearLedger} disabled={clearing}>
-                      {clearing ? 'Clearing…' : 'Clear history'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    className="tag"
-                    style={{ color: 'var(--rule-red)' }}
-                    onClick={() => setConfirmClear(true)}
-                  >
-                    Clear all lending history
-                  </button>
-                  {/* The same history as a PDF — only the lending ledger, never
-                      the expense shares. Only here while there is something
-                      to print (this row is gated on entries existing). */}
-                  <button className="tag" onClick={printBill} disabled={printing} aria-busy={printing}>
-                    {printing ? 'Preparing…' : 'Print bill'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
 
