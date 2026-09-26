@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { currentMonth, monthLabel, monthRange, todayISO } from '@/lib/dates';
+import { currentMonth, monthLabel, monthRange, shiftMonth, todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Category, CategoryStat, Summary } from '@/lib/types';
 import type { Flow } from '@/lib/flow';
@@ -280,7 +280,23 @@ export default function DashboardPage() {
                 <p className="muted text-[12px] mt-0.5">This month against the same days of last month</p>
               </div>
               {f && f.cumulative.length >= 2 ? (
-                <FlowCurve fill points={f.cumulative} monthDays={f.pace.monthDays} height={230} />
+                <FlowCurve
+                  fill
+                  points={f.cumulative}
+                  monthDays={f.pace.monthDays}
+                  height={230}
+                  whatIf={
+                    f.isCurrentMonth
+                      ? {
+                          paceMinor: f.pace.perDayMinor,
+                          projectedMinor: f.pace.projectedMinor,
+                          prevFullMinor: f.pace.prevFullMinor,
+                          monthName: monthLabel(f.month).split(' ')[0],
+                          prevMonthName: monthLabel(shiftMonth(f.month, -1)).split(' ')[0],
+                        }
+                      : undefined
+                  }
+                />
               ) : (
                 <EmptyState
                   title="Not enough to draw yet"

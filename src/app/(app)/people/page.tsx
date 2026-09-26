@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { api, RequestError } from '@/lib/client';
@@ -27,7 +27,7 @@ import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { NavIcon, PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
-import { CountMoney, useFreshKeys, useGrowClass, usePulseOnChange } from '@/components/motion';
+import { CountMoney, useFreshKeys, useMotionOk, usePulseOnChange } from '@/components/motion';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
@@ -154,7 +154,6 @@ function PeopleHub() {
    * on balances alone — they are not month-scoped, so stepping the month
    * picker can never flash a row.
    */
-  const grow = useGrowClass();
   const netPulse = usePulseOnChange([net, owedToMe, owedByMe]);
   const moved = useFreshKeys(
     everyone.map((r) => `${r.person.id}:${r.balanceMinor}`),
@@ -224,7 +223,7 @@ function PeopleHub() {
             </p>
           </div>
 
-          {(owedToMe > 0 || owedByMe > 0) && (
+          {peers.data && (
             <div className="min-w-0">
               <div className="flex items-baseline justify-between gap-4 mb-2">
                 <span>
@@ -240,35 +239,26 @@ function PeopleHub() {
                   </span>
                 </span>
               </div>
-              {/* One bar, both sides — two separate bars invited the reader to
-                  compare their lengths against different scales. */}
-              <div className="flex h-2 rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
-                <span
-                  className={grow}
-                  style={{
-                    width: `${receivableShare * 100}%`,
-                    background: 'linear-gradient(90deg, color-mix(in oklab, var(--credit) 60%, var(--surface-2)), var(--credit))',
-                    boxShadow: '0 0 10px -2px color-mix(in oklab, var(--credit) 55%, transparent)',
-                  }}
-                />
-                <span
-                  className={grow}
-                  style={{
-                    width: `${(1 - receivableShare) * 100}%`,
-                    background: 'linear-gradient(90deg, color-mix(in oklab, var(--rule-red) 60%, var(--surface-2)), var(--rule-red))',
-                    boxShadow: '0 0 10px -2px color-mix(in oklab, var(--rule-red) 55%, transparent)',
-                  }}
-                />
-              </div>
+              <TugBar
+                share={receivableShare}
+                square={owedToMe === 0 && owedByMe === 0}
+                ready={!peers.isValidating}
+              />
               <div className="flex items-baseline justify-between gap-3 mt-2 text-[11px] muted">
-                <span>
-                  <span className="num">{formatINR(owedToMe)}</span> receivable (
-                  {Math.round(receivableShare * 100)}%)
-                </span>
-                <span>
-                  <span className="num">{formatINR(owedByMe)}</span> payable (
-                  {Math.round((1 - receivableShare) * 100)}%)
-                </span>
+                {owedToMe === 0 && owedByMe === 0 ? (
+                  <span className="w-full text-center">All square, both ways</span>
+                ) : (
+                  <>
+                    <span>
+                      <span className="num">{formatINR(owedToMe)}</span> receivable (
+                      {Math.round(receivableShare * 100)}%)
+                    </span>
+                    <span>
+                      <span className="num">{formatINR(owedByMe)}</span> payable (
+                      {Math.round((1 - receivableShare) * 100)}%)
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -617,6 +607,69 @@ function PeopleHub() {
 }
 
 const RELATIONSHIPS = ['family', 'friend', 'other'] as const;
+
+/**
+ * What you are owed and what you owe, as one bar with a knob where the two
+ * meet.
+ *
+ * The knob is the balance. A lend or a borrow pulls it across with a small
+ * overshoot and it settles — the same weight the goal bars carry when they
+ * move — and when everything is paid off both ways it eases back to the
+ * middle and lights once. Nothing moves on load or while nothing changes.
+ * When there is nothing open, the bar stays, empty, with the knob centred:
+ * "all square" is a position too.
+ */
+function TugBar({ share, square, ready }: { share: number; square: boolean; ready: boolean }) {
+  const ok = useMotionOk();
+  const at = square ? 0.5 : share;
+  const tug = ok ? 'tug' : '';
+
+  /* Coming back to the middle from anywhere else. */
+  const wasOpen = useRef<boolean | null>(null);
+  const [settledId, setSettledId] = useState(0);
+  useEffect(() => {
+    if (!ready) return;
+    const before = wasOpen.current;
+    wasOpen.current = !square;
+    if (before && square) setSettledId((n) => n + 1);
+  }, [square, ready]);
+
+  const fill = (color: string) => ({
+    background: `linear-gradient(90deg, color-mix(in oklab, ${color} 60%, var(--surface-2)), ${color})`,
+    boxShadow: `0 0 10px -2px color-mix(in oklab, ${color} 55%, transparent)`,
+    opacity: square ? 0 : 1,
+  });
+
+  return (
+    <div className="relative h-2" role="presentation">
+      {/* One bar, both sides — two separate bars invited the reader to
+          compare their lengths against different scales. */}
+      <div className="absolute inset-0 flex rounded-full overflow-hidden gap-px" style={{ background: 'var(--surface-2)' }}>
+        <span className={tug} style={{ width: `${at * 100}%`, ...fill('var(--credit)') }} />
+        <span className={tug} style={{ width: `${(1 - at) * 100}%`, ...fill('var(--rule-red)') }} />
+      </div>
+      {/* The midpoint, marked faintly, so the knob's distance from it reads. */}
+      <span aria-hidden className="absolute left-1/2 -top-1 -bottom-1 w-px" style={{ background: 'var(--border-strong)' }} />
+      {settledId > 0 && ok && (
+        <span
+          key={settledId}
+          aria-hidden
+          className="settle-glow absolute left-1/2 top-1/2 w-3.5 h-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+        />
+      )}
+      <span
+        aria-hidden
+        className={`absolute top-1/2 w-3.5 h-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${tug}`}
+        style={{
+          left: `${at * 100}%`,
+          background: 'var(--text)',
+          border: '2px solid var(--surface)',
+          boxShadow: '0 1px 4px rgb(0 0 0 / 0.35)',
+        }}
+      />
+    </div>
+  );
+}
 
 function PersonModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (m: string) => void }) {
   const [name, setName] = useState('');

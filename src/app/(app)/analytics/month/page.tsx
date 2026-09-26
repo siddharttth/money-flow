@@ -31,7 +31,7 @@ import { BreakdownList } from '@/components/breakdown';
 import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { CategoryIcon } from '@/components/icons';
-import { CountMoney, InlineEdit, useGrowClass, useMotionOk, usePulseOnChange } from '@/components/motion';
+import { CountMoney, InlineEdit, useCrossing, useGrowClass, useMotionOk, usePulseOnChange } from '@/components/motion';
 import { useSaveCategory } from '@/components/plan-cards';
 
 export default function AnalyticsPage() {
@@ -973,6 +973,81 @@ function CategoryDrilldown({
  * Hidden entirely when nothing has a budget — an empty budgets section on a
  * page this long is just another thing to scroll past.
  */
+/**
+ * A budget bar that reacts when spending pushes it over a line — while you
+ * are looking, never on load.
+ *
+ * Crossing 90% makes the bar flinch once. Crossing 100% draws a hairline crack
+ * across it; from then on the crack is simply there, drawn, for as long as the
+ * category is over — including on a fresh load, where it appears without
+ * being drawn. Under reduced motion there is no flinch and the crack is
+ * never drawn in, only shown.
+ */
+const STRAIN_MARKS = [0.9, 1] as const;
+function StrainBar({
+  share,
+  from,
+  to,
+  grow,
+  scope,
+  ready,
+  children,
+}: {
+  share: number;
+  from: string;
+  to: string;
+  grow: string;
+  /** Month and category: another month is another bar, not a change. */
+  scope: string;
+  ready: boolean;
+  children?: React.ReactNode;
+}) {
+  const ok = useMotionOk();
+  const hit = useCrossing(share, STRAIN_MARKS, ready, scope);
+  // The flinch belongs to 90%; crossing 100% is the crack's moment.
+  const flinch = ok && hit?.marks.includes(0.9) ? { 'data-flinch': hit.id % 2 ? 'a' : 'b' } : {};
+  // Drawn in only when this crossing is what put it over.
+  const drawCrack = ok && !!hit?.marks.includes(1);
+
+  return (
+    <div className="relative mt-3" {...flinch}>
+      <div className="h-2 rounded-full overflow-hidden w-full relative" style={{ background: 'var(--surface-3, var(--bg))' }}>
+        <div
+          className={`h-full rounded-full ${grow}`}
+          style={{
+            width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
+            background: `linear-gradient(90deg, ${from}, ${to})`,
+            boxShadow: `0 0 12px -2px color-mix(in oklab, ${to} 55%, transparent)`,
+          }}
+        />
+        {share > 1 && (
+          /* A hairline fracture across the full bar near its end, in the
+             page's own ground colour so it reads as a gap in the fill. */
+          <svg
+            aria-hidden
+            className="absolute top-0 h-full pointer-events-none"
+            style={{ left: 'calc(76% - 5px)', width: 10 }}
+            viewBox="0 0 10 8"
+          >
+            <path
+              key={drawCrack ? hit!.id : 'still'}
+              className={drawCrack ? 'crack-draw' : undefined}
+              pathLength={1}
+              d="M6 -0.5 L3.5 2.2 L6.2 4.1 L3.8 6 L5 8.5"
+              fill="none"
+              stroke="var(--bg)"
+              strokeWidth="1.2"
+              strokeLinejoin="miter"
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function BudgetSection({ month }: { month: string }) {
   const { openCategory } = useInspector();
   const save = useSaveCategory();
@@ -998,10 +1073,11 @@ function BudgetSection({ month }: { month: string }) {
     .sort((a, b) => b.spentMinor / b.budgetMinor - a.spentMinor / a.budgetMinor);
 
   /* The card acknowledges a limit you just changed, or spending that moved it. */
+  const settled = !!stats.data && !stats.isValidating && !cats.isValidating;
   const budgetPulse = usePulseOnChange(
     budgeted.map((c) => [c.id, c.budgetMinor, c.spentMinor]),
     month,
-    !!stats.data && !stats.isValidating && !cats.isValidating,
+    settled,
   );
 
   useEffect(() => {
@@ -1140,20 +1216,14 @@ function BudgetSection({ month }: { month: string }) {
                     </span>
                   </div>
 
-                  <div className="relative mt-3">
-                    <div
-                      className="h-2 rounded-full overflow-hidden w-full"
-                      style={{ background: 'var(--surface-3, var(--bg))' }}
-                    >
-                      <div
-                        className={`h-full rounded-full ${grow}`}
-                        style={{
-                          width: `${Math.min(100, Math.max(share * 100, share > 0 ? 2 : 0))}%`,
-                          background: `linear-gradient(90deg, ${from}, ${to})`,
-                          boxShadow: `0 0 12px -2px color-mix(in oklab, ${to} 55%, transparent)`,
-                        }}
-                      />
-                    </div>
+                  <StrainBar
+                    share={share}
+                    from={from}
+                    to={to}
+                    grow={grow}
+                    scope={`${month}:${c.id}`}
+                    ready={settled}
+                  >
                     {/* Where an even burn would put you today. A bar at 60% on
                         the 10th is a different story from the same bar on the
                         28th, and only the marker tells them apart. */}
@@ -1164,7 +1234,7 @@ function BudgetSection({ month }: { month: string }) {
                         style={{ left: `${pace * 100}%`, background: 'var(--text)', opacity: 0.55 }}
                       />
                     )}
-                  </div>
+                  </StrainBar>
 
                   <div className="flex items-baseline justify-between gap-3 mt-2">
                     <span className="text-[11px] muted truncate">

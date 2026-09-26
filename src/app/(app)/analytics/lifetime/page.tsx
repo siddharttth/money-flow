@@ -21,6 +21,8 @@ import { InsightsTabs } from '@/components/insights-tabs';
 import { BreakdownList } from '@/components/breakdown';
 import { LifetimeTotals, SavingsHistory, type LifetimeTallyRow } from '@/components/plan-cards';
 import { useInspector } from '@/components/inspector';
+import { SpendCalendar } from '@/components/spend-calendar';
+import type { CalendarDay } from '@/lib/analytics';
 import { useGrowClass } from '@/components/motion';
 
 type CategoryTotal = {
@@ -49,6 +51,7 @@ export default function LifetimePage() {
   const saved = useSWR<{ items: SavedMonth[] }>('/api/analytics/savings?months=24');
   const trends = useSWR<{ items: { month: string; totalMinor: number }[] }>('/api/analytics/trends?months=24');
   const cats = useSWR<{ items: CategoryTotal[] }>('/api/analytics/category-totals');
+  const calendar = useSWR<{ firstDate: string | null; days: CalendarDay[] }>('/api/analytics/calendar');
 
   if (lifetime.error) return <ErrorState message={lifetime.error.message} onRetry={() => lifetime.mutate()} />;
 
@@ -161,6 +164,18 @@ export default function LifetimePage() {
           </div>
         </Card>
       </div>
+
+      {/* ---------- Every day ----------
+          The months above are totals; this is their texture — which days the
+          money went out on. */}
+      {calendar.data?.firstDate && (
+        <div>
+          <SectionHead label="Every day" />
+          <Card>
+            <SpendCalendar firstDate={calendar.data.firstDate} days={calendar.data.days} />
+          </Card>
+        </div>
+      )}
 
       {/* ---------- All-time categories ---------- */}
       <div>

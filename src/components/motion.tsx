@@ -272,6 +272,42 @@ export function useFreshKeys(keys: string[], ready: boolean, scope = ''): Set<st
   return fresh;
 }
 
+/* ---------- a figure crossing a line ---------- */
+
+/**
+ * The thresholds a figure has just risen past — a budget reaching 90% and then
+ * 100%, a goal passing a quarter, a half, three quarters, all of it — while
+ * you were looking. Compared only between two settled views in the same
+ * `scope`: the first load is not a crossing (it was crossed before this page
+ * opened), another month is not a crossing, and falling back below a line
+ * is not one either. Each event carries a fresh `id` so the same line
+ * crossed twice plays twice.
+ *
+ * Not gated on reduced motion: what crossed is information. The caller
+ * decides what moves.
+ */
+export function useCrossing(
+  value: number | null | undefined,
+  marks: readonly number[],
+  ready: boolean,
+  scope = '',
+): { marks: number[]; id: number } | null {
+  const prev = useRef<{ scope: string; value: number } | null>(null);
+  const [event, setEvent] = useState<{ marks: number[]; id: number } | null>(null);
+
+  useEffect(() => {
+    if (!ready || value == null) return;
+    const before = prev.current;
+    prev.current = { scope, value };
+    if (!before || before.scope !== scope || value <= before.value) return;
+    const crossed = marks.filter((m) => before.value < m && value >= m);
+    if (crossed.length) setEvent((e) => ({ marks: crossed, id: (e?.id ?? 0) + 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the marks are constant per caller
+  }, [value, ready, scope]);
+
+  return event;
+}
+
 /* ---------- editing a figure in place ---------- */
 
 /**

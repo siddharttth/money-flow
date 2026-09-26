@@ -557,6 +557,64 @@ h1, h2, h3 {
     min-width: 5ch;
   }
 
+  /*
+   * Crossing a line — played once, at the moment of crossing, never on load.
+   *
+   * A budget reaching 90% flinches: one sharp shake that settles, not a
+   * tremor. Reaching 100% draws a hairline crack across the bar once; the
+   * crack then stays, drawn, as a plain fact. Two keyframes each so a second
+   * crossing mid-animation restarts it.
+   */
+  @keyframes mf-flinch-a { 0%, 100% { transform: none; } 20% { transform: translateX(-3px); } 45% { transform: translateX(3px); } 70% { transform: translateX(-1.5px); } }
+  @keyframes mf-flinch-b { 0%, 100% { transform: none; } 20% { transform: translateX(-3px); } 45% { transform: translateX(3px); } 70% { transform: translateX(-1.5px); } }
+  [data-flinch='a'] { animation: mf-flinch-a 160ms ease-out; }
+  [data-flinch='b'] { animation: mf-flinch-b 160ms ease-out; }
+  @keyframes mf-crack { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  .crack-draw { stroke-dasharray: 1; animation: mf-crack 200ms ease-out both; }
+
+  /*
+   * A goal passing a milestone: a ring bursts out from the end of the bar and
+   * is gone in under half a second. A finished goal's seal presses in once.
+   */
+  @keyframes mf-burst {
+    0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0.9; }
+    100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  }
+  .burst { animation: mf-burst 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes mf-stamp {
+    0%   { transform: scale(1.6) rotate(-14deg); opacity: 0; }
+    60%  { transform: scale(0.94) rotate(-8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+  }
+  .stamp-in { animation: mf-stamp 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+  @keyframes mf-caption { 0% { opacity: 0; } 12%, 80% { opacity: 1; } 100% { opacity: 0; } }
+  .milestone-caption { animation: mf-caption 2200ms ease-out both; }
+  /* A finished goal's seal: a small tilted stamp in the colour of money kept. */
+  .finish-seal {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border: 1.5px solid var(--credit);
+    border-radius: 999px;
+    color: var(--credit);
+    background: var(--credit-soft);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transform: rotate(-8deg);
+    white-space: nowrap;
+  }
+
+  /*
+   * The balance between you and everyone else: the point where owed-to-you
+   * meets you-owe is pulled across with an overshoot and settles, and lights
+   * once when it comes back to the middle.
+   */
+  .tug { transition: left 480ms cubic-bezier(0.34, 1.45, 0.64, 1), width 480ms cubic-bezier(0.34, 1.45, 0.64, 1), opacity 240ms ease-out; }
+  @keyframes mf-settle { 0% { box-shadow: 0 0 0 0 transparent; } 35% { box-shadow: 0 0 0 5px color-mix(in oklab, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .settle-glow { animation: mf-settle 700ms ease-out 360ms both; }
+
   /* The live dot on the dashboard header. Slow, low-amplitude — a heartbeat,
    not a blink. Stopped entirely under reduced motion, below. */
 @keyframes mf-pulse {
@@ -572,9 +630,16 @@ h1, h2, h3 {
     .rise,
     .wash,
     .month-back,
-    .month-fwd {
+    .month-fwd,
+    [data-flinch],
+    .crack-draw,
+    .burst,
+    .stamp-in,
+    .settle-glow {
       animation: none !important;
     }
+    .burst { display: none; }
+    .tug { transition: none !important; }
     .grow,
     .grow-spring,
     .ring-sweep,

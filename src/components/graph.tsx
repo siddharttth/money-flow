@@ -51,6 +51,7 @@ export function FlowCurve({
    */
   dated = false,
   fill = false,
+  whatIf,
 }: {
   points: FlowPoint[];
   monthDays: number;
@@ -59,18 +60,54 @@ export function FlowCurve({
   /** Grow to the height of the container, with `height` as the floor. The
       plot is drawn with preserveAspectRatio="none", so it stretches cleanly. */
   fill?: boolean;
+  /**
+   * A handle on the end of the projection, for the month still under way:
+   * drag it to try a daily rate for the days that are left and read where the
+   * month would land. Exploratory only — nothing is saved, and it resets on
+   * leaving the page or on Reset. It never proposes a rate of its own.
+   */
+  whatIf?: {
+    /** The month's own pace and projection, as the dashboard states them —
+        the handle rests there, and the readout repeats them until dragged. */
+    paceMinor: number;
+    projectedMinor: number;
+    prevFullMinor: number;
+    monthName: string;
+    prevMonthName: string;
+  };
 }) {
   const gid = useId().replace(/:/g, '');
   const wrapRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
+  /** The daily rate being tried, in paise; null is the real pace. */
+  const [tryRate, setTryRate] = useState<number | null>(null);
+  const dragging = useRef(false);
 
   const W = 1000;
   const H = 320;
   const PAD = { top: 14, right: 8, bottom: 22, left: 8 };
 
+  const last = points.at(-1);
+  const remaining = last ? monthDays - last.day : 0;
+  const planning = !!whatIf && !!last && remaining > 0 && last.day > 0;
+  const paceRate = whatIf?.paceMinor ?? 0;
+  const paceEnd = whatIf?.projectedMinor ?? 0;
+  /** Where the month lands at the rate on screen: the real projection until
+      a rate is tried. */
+  const planEnd = tryRate == null ? paceEnd : (last?.thisMinor ?? 0) + tryRate * remaining;
+
   const max = useMemo(
-    () => niceMax(Math.max(1, ...points.map((p) => Math.max(p.thisMinor, p.prevMinor)))),
-    [points],
+    () =>
+      niceMax(
+        Math.max(
+          1,
+          ...points.map((p) => Math.max(p.thisMinor, p.prevMinor)),
+          /* Room above the projection to drag into, when there is one. */
+          ...(planning ? [paceEnd * 1.2, (whatIf?.prevFullMinor ?? 0) * 1.1] : []),
+        ),
+      ),
+    [points, planning, paceEnd, whatIf?.prevFullMinor],
   );
 
   if (points.length < 2) return null;
@@ -117,6 +154,7 @@ export function FlowCurve({
       */}
       <div className={`relative ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`}>
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         height={fill ? undefined : height}
@@ -230,13 +268,13 @@ export function FlowCurve({
               x1={x(points.at(-1)!.day)}
               y1={y(points.at(-1)!.thisMinor)}
               x2={x(monthDays)}
-              y2={y(Math.min(max, (points.at(-1)!.thisMinor / points.at(-1)!.day) * monthDays))}
-              stroke="var(--brass)"
+              y2={y(Math.min(max, planning ? planEnd : (points.at(-1)!.thisMinor / points.at(-1)!.day) * monthDays))}
+              stroke={tryRate != null ? 'var(--accent)' : 'var(--brass)'}
               strokeWidth="1.5"
               strokeDasharray="2 5"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              opacity="0.45"
+              opacity={tryRate != null ? 0.9 : 0.45}
             />
           </>
         )}
@@ -268,6 +306,51 @@ export function FlowCurve({
           </span>
         );
       })()}
+
+      {/* The handle on the month's end. A generous target of its own, so a
+          finger on it drags and a finger anywhere else still scrolls. */}
+      {planning && (
+        <span
+          role="slider"
+          tabIndex={0}
+          aria-label={`Daily spending to try for the rest of ${whatIf!.monthName}`}
+          aria-valuemin={0}
+          aria-valuenow={Math.round((tryRate ?? paceRate) / 100)}
+          aria-valuetext={`${formatINR(tryRate ?? paceRate)} a day`}
+          className="absolute w-9 h-9 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ns-resize rounded-full focus-visible:outline-2"
+          style={{
+            left: `${(x(monthDays) / W) * 100}%`,
+            top: `${(y(Math.min(max, planEnd)) / H) * 100}%`,
+            touchAction: 'none',
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            dragging.current = true;
+            drag(e.clientY);
+          }}
+          onPointerMove={(e) => dragging.current && drag(e.clientY)}
+          onPointerUp={() => (dragging.current = false)}
+          onPointerCancel={() => (dragging.current = false)}
+          onKeyDown={(e) => {
+            const step = (e.shiftKey ? 100 : 10) * 100;
+            if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setTryRate(roundRate((tryRate ?? paceRate) + step));
+            else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') setTryRate(Math.max(0, roundRate((tryRate ?? paceRate) - step)));
+            else if (e.key === 'Escape') setTryRate(null);
+            else return;
+            e.preventDefault();
+          }}
+        >
+          <span
+            className="w-3 h-3 rounded-full"
+            style={{
+              background: tryRate != null ? 'var(--accent)' : 'var(--surface)',
+              border: '2px solid var(--accent)',
+              boxShadow: '0 0 10px -1px color-mix(in oklab, var(--accent) 70%, transparent)',
+            }}
+          />
+        </span>
+      )}
       </div>
 
       {/* Five stops rather than two ends — "Day 14" is a place, "1 … 30" is a
@@ -283,8 +366,52 @@ export function FlowCurve({
           </span>
         ))}
       </div>
+
+      {planning && (() => {
+        const rate = tryRate ?? paceRate;
+        const end = Math.round(planEnd);
+        const diff = end - whatIf!.prevFullMinor;
+        return (
+          <p className="text-[12.5px] mt-3 leading-relaxed" aria-live="polite">
+            <span className="muted">At </span>
+            <span className="num font-semibold">{formatINR(rate)}</span>
+            <span className="muted"> a day from here{tryRate == null ? ' (your pace so far)' : ''}, {whatIf!.monthName} ends at </span>
+            <span className="num font-semibold">{formatINR(end)}</span>
+            {whatIf!.prevFullMinor > 0 && (
+              <span className="muted">
+                {' '}
+                — <span className="num" style={{ color: diff > 0 ? 'var(--rule-red)' : 'var(--credit)' }}>{formatINR(Math.abs(diff))}</span>{' '}
+                {diff > 0 ? 'over' : 'under'} {whatIf!.prevMonthName}
+              </span>
+            )}
+            <span className="muted">.</span>{' '}
+            {tryRate == null ? (
+              <span className="muted">Drag the end of the dotted line to try another rate.</span>
+            ) : (
+              <button type="button" className="micro micro-link" style={{ color: 'var(--accent)' }} onClick={() => setTryRate(null)}>
+                Reset
+              </button>
+            )}
+          </p>
+        );
+      })()}
     </div>
   );
+
+  /** The rate a drag to this height means, in whole ₹10 steps, never below zero. */
+  function drag(clientY: number) {
+    const box = svgRef.current?.getBoundingClientRect();
+    if (!box) return;
+    const units = ((clientY - box.top) / box.height) * H;
+    const minor = max * (1 - (units - PAD.top) / (H - PAD.top - PAD.bottom));
+    const end = Math.min(max, Math.max(last!.thisMinor, minor));
+    setTryRate(roundRate((end - last!.thisMinor) / remaining));
+  }
+}
+
+/** A daily rate in whole ₹10 steps. */
+function roundRate(minor: number) {
+  return Math.max(0, Math.round(minor / 1000) * 1000);
 }
 
 /** Five evenly spaced day labels, with today named where it falls. */

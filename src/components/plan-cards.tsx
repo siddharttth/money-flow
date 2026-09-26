@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSWRConfig } from 'swr';
 import { api } from '@/lib/client';
@@ -11,7 +11,7 @@ import type { Fund } from '@/lib/funds';
 import { Card, Money } from './ui';
 import { ShareBar } from './graph';
 import { CategoryIcon, NavIcon } from './icons';
-import { Collapse, CountMoney, InlineEdit, useGrowClass, useMotionOk, usePulseOnChange, useTween } from './motion';
+import { Collapse, CountMoney, InlineEdit, useCrossing, useGrowClass, useMotionOk, usePulseOnChange, useTween } from './motion';
 import { useToast } from './toast';
 
 function PlanLine({
@@ -172,6 +172,14 @@ function monthName(month: string): string {
  * about a goal they will miss by a year, so the pace line is not optional
  * decoration — it is the point of the card.
  */
+const MILESTONES = [0.25, 0.5, 0.75, 1] as const;
+const MILESTONE_LINES: Record<number, string> = {
+  0.25: 'A quarter of the way',
+  0.5: 'Halfway there',
+  0.75: 'Three quarters there',
+  1: 'Goal reached',
+};
+
 export function FundCard({
   fund,
   onAdd,
@@ -189,6 +197,26 @@ export function FundCard({
   const save = useSaveCategory();
   /* The card acknowledges a contribution landing or a target you changed. */
   const pulse = usePulseOnChange([fund.savedMinor, fund.targetMinor, fund.targetDate], month, settled);
+
+  /*
+   * A contribution that carries the goal past a quarter, a half, three
+   * quarters or the whole way: a burst off the end of the bar and a line
+   * saying which, for this goal only, and only as it happens — a page that
+   * opens on a goal at 60% has nothing to celebrate that it did not already
+   * know. Reduced motion keeps the line and drops the burst.
+   */
+  const ok = useMotionOk();
+  const milestone = useCrossing(fund.progress, MILESTONES, settled, month);
+  const reached = milestone ? Math.max(...milestone.marks) : null;
+  const [caption, setCaption] = useState<{ text: string; id: number } | null>(null);
+  useEffect(() => {
+    if (!milestone || reached == null) return;
+    setCaption({ text: MILESTONE_LINES[reached], id: milestone.id });
+    const t = setTimeout(() => setCaption(null), 2200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one caption per crossing
+  }, [milestone?.id]);
+  const stampNow = ok && reached === 1;
 
   /*
    * Laid out by the card's own width, not the screen's. One goal gets the
@@ -212,12 +240,15 @@ export function FundCard({
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-[15px] font-semibold truncate">{fund.name}</h3>
+                {/* The finish seal — a real state, so it is there on every load;
+                    it only presses in on the save that finished the goal. */}
                 {fund.isComplete && (
                   <span
-                    className="micro px-1.5 py-0.5 rounded"
-                    style={{ background: 'var(--credit-soft)', color: 'var(--credit)' }}
+                    key={stampNow ? milestone!.id : 'seal'}
+                    className={`finish-seal shrink-0 ${stampNow ? 'stamp-in' : ''}`}
+                    aria-label="Goal reached"
                   >
-                    done
+                    ✓ Goal reached
                   </span>
                 )}
               </div>
@@ -251,9 +282,35 @@ export function FundCard({
           </div>
 
           <div className="mt-4">
-            <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} spring />
+            <div className="relative">
+              <ShareBar share={fund.progress} color={fund.isComplete ? 'var(--credit)' : fund.color} height={8} spring />
+              {ok && milestone && (
+                <span
+                  key={milestone.id}
+                  aria-hidden
+                  className="burst absolute top-1/2 w-5 h-5 rounded-full pointer-events-none"
+                  style={{
+                    left: `${Math.min(100, fund.progress * 100)}%`,
+                    border: `2px solid ${fund.isComplete ? 'var(--credit)' : fund.color}`,
+                    boxShadow: `0 0 14px ${fund.isComplete ? 'var(--credit)' : fund.color}`,
+                  }}
+                />
+              )}
+            </div>
             <div className="flex items-baseline justify-between gap-3 mt-2">
-              <span className="num text-[12px] font-semibold">{Math.round(fund.progress * 100)}%</span>
+              <span className="num text-[12px] font-semibold">
+                {Math.round(fund.progress * 100)}%
+                {caption && (
+                  <span
+                    key={caption.id}
+                    role="status"
+                    className="milestone-caption ml-2 font-semibold"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {caption.text}
+                  </span>
+                )}
+              </span>
               {!fund.isComplete && (
                 <span className="num text-[12px] muted">{formatINR(fund.remainingMinor)} to go</span>
               )}

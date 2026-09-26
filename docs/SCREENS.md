@@ -97,7 +97,7 @@ column beside it; the curve takes the difference.
 - **Spend allocation** — a stacked bar scaled to the larger of money-in and
   money-out, with a red mark where income ran out. Legs: Spent · Invested ·
   Free / From savings. The caption carries the textbook savings rate, qualified.
-- **Cumulative spend trajectory** — this month against last month's dashed line.
+- **Cumulative spend trajectory** — this month against last month's dashed line. In the live month a **what-if handle** sits on the end of the projection: drag it to try a daily rate for the days left and read where the month lands against last month. Exploratory only — **Reset** puts it back, nothing is saved, and it never suggests a rate.
 - **Stat strip** as the footer row: **Today** and **This week** (each opens
   those transactions) · **Typical entry** (opens Entry sizes on This month) ·
   **Net with people**, with "You are owed ₹X · **Settle →**" when anything is open.
@@ -220,7 +220,8 @@ Says a payment is logged like anything else, and that this is what feeds
 ### Goals
 - One **FundCard** per goal:
   - Name, `saved of target`, and `by <date>` (with the year when it isn't this one) — **the target and the date are editable in place**. The date cannot go into the past; clearing it leaves the goal with no deadline ("add a date").
-  - Progress bar, % and **₹X to go**
+  - Progress bar, % and **₹X to go**. A contribution that carries the goal past a quarter, half, three quarters or the whole way bursts off the end of the bar with a one-line caption ("Halfway there") — that goal only, and only as it happens.
+  - A finished goal carries a **"✓ Goal reached" seal**, pressed in on the save that finished it and simply there afterwards.
   - **Needs a month** — the contribution required to land on time — and months left
   - **Pace** — ₹X ahead of / behind plan. Says **"Just started"** for the first three weeks rather than dressing one deposit up as a trend.
   - **Projection** — "At the rate so far you get there around `<date>`", and whether that beats the target. Withheld until there are 2+ contributions and 30 days of history.
@@ -246,7 +247,7 @@ Explains that none of this counts as spending anywhere in the app, and that the 
 
 ### Net exposure card
 - Big figure: net balance, with "owed to you, on balance" / "you owe, on balance" / "everything is settled".
-- **They owe me** and **I owe** side by side over one two-sided bar.
+- **They owe me** and **I owe** side by side over one two-sided bar, with a **knob where the sides meet**. A lend or borrow pulls it across with a small overshoot; settling everything eases it back to the middle and lights it once. With nothing open the bar stays, knob centred: "All square, both ways".
 - Two actions: **↗ I lent money** and **↙ I borrowed money**.
 - The card's footer row — three facts about the ledger as a whole:
   - **Active ledgers** — contacts, how many are outstanding and how many balanced. Tapping it switches to **Owing**.
@@ -295,6 +296,11 @@ place** — a bar that runs green, amber when ahead of pace, and red when over,
 and **a pace marker** showing where an even burn would put you today. A bar at
 60% on the 10th is a different story from the same bar on the 28th, and the
 marker is what says which. Tapping a row opens the category inspector.
+
+**Strain** — when spending pushes a bar past 90% while you are looking, it
+flinches once; past 100%, a hairline crack draws across it. The crack then
+stays for as long as the category is over, and on a fresh load it is simply
+there. Nothing plays for a line crossed before the page opened.
 
 ### Where it went
 One card, two halves: by category and by person — two ways of slicing the same month.
@@ -360,6 +366,16 @@ One card, two halves the same height.
 - **What you keep** — savings rate per month, gaps for months with no income,
   and a **pooled** footer (`Σsaved ÷ Σincome`, not the mean of the rates). The
   latest twelve, with **Show N earlier months**.
+
+### Every day *(new)*
+A year of spending as a heatmap, laid out like a contribution graph: one column
+per week, one row per weekday, a square per day shaded by what went out (four
+shades, scaled to your own spending). "Nothing spent" and "no record" are drawn
+differently, so a gap in the record never passes for a frugal day. Year tabs,
+with the year's total, spending days and no-spend days beside them. Hover or
+tap reads the day out — amount, entries, the category that took the most — and
+a click (or a second tap) opens that day in Transactions. On a phone the strip
+scrolls sideways and opens on the latest weeks.
 
 ### What it has all gone on *(new)*
 Every category by lifetime total, in two columns on a wide screen. The monthly
@@ -437,7 +453,7 @@ A three-step wizard, reachable from Settings → Data.
 | **Soft delete + Undo** | Deleting a transaction or ledger entry sets `deleted_at` and raises a toast with **Undo**. Nothing is lost. |
 | **Clear lending history** | Per person, from their inspector. Hides every entry from the UI but keeps the rows for analytics. Two-step confirm. |
 | **Month persistence** | Every month-scoped screen keeps its own selection. Dashboard and Lifetime have no picker at all — one is always now, the other is always everything. |
-| **Motion** | For changes, never for arrival: nothing animates while a page is loading. After that, figures count to their new value and bars ease to it (~220ms; goal and budget bars overshoot ~2%), collapsed sections slide open, a card highlights after a change you made (switching month is not one), and a row you added, edited or restored highlights once. Drawers slide, and nothing spins except a genuine network wait. Everything collapses to zero duration under `prefers-reduced-motion`. |
+| **Motion** | For changes, never for arrival: nothing animates while a page is loading. After that, figures count to their new value and bars ease to it (~220ms; goal and budget bars overshoot ~2%), collapsed sections slide open, a card highlights after a change you made (switching month is not one), and a row you added, edited or restored highlights once. Drawers slide, and nothing spins except a genuine network wait. The one other event is **a figure crossing a line while you watch**: a budget flinching at 90% and cracking at 100%, a goal bursting at each quarter with a one-line caption and a seal when finished, the People balance knob pulled across and lit when everything settles. Never on load. Everything collapses to zero duration under `prefers-reduced-motion` — the crack, seal and caption still show. |
 | **Editing in place** | A single value — a category's monthly budget, a goal's target or date — is edited where it is printed: tap it, type, Enter saves, Escape cancels. Anything with more than one field, or a confirmation step (a transaction and its split, a settle-up), keeps its sheet. |
 | **Stale-while-revalidate** | Switching months keeps the previous figures on screen while the next load runs, rather than blanking to skeletons. |
 | **Empty states** | Every list and card has one. A full-size one says what is missing and, where there is one, offers the action that would fill it; inside a paired or tabbed card it is a single quiet line, so the empty half is never taller than the full one. |

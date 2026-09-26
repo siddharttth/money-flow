@@ -6,7 +6,7 @@ vi.mock('@/db', () => ({ db: testDb }));
 
 const { users, categories, people, expenses, expensePeople, ledgerEntries } = await import('@/db/schema');
 const { createExpense } = await import('@/lib/expenses');
-const { getTotal } = await import('@/lib/analytics');
+const { getTotal, getSpendCalendar } = await import('@/lib/analytics');
 const { getRecurringCharges, splitCommitted } = await import('@/lib/recurring');
 const { getFunds, requiredSavingsMinor } = await import('@/lib/funds');
 const { getMonthlyPlan, getSweep, getSavingsHistory, getLifetimeTally } = await import('@/lib/plan');
@@ -709,6 +709,38 @@ describe('lifetime savings leaves the ledger out', () => {
 
     const after = await getLifetimeTally(userId);
     expect(after.savingsMinor).toBe(4_000_000);
+  });
+});
+
+describe('the spending calendar', () => {
+  it('adds each day up, names its biggest category, and leaves income and investing out', async () => {
+    await add(40000, 'Salary', '2026-08-01');
+    // Two food entries (₹700 together) outweigh one larger bill (₹500).
+    await add(300, 'Outside Food', '2026-08-03');
+    await add(500, 'Bills', '2026-08-03');
+    await add(400, 'Outside Food', '2026-08-03');
+    await add(5000, 'SIP', '2026-08-04');
+    await add(120, 'Outside Food', '2026-08-06');
+
+    const cal = await getSpendCalendar(userId);
+    // The first day anything was recorded, income included — so the 2nd, with
+    // nothing spent, reads as tracked rather than as no record.
+    expect(cal.firstDate).toBe('2026-08-01');
+    expect(cal.days).toEqual([
+      expect.objectContaining({ date: '2026-08-03', totalMinor: 120_000, count: 3, top: expect.objectContaining({ name: 'Outside Food' }) }),
+      expect.objectContaining({ date: '2026-08-06', totalMinor: 12_000, count: 1, top: expect.objectContaining({ name: 'Outside Food' }) }),
+    ]);
+  });
+
+  it('adds up to the lifetime spending total', async () => {
+    await add(40000, 'Salary', '2026-08-01');
+    await add(300, 'Outside Food', '2026-08-03');
+    await add(700, 'Bills', '2026-09-10');
+    await add(5000, 'SIP', '2026-09-11');
+
+    const cal = await getSpendCalendar(userId);
+    const life = await getLifetimeTally(userId);
+    expect(cal.days.reduce((s, d) => s + d.totalMinor, 0)).toBe(life.outMinor);
   });
 });
 

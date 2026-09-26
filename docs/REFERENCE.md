@@ -24,7 +24,7 @@ Read this first; it explains most of the formulas below.
 | **Soft delete** | Every query filters `deleted_at IS NULL`. Deleting is reversible; nothing is destroyed. |
 | **A partial period is only compared to the same partial period** | Month-to-date is compared against the same elapsed days of last month, never against the whole of it. Baselines are pro-rated by `elapsedDays / monthDays`. |
 | **Honesty gates** | A derived figure that needs N observations does not render below N — it renders what it is waiting for. Applies to goal pace (21 days), goal projection (2 contributions + 30 days), category projection (4 transactions), momentum (2 eligible months), income patterns (4 payments), charts (2 months). |
-| **Motion is for changes, never for arrival** | `src/components/motion.tsx`. Every request goes through a counter in the SWR fetcher; a component only animates once its page's requests have finished and the page has been quiet for 450ms. Before that every change snaps. After it: money figures count to their new value (220ms, integer paise throughout), bars and rings ease to their new width (220ms, goal and budget bars overshoot ~2% at 260ms), collapsible sections open by animating one grid row 0fr→1fr (200ms), a card that changed because of something you did pulses its accent ring once (250ms), and a row you just added, edited or restored washes once (950ms). A card's pulse is scoped to the view — switching month is not a change. All of it is off under `prefers-reduced-motion`. |
+| **Motion is for changes, never for arrival** | `src/components/motion.tsx`. Every request goes through a counter in the SWR fetcher; a component only animates once its page's requests have finished and the page has been quiet for 450ms. Before that every change snaps. After it: money figures count to their new value (220ms, integer paise throughout), bars and rings ease to their new width (220ms, goal and budget bars overshoot ~2% at 260ms), collapsible sections open by animating one grid row 0fr→1fr (200ms), a card that changed because of something you did pulses its accent ring once (250ms), and a row you just added, edited or restored washes once (950ms). A card's pulse is scoped to the view — switching month is not a change. **Crossing a line** is the one other event (`useCrossing`): a figure rising past a threshold *while you watch* — never on load, never on a month switch, never falling back. A budget passing 90% flinches once (160ms); passing 100% draws a hairline crack (200ms) that then stays, static, while over. A goal passing 25/50/75/100% bursts off the end of its bar (380ms) with a one-line caption for ~2s, and a finished goal's seal presses in. The balance knob on People is pulled across with an overshoot (480ms) and lights once when everything settles. All of it is off under `prefers-reduced-motion` — the crack, seal and caption still appear, unanimated. |
 | **Single values edit where they are printed** | A figure that is one field of one record — a category's monthly budget, a goal's target amount or date — is tap-to-edit in place (`InlineEdit`): dotted underline, Enter saves, Escape or leaving the field cancels. It saves one field through `PATCH /api/categories/[id]` and refreshes every screen that reads it. Anything multi-field, or anything whose flow carries a confirmation (transaction amounts and their splits, settle-ups), still opens its sheet. |
 
 ### Shared shell — on all eight pages
@@ -106,6 +106,7 @@ page's glow and pulses when its figures change.
 | Element | Calculation | Representation |
 | --- | --- | --- |
 | **Flow curve** | Cumulative running total per day. Solid = this month; dashed = last month at the same day index. Runs to **today** in a live month, not to the 31st. Needs ≥ 2 points. | SVG area + line, 230px minimum, growing to fill the card's height |
+| **What-if handle** — *live month only* | Rests at `pace.projectedMinor`; dragging sets a daily rate for the `monthDays − today` days left, in ₹10 steps, never below ₹0: `end = spentToDay + rate × daysLeft`. Compared with `pace.prevFullMinor`. | A handle on the end of the dotted run-out (36px target; arrow keys ±₹10, Shift ±₹100, Escape resets). Readout: "At ₹X a day from here (your pace so far), \<Month\> ends at ₹Y — ₹Z under/over \<last month\>." — the same two figures as the hero's "projected … at …/day" until dragged. **Reset** once a rate is tried. Nothing is saved; it never proposes a rate. |
 
 #### Stat strip — the card's footer row
 | Tile | Calculation | Representation |
@@ -248,7 +249,7 @@ changes while you are on it (a payment recorded).
 | Element | Calculation | Representation |
 | --- | --- | --- |
 | Net | `Σ(direction='out') − Σ(direction='in')` across everyone | Hero figure, `|net|` with "Net receivable" / "Net payable" badge and "owed to you, on balance" / "you owe, on balance" / "everything is settled"; "Across N open counterparties." |
-| They owe me / I owe | `owedToMeMinor` = Σ of positive per-person balances; `owedByMeMinor` = Σ of negative ones | Green and red figures over **one** two-sided bar, each side with its figure and % of the total |
+| They owe me / I owe | `owedToMeMinor` = Σ of positive per-person balances; `owedByMeMinor` = Σ of negative ones | Green and red figures over **one** two-sided bar, each side with its figure and % of the total. **A knob sits where the two sides meet** and is pulled across with an overshoot when a balance changes. With nothing open the bar stays, empty, knob centred, "All square, both ways" — and a settle-up that gets there eases the knob back to the middle and lights it once. |
 | Actions | — | **↗ I lent money** / **↙ I borrowed money** ghost buttons |
 
 The card's footer row — three facts about the ledger as a whole:
@@ -322,6 +323,7 @@ One card split by hairlines.
 | **Pace marker** | `pace = (dayOfMonth) / daysInMonth`, clamped to 1; only in the current month | 1px vertical rule at `pace × 100%`, 55% opacity |
 | Colour | Red when over; amber when `share > pace + 0.05`; else green | Gradient along the bar |
 | Status line | — | "Limit already reached" / "Ahead of an even burn for this point in the month" / "N% of the month elapsed" / "Within the limit", and "N% of planned" |
+| **Strain** | `share` crossing 0.9 or 1 while the page is open, per category and month | Crossing 90%: the bar flinches once. Crossing 100%: a hairline crack draws across the bar near its end. The crack stays while over — on a fresh load it is simply there, undrawn. |
 
 The card pulses when a budget or its spending changes within the month shown.
 
@@ -425,6 +427,23 @@ across to its amount.
 | **What you keep** | Per month: `saved = in − out`, `ratePct = saved / in`. Months with **no income are drawn as gaps, not zeroes**. | One row per month: name, %, amount, bar. Negative months in red. The latest 12, with **Show N earlier months** sliding the rest open. |
 | Footer average | **Pooled** over every month, shown or not: `Σsaved / Σin`, not the mean of the monthly rates — a ₹5k month at 90% must not weigh as much as a ₹50k month at 20%. | "Averaging N% kept across M months with income logged." |
 
+### Every day — *once anything is recorded*
+`/api/analytics/calendar` → `getSpendCalendar`: per day, spending only (not income
+or investment), its entry count and the category that took the most. Adds up to
+Lifetime spent exactly.
+
+| Element | Calculation | Representation |
+| --- | --- | --- |
+| Day square | Four shades by **quartile** of the days with any spending, so the scale fits this person | Accent mixed in at 26 / 46 / 70 / 100% |
+| Nothing spent | A day between the first record and today with no spending | Plain filled square |
+| No record | Before the first record (any kind), or still to come | Outline only — never drawn like "nothing spent" |
+| Today | — | Accent outline |
+| Readout | — | Hover or focus: "\<weekday, date\> · ₹X · N entries · Mostly \<category\>". Click opens `/expenses?day=`; on touch the first tap reads, a second (or **Open day →**) opens. |
+| Layout | A calendar year as a contribution graph: one column per Monday-first week, one row per weekday | Month labels over the week holding each 1st; Mon / Wed / Fri down the side. On a narrow screen the strip scrolls sideways and opens with today near the right edge. |
+| Year tabs | Every year from the first record to this one, newest first | Tabs; the summary beside them: "₹X in \<year\> · spent on N days · N no-spend days". The shade scale is shared across years, so a tab reads the same as the next. |
+
+Nothing on it animates.
+
 ### What it has all gone on
 All-time totals per category, ranked — two columns on a wide screen, reading
 down the first and on into the second. Tapping one opens the inspector in
@@ -478,6 +497,8 @@ so) · Contributions count · Last month (tapping it steps to that month).
 | --- | --- | --- |
 | Header | `savedMinor of targetMinor · by <targetLabel>` — the date carries the **year** when it is not this one | Icon, name, muted line. **The target and the date are editable in place**: the date cannot be before today, and clearing it leaves a goal with no deadline ("add a date"). |
 | Progress | `min(1, saved / target)` | 8px bar, green when complete |
+| **Milestones** | `progress` crossing 0.25 / 0.5 / 0.75 / 1 while the page is open | A ring bursts off the end of the bar and a caption beside the % — "A quarter of the way" / "Halfway there" / "Three quarters there" / "Goal reached" — fades after ~2s. Only the goal that crossed. |
+| **Finish seal** | `isComplete` | A tilted "✓ Goal reached" stamp beside the name, on every load; it presses in only on the save that finished the goal |
 | Remaining | `max(0, target − saved)` | "₹X to go" |
 | **Needs a month** | `ceil(remaining / monthsLeft)` where `monthsLeft = monthsBetween(today, targetDate)` — part months count as one | Figure + "N months left" |
 | **Pace** | `expectedByNow = target × (elapsed / span)` on the line from the **first contribution** to the target date; `paceDelta = saved − expectedByNow` | Green "+₹X ahead of plan" / red "−₹X behind plan" |

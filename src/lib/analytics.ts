@@ -475,3 +475,59 @@ export async function getSummary(userId: string, month: string) {
     activeDays: elapsed,
   };
 }
+
+export type CalendarDay = {
+  date: string;
+  totalMinor: number;
+  count: number;
+  /** The category that took the most that day. */
+  top: { name: string; color: string } | null;
+};
+
+/**
+ * Every day's spending, all time, for the Lifetime calendar: what went out,
+ * how many entries, and which category took most of it.
+ *
+ * Spending only — income and investment are not what a spending calendar
+ * shades. `firstDate` is the first day anything at all was recorded, so the
+ * calendar can tell a day that was tracked and cost nothing from a day before
+ * tracking began.
+ */
+export async function getSpendCalendar(userId: string): Promise<{ firstDate: string | null; days: CalendarDay[] }> {
+  const live = and(eq(expenses.userId, userId), isNull(expenses.deletedAt));
+  const [rows, [first]] = await Promise.all([
+    db
+      .select({
+        date: expenses.expenseDate,
+        name: categories.name,
+        color: categories.color,
+        total: sql<string>`SUM(${expenses.amountMinor})`,
+        count: sql<string>`COUNT(*)`,
+      })
+      .from(expenses)
+      .innerJoin(categories, eq(categories.id, expenses.categoryId))
+      .where(and(live, sql`${categories.kind} NOT IN ('investment', 'income')`))
+      .groupBy(expenses.expenseDate, categories.id, categories.name, categories.color),
+    db.select({ date: sql<string | null>`MIN(${expenses.expenseDate})` }).from(expenses).where(live),
+  ]);
+
+  const byDay = new Map<string, CalendarDay & { topMinor: number }>();
+  for (const r of rows) {
+    const total = sumToMinor(r.total);
+    const day = byDay.get(r.date) ?? { date: r.date, totalMinor: 0, count: 0, top: null, topMinor: -1 };
+    day.totalMinor += total;
+    day.count += Number(r.count);
+    if (total > day.topMinor) {
+      day.topMinor = total;
+      day.top = { name: r.name, color: r.color };
+    }
+    byDay.set(r.date, day);
+  }
+
+  return {
+    firstDate: first?.date ?? null,
+    days: [...byDay.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(({ topMinor: _topMinor, ...d }) => d),
+  };
+}
