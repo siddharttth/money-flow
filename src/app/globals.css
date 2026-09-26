@@ -1258,3 +1258,35 @@ body:has(.auth) { background: var(--paper-0); }
   animation: lp-blink 2.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .lp-caret { animation: none; } }
+
+/*
+ * The landing page's working demo — the app's own motion, in the landing
+ * palette: an entry rising in, a row lighting after a change, a settled
+ * balance swept in gold, a save that fills, lands and confirms.
+ */
+@keyframes lp-rise { from { opacity: 0; transform: translateY(6px); } }
+.lp-rise { animation: lp-rise 320ms var(--ease-lux) both; }
+@keyframes lp-fade { from { opacity: 0; } }
+.lp-fade { animation: lp-fade 180ms ease-out both; }
+@keyframes lp-flash {
+  0%   { background: color-mix(in oklab, var(--gold) 20%, transparent); }
+  100% { background: transparent; }
+}
+.lp-flash { animation: lp-flash 1100ms ease-out; }
+@keyframes lp-sweep { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.lp-sweep {
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--gold) 22%, transparent) 45%, color-mix(in oklab, var(--gold) 22%, transparent) 55%, transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: lp-sweep 1100ms var(--ease-lux) both;
+}
+@keyframes lp-fill { from { width: 0; } to { width: 100%; } }
+.lp-saving { background: color-mix(in oklab, var(--onforest) 35%, transparent); animation: lp-fill 380ms ease-out both; }
+@keyframes lp-saved { 0% { transform: scale(1); } 40% { transform: scale(1.025); } 100% { transform: scale(1); } }
+.lp-saved { animation: lp-saved 360ms var(--ease-lux); }
+@keyframes lp-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 60% { transform: translateX(4px); } }
+.lp-shake { animation: lp-shake 220ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-rise, .lp-fade, .lp-flash, .lp-sweep, .lp-saving, .lp-saved, .lp-shake { animation: none; }
+  .lp-sweep { background-image: none; }
+}

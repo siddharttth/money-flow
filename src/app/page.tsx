@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getSession } from '@/lib/auth';
 import { Reveal } from '@/components/lp-reveal';
 import { Logo } from '@/components/logo';
-import { DashboardPanel, LedgerPanel, MechanismPanels, Ticker } from '@/components/lp-mockups';
+import { DashboardPanel, LandingDemo, LedgerPanel, MechanismPanels, Ticker } from '@/components/lp-mockups';
 
 /**
  * Public landing page.
@@ -80,6 +80,8 @@ export default async function LandingPage() {
       </header>
 
       <main>
+        {/* One pretend ledger the panels share, so they behave as one app. */}
+        <LandingDemo>
         {/* ------------------------------ Hero ----------------------------- */}
         <section id="top" className="lp-paper mx-auto max-w-6xl px-6 pt-40 md:pt-48 pb-24 text-center">
           <Reveal>
@@ -309,6 +311,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        </LandingDemo>
       </main>
 
       <footer className="py-14" style={{ background: 'var(--forest-ink)', color: 'var(--onforest)' }}>
