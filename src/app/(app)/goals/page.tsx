@@ -5,6 +5,8 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { currentMonth, dayLabel, monthLabel, shiftMonth } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
+import { api } from '@/lib/client';
+import type { Expense } from '@/lib/types';
 import type { InvestmentSummary } from '@/lib/investments';
 import type { Fund } from '@/lib/funds';
 import {
@@ -45,7 +47,7 @@ export default function InvestmentsPage() {
   const [month, setMonth] = useState(currentMonth());
   const [allContributions, setAllContributions] = useState(false);
   const grow = useGrowClass();
-  const { openAdd } = useShell();
+  const { openAdd, toast } = useShell();
   const { openCategory } = useInspector();
 
   const { data, error, mutate } = useSWR<InvestmentSummary>(`/api/analytics/investments?month=${month}`);
@@ -55,17 +57,37 @@ export default function InvestmentsPage() {
 
   const monthName = monthLabel(month).split(' ')[0];
   const folds = (data?.recent.length ?? 0) > RECENT + 2;
+  /* A contribution recorded wrong is fixed where it is seen: the row opens
+     the same edit sheet the ledger uses, with the whole entry loaded. */
+  async function editContribution(id: string) {
+    try {
+      openAdd(await api.get<Expense>(`/api/expenses/${id}`));
+    } catch {
+      toast('Could not open that entry', 'error');
+    }
+  }
+
   const renderContribution = (e: InvestmentSummary['recent'][number]) => (
-    <li key={e.id} className="flex items-center gap-3 px-3.5 sm:px-4 py-3">
-      <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
-      <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
-        <p className="micro mt-0.5">
-          {dayLabel(e.date)}
-          {e.note ? ` · ${e.category.name}` : ''}
-        </p>
-      </div>
-      <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
+    <li key={e.id}>
+      <button
+        type="button"
+        className="group row w-full text-left flex items-center gap-3 px-3.5 sm:px-4 py-3"
+        onClick={() => editContribution(e.id)}
+        aria-label={`Edit ${e.note || e.category.name}, ${formatINR(e.amountMinor)}`}
+      >
+        <CategoryIcon icon={e.category.icon} color={e.category.color} size={32} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-semibold truncate">{e.note || e.category.name}</p>
+          <p className="micro mt-0.5">
+            {dayLabel(e.date)}
+            {e.note ? ` · ${e.category.name}` : ''}
+          </p>
+        </div>
+        <span className="reveal tag shrink-0" aria-hidden>
+          Edit
+        </span>
+        <Money minor={e.amountMinor} className="text-[13.5px] font-semibold shrink-0" />
+      </button>
     </li>
   );
   const outgoings = data ? data.monthMinor + data.monthSpendingMinor : 0;

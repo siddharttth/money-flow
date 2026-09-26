@@ -233,7 +233,7 @@ Says a payment is logged like anything else, and that this is what feeds
 Lifetime totals per investment category, biggest first. Tap → category inspector. Three empty states, correctly distinguished: no investment categories at all, a goal exists but nothing contributed yet, or loading.
 
 ### Every contribution
-Reverse-chronological list of every investment transaction: note or category name, date, category, amount. The latest six, with **Show N more** when that would hide three or more.
+Reverse-chronological list of every investment transaction: note or category name, date, category, amount. The latest six, with **Show N more** when that would hide three or more. Tap a row to edit it — the same sheet as everywhere else, with the entry loaded.
 
 ### Footnote
 Explains that none of this counts as spending anywhere in the app, and that the screen reports what you put in, not what it is worth today.

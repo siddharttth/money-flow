@@ -500,7 +500,8 @@ contributed · loading.
 ### Every contribution
 Reverse-chronological list: note-or-category, date, category, amount. The latest
 6, with **Show N more** sliding the rest open — only when that hides three or
-more.
+more. **Tapping a row opens the edit sheet** with that entry loaded (an **Edit**
+tag shows on hover on desktop, always on touch).
 
 ### Footnote
 States that none of this counts as spending anywhere, and that the screen reports

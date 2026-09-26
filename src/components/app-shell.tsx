@@ -349,7 +349,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
         <Modal
           open={addOpen}
           onClose={() => setAddOpen(false)}
-          title={editing ? 'Edit expense' : 'Add transaction'}
+          title={editing ? 'Edit transaction' : 'Add transaction'}
           wide
         >
           <AddTransaction
