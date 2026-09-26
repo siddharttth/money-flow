@@ -146,7 +146,7 @@ Obsidian (the dark theme), so the bar uses neutral / green / accent instead.
 ### Lifetime footer line
 | Element | Calculation | Representation |
 | --- | --- | --- |
-| "Kept across N months" | `lifetime.inHandMinor` and `months` — **fetched without a month in the SWR key**, so it never moves with the page | One-line row linking to `/analytics/lifetime`, red when negative |
+| "Saved across N months" | `lifetime.savingsMinor` (`Σearned − Σspent − Σinvested`, no ledger) and `months` — **fetched without a month in the SWR key**, so it never moves with the page. The same figure the Lifetime page leads with. | One-line row linking to `/analytics/lifetime`; red with a − when negative |
 
 ---
 
@@ -389,35 +389,32 @@ none of the trends respond to the month picker.
 > Every month added up. **No month picker**; nothing here moves when the month
 > changes elsewhere.
 
-### Where you stand — one card
-Net worth and the cash half of the same arithmetic, then the running tallies as
-the card's footer row. Lime glow, coral when net worth is negative.
+### Lifetime totals — one card
+Of everything earned, where it went and what is left. **The lending ledger is
+not in any figure on this page** — People owns what is owed either way. Savings
+as the page's one large figure, the subtraction behind it, then the running
+tallies as the card's footer row. Lime glow, coral when savings are negative.
 
-#### What you have built
+#### Lifetime savings
 | Element | Calculation | Representation |
 | --- | --- | --- |
-| **Headline** | `inHand + invested + owedToMe − owedByMe` | The page's largest figure (2.4rem/5xl), red when negative |
-| Cash in hand | `lifetime.inHandMinor` (see below) | dl row linking to the section underneath |
-| Invested | Σ all `kind='investment'` ever — **added back**, because this is net worth not cash | Green dl row → `/goals` |
-| Owed to you | `ledger.owedToMeMinor` | dl row → `/people` |
-| You owe | `−ledger.owedByMeMinor` | Red dl row → `/people` |
-| Net position | The sum | Bold dl row above a rule |
+| **Headline** | `savingsMinor = Σearned − Σspent − Σinvested` | The page's largest figure (2.4rem/5xl), red with a − when negative |
+| Context | `months` = distinct months with any row; `firstMonth` = earliest | "saved across N months, since \<month\>" |
+| Lifetime earned | Σ all `kind='income'` ever | dl row → `/income` |
+| Lifetime spent | Σ everything not income or investment | − dl row → `/expenses` |
+| Lifetime invested | Σ all `kind='investment'` ever | − dl row → `/goals` |
+| Lifetime savings | The difference | Bold dl row above a rule, green (red when negative) |
+| Caption | — | "After spending and investing. The monthly "kept" figures below count investments as kept." — the monthly figures are `in − out`, so they sum to more than this by the amount invested |
+| No income yet | `known = false` | "Tell the app what comes in" and **Add an income source** in place of the figure |
 
 The breakdown sits in a column capped at 28rem, so each label reads straight
 across to its amount.
-
-#### Lifetime in hand — below a rule, one step smaller
-| Element | Calculation | Representation |
-| --- | --- | --- |
-| Figure | `Σin − Σout − Σinvested − Σlent + Σborrowed` — **the ledger is included**, because the section claims to describe cash | 1.6rem/3xl figure, signed |
-| Breakdown | Everything that came in / spent / invested, then the total | dl with a ruled total row |
-| Context | `months` = distinct months with any row; `firstMonth` = earliest | "kept across N months, since \<month\>" |
 
 #### Stat strip — the footer row
 | Tile | Calculation |
 | --- | --- |
 | Months tracked | Distinct `YYYY-MM` with any transaction, sub-label = first month. Links to that month on This month. |
-| Ever invested | Lifetime investment total. Links to `/goals`. |
+| Savings rate | `savingsMinor ÷ Σearned`, rounded; "—" with no income. Sub-label "of everything earned". |
 | Best month kept | `max(savedMinor)` across months with income, sub-label = that month. Links to that month on This month. |
 | Positive streak | Longest run of consecutive months with `savedMinor > 0` |
 
@@ -434,9 +431,8 @@ down the first and on into the second. Tapping one opens the inspector in
 **lifetime scope** — month-by-month totals rather than this month's rows.
 
 ### More history — collapsed, the answer on the closed header
-#### Lending, all time — *when the ledger has moved*
-Header: "Net ₹X in your favour / against you". Open: Owed to you · You owe · Net,
-and **Open People →**.
+Absent entirely until there are two calendar years. *(Lending, all time was
+removed with the ledger — People shows owed to you, you owe and net.)*
 
 #### Year on year — *needs ≥ 2 calendar years*
 Header: "N years". Open: per year `Σin`, `Σout`, `Σsaved` — two bars (In green,

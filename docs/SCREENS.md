@@ -337,18 +337,22 @@ Opened by tapping a category. Shows the total, the transaction count and its % o
 > The whole arc, and deliberately no month picker. Nothing here moves when you
 > change the month elsewhere.
 
-### Where you stand
-One card.
-- **Net position** — `cash + invested + owed to you − you owe`, with each line
-  spelled out and linking to the screen that owns it. Investments are **added
-  back** here — this is net worth, and the card says so, where the section below
-  it is the cash half of the same arithmetic. The figure no screen previously
-  answered.
-- **Lifetime in hand** — `Σ(came in − spent − invested − lent + borrowed)` across
-  every month, with the subtraction spelled out. The ledger is in it now: money
-  handed to a friend has left the account.
-- **Stat strip** as the footer row: Months tracked · Ever invested · Best month
-  kept · Positive streak. The first three open the month or screen they describe.
+### Lifetime totals
+One card, answering one question: of everything earned, where did it go and
+what is left. **No lending** in any figure — People owns the ledger.
+- **Lifetime savings** — `earned − spent − invested`, the page's largest figure,
+  "saved across N months, since \<month\>". Beside it the subtraction spelled
+  out — Lifetime earned · spent · invested — each row opening the screen it
+  comes from, and a caption noting that the monthly "kept" figures below count
+  investments as kept. Without any income, a prompt to add an income source
+  stands in for the figure.
+- **Stat strip** as the footer row: Months tracked · Savings rate · Best month
+  kept · Positive streak. Savings rate is the headline as a share of everything
+  earned; it replaced Ever invested, which repeated the card's Invested row.
+
+*(Replaced "What you have built" — net position with the ledger — and "Lifetime
+in hand", which subtracted money lent. The Dashboard's one-line link now reads
+"Saved across N months" with this same figure.)*
 
 ### Over time
 One card, two halves the same height.
@@ -362,11 +366,13 @@ Every category by lifetime total, in two columns on a wide screen. The monthly
 view answers what is moving; this answers what it has cost.
 
 ### More history
-Collapsed, with the answer on each closed header.
-- **Lending, all time** — Owed to you · You owe · Net. The ledger previously only
-  ever appeared as a current balance.
+Collapsed, with the answer on the closed header, and absent entirely until there
+is something in it.
 - **Year on year** *(gated at 2+ years)* — In, out and kept per calendar year, as
-  paired bars. Withheld below two years rather than drawn from a fragment.
+  paired bars. Withheld below two years rather than drawn from a fragment. Its
+  "kept" is `in − out`, as the monthly figures are; it never included the ledger.
+
+*(Lending, all time was removed — People shows owed to you, you owe and net.)*
 
 ---
 

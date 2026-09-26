@@ -79,7 +79,7 @@ export default function DashboardPage() {
   const funds = useSWR<{ items: Fund[] }>(`/api/funds?month=${month}`);
   const cats = useSWR<{ items: Category[] }>('/api/categories');
   const catStats = useSWR<{ items: CategoryStat[] }>(`/api/analytics/categories?month=${month}`);
-  const lifetime = useSWR<{ inHandMinor: number; months: number }>('/api/analytics/lifetime');
+  const lifetime = useSWR<{ savingsMinor: number; months: number }>('/api/analytics/lifetime');
 
   const s = summary.data;
   const f = flow.data;
@@ -438,20 +438,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* The lifetime figure keeps a one-line presence, and links to its page. */}
+      {/* The lifetime figure keeps a one-line presence, and links to its page —
+          the same savings figure that page leads with. */}
       {lifetime.data && lifetime.data.months > 0 && (
         <Link
           href="/analytics/lifetime"
           className="row flex items-baseline justify-between gap-3 px-4 py-3 rounded-xl"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
         >
-          <span className="label mb-0">Kept across {lifetime.data.months} months</span>
+          <span className="label mb-0">Saved across {lifetime.data.months} months</span>
           <span className="flex items-baseline gap-1.5">
-            <CountMoney
-              minor={Math.abs(lifetime.data.inHandMinor)}
-              className="text-[15px] font-semibold"
-              style={lifetime.data.inHandMinor < 0 ? { color: 'var(--rule-red)' } : undefined}
-            />
+            {/* Signed, as the page it opens is — red alone does not say minus. */}
+            <span
+              className="text-[15px] font-semibold num"
+              style={lifetime.data.savingsMinor < 0 ? { color: 'var(--rule-red)' } : undefined}
+            >
+              {lifetime.data.savingsMinor < 0 && '−'}
+              <CountMoney minor={Math.abs(lifetime.data.savingsMinor)} />
+            </span>
             <span className="micro" style={{ color: 'var(--accent)' }}>
               →
             </span>

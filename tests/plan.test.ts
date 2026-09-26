@@ -636,7 +636,7 @@ describe('investing more than the month produced', () => {
   });
 });
 
-describe('lifetime in hand', () => {
+describe('lifetime savings', () => {
   it('is every month added up, and matches summing them one by one', async () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
     // August went backwards: ₹33,133 in, ₹25,366 spent, ₹10,000 invested.
@@ -648,14 +648,14 @@ describe('lifetime in hand', () => {
     await add(30000, 'Outside Food', '2026-09-10');
 
     const life = await getLifetimeTally(userId);
-    expect(life.inHandMinor).toBe(-223_300 + 1_000_000);
+    expect(life.savingsMinor).toBe(-223_300 + 1_000_000);
     expect(life.months).toBe(2);
     expect(life.firstMonth).toBe('2026-08');
 
     // The same number by the long route, which is the definition being claimed.
     const history = await getSavingsHistory(userId, 12);
     const summed = history.reduce((s, m) => s + m.savedMinor - m.investedMinor, 0);
-    expect(summed).toBe(life.inHandMinor);
+    expect(summed).toBe(life.savingsMinor);
   });
 
   it('does not move when a different month is asked for', async () => {
@@ -669,18 +669,18 @@ describe('lifetime in hand', () => {
     const b = await getLifetimeTally(userId);
 
     // It moves when the DATA moves, and only then.
-    expect(a.inHandMinor).toBe(4_000_000);
-    expect(b.inHandMinor).toBe(3_900_000);
+    expect(a.savingsMinor).toBe(4_000_000);
+    expect(b.savingsMinor).toBe(3_900_000);
   });
 
-  it('subtracts investment, because this is cash and not net worth', async () => {
+  it('subtracts investment — savings is what spending and investing left', async () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
     await add(50000, 'Salary', '2026-08-01');
     await add(50000, 'SIP', '2026-08-02');
 
     const life = await getLifetimeTally(userId);
     expect(life.investedMinor).toBe(5_000_000);
-    expect(life.inHandMinor).toBe(0);
+    expect(life.savingsMinor).toBe(0);
   });
 
   it('says nothing rather than zero for an account with no income at all', async () => {
@@ -690,45 +690,25 @@ describe('lifetime in hand', () => {
   });
 });
 
-describe('lifetime in hand counts the ledger', () => {
-  it('subtracts money lent out — it has left the account', async () => {
+describe('lifetime savings leaves the ledger out', () => {
+  // People reports what is owed either way; Lifetime answers only where the
+  // earnings went. Lending in either direction must not move it.
+  it('does not move for money lent out or borrowed', async () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
     await add(50000, 'Salary', '2026-08-01');
     await add(10000, 'Outside Food', '2026-08-10');
 
     const before = await getLifetimeTally(userId);
-    expect(before.inHandMinor).toBe(4_000_000);
+    expect(before.savingsMinor).toBe(4_000_000);
 
     const [friend] = await testDb.insert(people).values({ userId, name: 'Sankalp', sortOrder: 0 }).returning();
-    await testDb.insert(ledgerEntries).values({
-      userId,
-      personId: friend.id,
-      direction: 'out',
-      amountMinor: 1_235_000,
-      entryDate: '2026-08-12',
-    });
+    await testDb.insert(ledgerEntries).values([
+      { userId, personId: friend.id, direction: 'out', amountMinor: 1_235_000, entryDate: '2026-08-12' },
+      { userId, personId: friend.id, direction: 'in', amountMinor: 500_000, entryDate: '2026-08-14' },
+    ]);
 
     const after = await getLifetimeTally(userId);
-    expect(after.lentMinor).toBe(1_235_000);
-    // The card says "this is cash, not net worth". ₹12,350 handed over is not cash.
-    expect(after.inHandMinor).toBe(4_000_000 - 1_235_000);
-  });
-
-  it('adds money borrowed — it is in the account, and owed back', async () => {
-    vi.useFakeTimers().setSystemTime(new Date('2026-09-30T10:00:00Z'));
-    await add(50000, 'Salary', '2026-08-01');
-    const [friend] = await testDb.insert(people).values({ userId, name: 'Aarav', sortOrder: 0 }).returning();
-    await testDb.insert(ledgerEntries).values({
-      userId,
-      personId: friend.id,
-      direction: 'in',
-      amountMinor: 500_000,
-      entryDate: '2026-08-12',
-    });
-
-    const life = await getLifetimeTally(userId);
-    expect(life.borrowedMinor).toBe(500_000);
-    expect(life.inHandMinor).toBe(5_500_000);
+    expect(after.savingsMinor).toBe(4_000_000);
   });
 });
 

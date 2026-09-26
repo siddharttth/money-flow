@@ -20,14 +20,17 @@ function PlanLine({
   sign,
   strong,
   tone,
+  href,
 }: {
   label: string;
   minor: number;
   sign?: '+' | '−';
   strong?: boolean;
   tone?: 'good' | 'bad';
+  /** The screen that owns the figure; the whole row opens it. */
+  href?: string;
 }) {
-  return (
+  const row = (
     <div className="flex items-baseline justify-between gap-3">
       <dt className={`text-[12.5px] ${strong ? 'font-semibold' : ''}`} style={{ color: strong ? 'var(--text)' : 'var(--text-muted)' }}>
         {label}
@@ -43,6 +46,13 @@ function PlanLine({
         {formatINR(Math.abs(minor))}
       </dd>
     </div>
+  );
+  return href ? (
+    <Link href={href} className="row block -mx-2 px-2 py-0.5 rounded">
+      {row}
+    </Link>
+  ) : (
+    row
   );
 }
 
@@ -571,39 +581,31 @@ export type LifetimeTallyRow = {
   inMinor: number;
   outMinor: number;
   investedMinor: number;
-  inHandMinor: number;
+  savingsMinor: number;
   months: number;
   firstMonth: string | null;
 };
 
 /**
- * The running total the months are instalments of.
+ * Of everything earned, where it went and what is left.
  *
- * A month is a unit of accounting, not a unit of life, and the monthly card
- * cannot help resetting on the 1st. August being down ₹2,233 reads very
- * differently next to eleven months that were not — so this adds them all up
- * and, unlike everything else on the dashboard, does not move when you change
- * the month.
+ * Four lifetime totals and nothing else: earned, spent, invested, and the
+ * savings those three leave. The lending ledger is left out on purpose —
+ * People reports what is owed either way, and mixing it in here made one
+ * page answer two questions. The months are instalments of this; it does not
+ * move when you change the month elsewhere.
+ *
+ * Rendered as a section of the Lifetime card it shares with the stat strip.
  */
-export function LifetimeInHand({
-  data,
-  bare = false,
-}: {
-  data: LifetimeTallyRow;
-  /** A section of a card it shares — no card of its own, and a figure one
-      step quieter than the headline above it. */
-  bare?: boolean;
-}) {
+export function LifetimeTotals({ data }: { data: LifetimeTallyRow }) {
   /*
-   * With nothing coming in there is no figure to give, and this is the only
-   * card on the dashboard that is always present — so it carries the prompt
-   * that used to live on safe-to-spend. Returning null here would leave a
-   * fresh account with no route to setting income up at all.
+   * With nothing coming in there is no figure to give. The prompt stands in
+   * for it, so a fresh account still has a route to setting income up.
    */
   if (!data.known) {
-    const prompt = (
-      <>
-        <p className="label mb-2">Lifetime in hand</p>
+    return (
+      <div>
+        <p className="label mb-2">Lifetime savings</p>
         <p className="text-[15px] font-semibold">Tell the app what comes in</p>
         <p className="muted text-[13px] mt-1.5 leading-relaxed max-w-lg">
           It knows what leaves and nothing about what arrives, so it cannot say what you have kept. Add an income
@@ -613,63 +615,47 @@ export function LifetimeInHand({
         <Link href="/settings?add=income" className="btn btn-primary mt-4">
           Add an income source
         </Link>
-      </>
+      </div>
     );
-    return bare ? <div>{prompt}</div> : <Card className="!p-5">{prompt}</Card>;
   }
 
-  const down = data.inHandMinor < 0;
+  const down = data.savingsMinor < 0;
 
-  const body = (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,28rem)] lg:justify-between gap-5 lg:gap-8 items-start">
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,18rem)_minmax(0,28rem)] lg:justify-between gap-6 lg:gap-8 items-start">
       <div>
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="label mb-0">Lifetime in hand</p>
-          {/* The one figure here that is not about the month on screen. */}
-          <span className="micro">all time</span>
-        </div>
-
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-          <span
-            className={`${
-              bare ? 'text-[1.6rem] sm:text-3xl' : 'text-[2.4rem] sm:text-5xl'
-            } font-semibold leading-none tracking-tight num`}
-            style={down ? { color: 'var(--rule-red)' } : undefined}
-          >
-            {down && '−'}
-            <CountMoney minor={Math.abs(data.inHandMinor)} />
-          </span>
-        </div>
-
+        <p className="label mb-2">Lifetime savings</p>
+        <span
+          className="num text-[2.4rem] sm:text-5xl font-semibold leading-none tracking-tight"
+          style={down ? { color: 'var(--rule-red)' } : undefined}
+        >
+          {down && '−'}
+          <CountMoney minor={Math.abs(data.savingsMinor)} />
+        </span>
         <p className="muted text-[13px] mt-2.5 leading-relaxed">
-          {down ? 'drawn down' : 'kept'} across {data.months} {data.months === 1 ? 'month' : 'months'}
+          {down ? 'drawn down' : 'saved'} across {data.months} {data.months === 1 ? 'month' : 'months'}
           {data.firstMonth && <>, since {monthName(data.firstMonth)}</>}
         </p>
       </div>
 
-      {/* The same subtraction as the monthly card, over every month there is. */}
+      {/* The subtraction spelled out, each total opening the screen it comes from.
+          No wider than it takes to read a label across to its amount. */}
       <div className="min-w-0">
         <dl className="space-y-2">
-          <PlanLine label="Everything that came in" minor={data.inMinor} sign="+" strong />
-          <PlanLine label="Everything spent" minor={data.outMinor} sign="−" />
-          {data.investedMinor > 0 && <PlanLine label="Everything invested" minor={data.investedMinor} sign="−" />}
+          <PlanLine label="Lifetime earned" minor={data.inMinor} sign="+" href="/income" />
+          <PlanLine label="Lifetime spent" minor={data.outMinor} sign="−" href="/expenses" />
+          <PlanLine label="Lifetime invested" minor={data.investedMinor} sign="−" href="/goals" />
           <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <PlanLine label="In hand" minor={data.inHandMinor} strong tone={down ? 'bad' : 'good'} />
+            <PlanLine label="Lifetime savings" minor={data.savingsMinor} strong tone={down ? 'bad' : 'good'} />
           </div>
         </dl>
-
-        {data.investedMinor > 0 && (
-          <p className="muted text-[12px] mt-3.5 leading-relaxed">
-            Investments are subtracted because this is cash, not net worth —{' '}
-            <span className="num">{formatINR(data.investedMinor)}</span> of it is still yours, just not
-            spendable.
-          </p>
-        )}
+        {/* Two meanings of "kept" share this page; say which is which. */}
+        <p className="muted text-[12px] mt-3.5 leading-relaxed">
+          After spending and investing. The monthly &ldquo;kept&rdquo; figures below count investments as kept.
+        </p>
       </div>
     </div>
   );
-
-  return bare ? body : <Card className="!p-5 sm:!p-6">{body}</Card>;
 }
 
 /* ------------------------------------------------------------------ *

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { categories, expenses, ledgerEntries } from '@/db/schema';
+import { categories, expenses } from '@/db/schema';
 import { sumToMinor } from './money';
 import { getTotal } from './analytics';
 import { getFunds, requiredSavingsMinor, type Fund } from './funds';
@@ -377,15 +377,13 @@ export type LifetimeTally = {
   inMinor: number;
   outMinor: number;
   investedMinor: number;
-  /** Money handed to someone else. Gone from the account, still owed to you. */
-  lentMinor: number;
-  /** Money someone handed you. In the account, and owed back. */
-  borrowedMinor: number;
   /**
-   * in − out − invested − lent + borrowed. Cash, and the ledger is part of
-   * cash: money you lent has genuinely left the account.
+   * in − out − invested: of everything earned, what neither spending nor
+   * investing took. The lending ledger is deliberately not in it — money lent
+   * or borrowed is People's to report, and Lifetime answers only where the
+   * earnings went.
    */
-  inHandMinor: number;
+  savingsMinor: number;
   /** Distinct months with anything in them, for context under the figure. */
   months: number;
   /** 'YYYY-MM' of the earliest month with anything in it. */
@@ -408,7 +406,7 @@ export type LifetimeTally = {
  * this is one query rather than one per month.
  */
 export async function getLifetimeTally(userId: string): Promise<LifetimeTally> {
-  const [row, ledger] = await Promise.all([lifetimeFlows(userId), lifetimeLedger(userId)]);
+  const row = await lifetimeFlows(userId);
 
   const inMinor = sumToMinor(row?.income ?? 0);
   const outMinor = sumToMinor(row?.spent ?? 0);
@@ -419,33 +417,10 @@ export async function getLifetimeTally(userId: string): Promise<LifetimeTally> {
     inMinor,
     outMinor,
     investedMinor,
-    lentMinor: ledger.lentMinor,
-    borrowedMinor: ledger.borrowedMinor,
-    /*
-     * The ledger belongs in this subtraction.
-     *
-     * This card subtracts investments and explains that it is reporting cash
-     * rather than net worth — and then ignored `ledger_entries` entirely, so
-     * ₹12,350 handed to a friend was still counted as sitting in your pocket.
-     * Either the arithmetic includes the ledger or the caption is false.
-     */
-    inHandMinor: inMinor - outMinor - investedMinor - ledger.lentMinor + ledger.borrowedMinor,
+    savingsMinor: inMinor - outMinor - investedMinor,
     months: Number(row?.months ?? 0),
     firstMonth: row?.first ?? null,
   };
-}
-
-/** Everything ever lent out and taken in, live entries only. */
-async function lifetimeLedger(userId: string) {
-  const [row] = await db
-    .select({
-      lent: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'out'), 0)`,
-      borrowed: sql<string>`COALESCE(SUM(${ledgerEntries.amountMinor}) FILTER (WHERE ${ledgerEntries.direction} = 'in'), 0)`,
-    })
-    .from(ledgerEntries)
-    .where(sql`${ledgerEntries.userId} = ${userId} AND ${ledgerEntries.deletedAt} IS NULL`);
-
-  return { lentMinor: sumToMinor(row?.lent ?? 0), borrowedMinor: sumToMinor(row?.borrowed ?? 0) };
 }
 
 async function lifetimeFlows(userId: string) {
