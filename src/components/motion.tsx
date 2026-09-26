@@ -101,6 +101,7 @@ export function useMotionOk(): boolean {
 /* ---------- counting figures ---------- */
 
 const COUNT_MS = 220;
+const INTRO_MS = 300;
 
 /**
  * The number to draw for a value that may be changing: the value itself,
@@ -151,13 +152,40 @@ export function CountMoney({
   className = '',
   style,
   compact,
+  intro = false,
 }: {
   minor: number;
   className?: string;
   style?: React.CSSProperties;
   compact?: boolean;
+  /**
+   * Count up from zero once, on arrival — the single exception to "nothing
+   * animates on arrival", reserved for the first look at a new month. A
+   * touch slower than a change (300ms), so it reads as deliberate.
+   */
+  intro?: boolean;
 }) {
-  const shown = useTween(minor);
+  const tweened = useTween(minor);
+  const reduced = useReducedMotion();
+  /* Starting at zero from the first render, so the figure never flashes its
+     full value for a frame before counting up to it. */
+  const [introShown, setIntroShown] = useState<number | null>(() => (intro && !reduced ? 0 : null));
+  useEffect(() => {
+    if (!intro || reduced) return;
+    const target = minor;
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const p = Math.min(1, Math.max(0, (now - start) / INTRO_MS));
+      setIntroShown(p >= 1 ? null : Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    setIntroShown(0);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the intro is asked for
+  }, [intro, reduced]);
+  const shown = introShown ?? tweened;
   return (
     <span className={`num ${className}`} data-zero={minor === 0} style={style}>
       {formatINR(shown, { compact })}
@@ -306,6 +334,101 @@ export function useCrossing(
   }, [value, ready, scope]);
 
   return event;
+}
+
+/* ---------- a new month ---------- */
+
+/**
+ * True on the first visit in a month that is later than the last one seen
+ * here — a new tracking period starting, which otherwise happens without a
+ * word. Remembered per browser (a convenience, not data): a private window or
+ * cleared storage just means no cue, never a wrong one. The very first visit
+ * is not a transition, so it stays quiet too.
+ */
+const SEEN_MONTH_KEY = 'mf:last-month-seen';
+export function useFreshMonth(month: string): boolean {
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    try {
+      const last = window.localStorage.getItem(SEEN_MONTH_KEY);
+      window.localStorage.setItem(SEEN_MONTH_KEY, month);
+      if (last && last < month) setFresh(true);
+    } catch {
+      /* storage unavailable: no cue */
+    }
+  }, [month]);
+  return fresh;
+}
+
+/* ---------- a debt reaching zero ---------- */
+
+/**
+ * The ids whose balance just reached zero from anything else — a settle-up
+ * landing, not a page arriving with a settled row. Each maps to the amount
+ * it came down from, so the row can count it off. Held for the length of the
+ * moment, then released. Not gated on reduced motion: "settled" is news
+ * either way; the row decides what moves.
+ */
+const CLEARED_MS = 1900;
+export function useJustCleared(balances: [id: string, minor: number][], ready: boolean): Map<string, number> {
+  const seen = useRef<Map<string, number> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [cleared, setCleared] = useState<Map<string, number>>(() => new Map());
+  const sig = balances.map(([id, m]) => `${id}:${m}`).join('|');
+
+  useEffect(() => {
+    if (!ready) return;
+    const before = seen.current;
+    seen.current = new Map(balances);
+    if (!before) return;
+    const hit = new Map<string, number>();
+    for (const [id, minor] of balances) {
+      const was = before.get(id);
+      if (minor === 0 && was) hit.set(id, Math.abs(was));
+    }
+    if (!hit.size) return;
+    setCleared(hit);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCleared(new Map()), CLEARED_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined balances
+  }, [sig, ready]);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return cleared;
+}
+
+/**
+ * A settled balance counting itself off: from what was owed down to ₹0 over
+ * ~0.7s — slower than a figure's usual 220ms, because the count is the point —
+ * then "Settled ✓". Straight to the end state under reduced motion.
+ */
+export function CountDownToZero({ from, className = '' }: { from: number; className?: string }) {
+  /* Reduced motion only — not the page-settled gate: this only ever mounts
+     because a settle-up just landed, while that gate is still closing behind
+     the refetch, and waiting on it flashed the end state first. */
+  const reduced = useReducedMotion();
+  const ok = !reduced;
+  const [shown, setShown] = useState(ok ? from : 0);
+  useEffect(() => {
+    if (!ok) return;
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const p = Math.min(1, Math.max(0, (now - start) / 700));
+      setShown(p >= 1 ? 0 : Math.round(from * Math.pow(1 - p, 2)));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [from, ok]);
+
+  return shown > 0 ? (
+    <span className={`num ${className}`}>{formatINR(shown)}</span>
+  ) : (
+    <span className={`num ${className}`} style={{ color: 'var(--credit)' }}>
+      Settled ✓
+    </span>
+  );
 }
 
 /* ---------- editing a figure in place ---------- */

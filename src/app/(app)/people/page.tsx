@@ -27,7 +27,7 @@ import { useShell } from '@/components/app-shell';
 import { useInspector } from '@/components/inspector';
 import { NavIcon, PersonMark } from '@/components/icons';
 import { PALETTE } from '@/lib/defaults';
-import { CountMoney, useFreshKeys, useMotionOk, usePulseOnChange } from '@/components/motion';
+import { CountDownToZero, CountMoney, useFreshKeys, useJustCleared, useMotionOk, usePulseOnChange } from '@/components/motion';
 
 /**
  * People and Peers were two screens for one entity — a contact you spend with
@@ -159,7 +159,13 @@ function PeopleHub() {
     everyone.map((r) => `${r.person.id}:${r.balanceMinor}`),
     !!people.data && !!peers.data,
   );
-  const movedPeople = new Set([...moved].map((k) => k.split(':')[0]));
+  /* A balance that just reached zero gets its own moment — a green sweep and
+     the amount counting off — instead of the ordinary edit wash. */
+  const cleared = useJustCleared(
+    everyone.map((r) => [r.person.id, r.balanceMinor]),
+    !!people.data && !!peers.data && !peers.isValidating,
+  );
+  const movedPeople = new Set([...moved].map((k) => k.split(':')[0]).filter((id) => !cleared.has(id)));
 
   /* After every hook, so an error cannot change how many of them run. */
   if (people.error) return <ErrorState message={people.error.message} onRetry={() => people.mutate()} />;
@@ -412,7 +418,9 @@ function PeopleHub() {
                 return (
                   <li
                     key={person.id}
-                    className={`row px-3.5 sm:px-4 py-3 ${movedPeople.has(person.id) ? 'wash' : ''}`}
+                    className={`row px-3.5 sm:px-4 py-3 ${
+                      cleared.has(person.id) ? 'cleared' : movedPeople.has(person.id) ? 'wash' : ''
+                    }`}
                     onClick={() => openPerson(person.id)}
                     /* A row with an open balance is tinted, so the two that
                        need action are findable in a list of eight without
@@ -446,6 +454,9 @@ function PeopleHub() {
                         {/* On a phone the balance rides up next to the name. */}
                         <span className="sm:hidden shrink-0 text-right">
                           <Money minor={spendMinor} className="text-[13.5px] font-semibold block" />
+                          {cleared.has(person.id) && (
+                            <CountDownToZero from={cleared.get(person.id)!} className="text-[11px] font-semibold" />
+                          )}
                           {balanceMinor !== 0 && (
                             <span
                               className="num text-[11px] font-semibold"
@@ -475,7 +486,12 @@ function PeopleHub() {
                       </div>
 
                       <div className="hidden sm:block text-right">
-                        {balanceMinor === 0 ? (
+                        {cleared.has(person.id) ? (
+                          <>
+                            <CountDownToZero from={cleared.get(person.id)!} className="text-[14px] font-semibold block" />
+                            <span className="micro">balance cleared</span>
+                          </>
+                        ) : balanceMinor === 0 ? (
                           <span className="num text-[13px] muted">—</span>
                         ) : (
                           <>

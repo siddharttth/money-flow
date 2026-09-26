@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { formatINR } from '@/lib/money';
 import { dayLabel, monthLabel } from '@/lib/dates';
-import { useGrowClass, useReducedMotion } from './motion';
+import { useGrowClass, useReducedMotion, useTween } from './motion';
 
 /**
  * Every chart in the app, hand-drawn in SVG.
@@ -51,6 +51,8 @@ export function FlowCurve({
    */
   dated = false,
   fill = false,
+  live = false,
+  names,
   whatIf,
 }: {
   points: FlowPoint[];
@@ -60,6 +62,13 @@ export function FlowCurve({
   /** Grow to the height of the container, with `height` as the floor. The
       plot is drawn with preserveAspectRatio="none", so it stretches cleanly. */
   fill?: boolean;
+  /** The month is still under way: its last point is today, still moving. */
+  live?: boolean;
+  /**
+   * The two months by name, for the key above the chart and the readout.
+   * Without them the chart relies on the caption around it.
+   */
+  names?: { current: string; previous: string };
   /**
    * A handle on the end of the projection, for the month still under way:
    * drag it to try a daily rate for the days that are left and read where the
@@ -83,12 +92,22 @@ export function FlowCurve({
   /** The daily rate being tried, in paise; null is the real pace. */
   const [tryRate, setTryRate] = useState<number | null>(null);
   const dragging = useRef(false);
+  /** A finger on the chart: where it went down, and whether it has turned
+      into a sideways scrub (as opposed to a scroll, which the browser keeps). */
+  const touch = useRef<{ x: number; y: number; scrubbing: boolean } | null>(null);
 
   const W = 1000;
   const H = 320;
   const PAD = { top: 14, right: 8, bottom: 22, left: 8 };
 
   const last = points.at(-1);
+  /*
+   * Today's total, eased when it changes — a transaction added while you are
+   * looking moves the newest segment into place rather than snapping it.
+   * Only that point: the rest of the line is history and never re-animates,
+   * and nothing moves on arrival (useTween waits for the page to settle).
+   */
+  const lastShown = useTween(last?.thisMinor ?? 0);
   const remaining = last ? monthDays - last.day : 0;
   const planning = !!whatIf && !!last && remaining > 0 && last.day > 0;
   const paceRate = whatIf?.paceMinor ?? 0;
@@ -110,43 +129,123 @@ export function FlowCurve({
     [points, planning, paceEnd, whatIf?.prevFullMinor],
   );
 
-  if (points.length < 2) return null;
+  if (points.length < 2 || !last) return null;
+
+  /* The line as drawn: history as it is, today where the ease has got to. */
+  const drawn = points.map((p, i) => (i === points.length - 1 ? { ...p, thisMinor: lastShown } : p));
+  const today = drawn.at(-1)!;
+  /* A month with nothing in it to compare against says so in words, rather
+     than drawing a flat dashed line along the axis and calling it a comparison. */
+  const hasPrev = points.some((p) => p.prevMinor > 0);
 
   // The x axis is always the full month, so a half-finished month visibly stops
   // short instead of stretching to fill the frame.
   const x = (day: number) => PAD.left + ((day - 1) / Math.max(1, monthDays - 1)) * (W - PAD.left - PAD.right);
   const y = (minor: number) => PAD.top + (1 - minor / max) * (H - PAD.top - PAD.bottom);
+  const pctX = (day: number) => (x(day) / W) * 100;
+  const pctY = (minor: number) => (y(minor) / H) * 100;
 
   const line = (key: 'thisMinor' | 'prevMinor') =>
-    points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.day).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
+    drawn.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.day).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
 
-  const area = `${line('thisMinor')} L${x(points.at(-1)!.day).toFixed(1)},${y(0).toFixed(1)} L${x(points[0].day).toFixed(1)},${y(0).toFixed(1)} Z`;
+  const area = `${line('thisMinor')} L${x(today.day).toFixed(1)},${y(0).toFixed(1)} L${x(drawn[0].day).toFixed(1)},${y(0).toFixed(1)} Z`;
 
-  const active = hover != null ? points[Math.min(hover, points.length - 1)] : null;
+  /* The run-out to the month's end: the what-if rate when there is one, the
+     straight-line pace otherwise. */
+  const projecting = today.day < monthDays;
+  const projEnd = Math.min(max, planning ? planEnd : (today.thisMinor / today.day) * monthDays);
+  const projArea = `M${x(today.day).toFixed(1)},${y(today.thisMinor).toFixed(1)} L${x(monthDays).toFixed(1)},${y(projEnd).toFixed(1)} L${x(monthDays).toFixed(1)},${y(0).toFixed(1)} L${x(today.day).toFixed(1)},${y(0).toFixed(1)} Z`;
 
-  /*
-   * Mouse only. A finger dragged up the page still emits pointermove across
-   * this chart, so on a phone every scroll past the dashboard ran a setState
-   * per frame and re-rendered the whole curve — the main thread was busy
-   * exactly when the next tap arrived, which is how taps get dropped.
-   */
-  function onMove(e: React.PointerEvent) {
-    if (e.pointerType !== 'mouse') return;
-    const box = wrapRef.current?.getBoundingClientRect();
+  const active = hover != null ? drawn[Math.min(hover, drawn.length - 1)] : null;
+  const at = active ?? today;
+
+  function pointAt(clientX: number) {
+    const box = svgRef.current?.getBoundingClientRect();
     if (!box) return;
-    const ratio = (e.clientX - box.left) / box.width;
+    const ratio = (clientX - box.left) / box.width;
     const day = Math.round(ratio * (monthDays - 1)) + 1;
     const idx = points.findIndex((p) => p.day >= day);
     setHover(idx === -1 ? points.length - 1 : idx);
   }
 
+  /*
+   * Reading the line. A mouse reads wherever it hovers. A finger reads only
+   * once it drags sideways along the line: a tap does nothing, and a drag up
+   * or down is a scroll — the chart is `pan-y`, so the browser keeps those and
+   * cancels ours. Either way the readout swaps instantly; reading is not a
+   * change, so nothing about it animates.
+   */
+  function onDown(e: React.PointerEvent) {
+    if (e.pointerType === 'mouse') return;
+    touch.current = { x: e.clientX, y: e.clientY, scrubbing: false };
+  }
+  function onMove(e: React.PointerEvent) {
+    if (e.pointerType === 'mouse') return pointAt(e.clientX);
+    const t = touch.current;
+    if (!t) return;
+    if (!t.scrubbing) {
+      const dx = Math.abs(e.clientX - t.x);
+      if (dx < 8 || dx < Math.abs(e.clientY - t.y)) return;
+      t.scrubbing = true;
+    }
+    pointAt(e.clientX);
+  }
+  function onEnd() {
+    touch.current = null;
+    setHover(null);
+  }
+
+  const dayName = (p: FlowPoint) =>
+    p === today && live ? `Day ${p.day} · today` : dated ? dayLabel(p.date) : `Day ${p.day} · ${dayLabel(p.date)}`;
+
   return (
     <div className={`relative select-none ${fill ? 'flex flex-col flex-1 min-h-0' : ''}`} ref={wrapRef}>
       {/*
-        No readout block above the plot. It duplicated the legend the card
-        already prints and pushed the chart down by a row; the reference puts
-        the figure on the curve, at the point it belongs to.
+        What the two lines are. On a wide screen a key, with the figures
+        floating on the curve; on a phone a readout bar pinned here instead —
+        a floating box there covers the line it is describing, or clips. The
+        bar follows a scrub and rests on today.
       */}
+      {names && (
+        <>
+          <div className="hidden sm:flex items-center gap-4 mb-3 micro">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-4 h-[2px] rounded-full" style={{ background: 'var(--brass)' }} />
+              {names.current}
+            </span>
+            {hasPrev ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-4 border-t-[1.5px] border-dashed" style={{ borderColor: 'var(--text-muted)' }} />
+                {names.previous}, same days
+              </span>
+            ) : (
+              <span className="normal-case tracking-normal text-[11.5px] muted">
+                No spending recorded in {names.previous} to compare against
+              </span>
+            )}
+          </div>
+          <div
+            className="sm:hidden flex items-center justify-between gap-3 h-9 px-3 mb-2 rounded-lg"
+            style={{ background: 'var(--surface-2)' }}
+            aria-live="polite"
+          >
+            <span className="micro truncate">{dayName(at)}</span>
+            <span className="flex items-baseline gap-2.5 shrink-0">
+              <span className="num text-[13px] font-semibold" style={{ color: 'var(--brass)' }}>
+                {formatINR(at.thisMinor)}
+              </span>
+              {hasPrev ? (
+                <span className="num text-[11.5px] muted">
+                  {names.previous.slice(0, 3)} {formatINR(at.prevMinor)}
+                </span>
+              ) : (
+                <span className="text-[11px] muted">no {names.previous.slice(0, 3)} data</span>
+              )}
+            </span>
+          </div>
+        </>
+      )}
+
       {/*
         No y scale. A cumulative curve is read as a shape against the dashed
         one beside it, not as a series of values off an axis — and the exact
@@ -160,20 +259,13 @@ export function FlowCurve({
         height={fill ? undefined : height}
         preserveAspectRatio="none"
         role="img"
-        aria-label="Cumulative spending this month compared with last month"
+        aria-label={`Cumulative spending this month${hasPrev ? ' compared with last month' : ''}`}
+        onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerUp={(e) => e.pointerType !== 'mouse' && onEnd()}
+        onPointerCancel={onEnd}
+        onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(null)}
         style={{ touchAction: 'pan-y', display: 'block', ...(fill ? { flex: '1 1 auto', minHeight: height } : null) }}
-        onPointerDown={(e) => {
-          // A deliberate tap still reads the curve; a scroll past it does not.
-          if (e.pointerType === 'mouse') return;
-          const box = wrapRef.current?.getBoundingClientRect();
-          if (!box) return;
-          const ratio = (e.clientX - box.left) / box.width;
-          const day = Math.round(ratio * (monthDays - 1)) + 1;
-          const idx = points.findIndex((p) => p.day >= day);
-          setHover(idx === -1 ? points.length - 1 : idx);
-        }}
       >
         <defs>
           <linearGradient id={`fill-${gid}`} x1="0" y1="0" x2="0" y2="1">
@@ -197,17 +289,26 @@ export function FlowCurve({
           />
         ))}
 
-        {/* Last month, dashed and behind — a reference, not a second subject. */}
-        <path
-          d={line('prevMinor')}
-          fill="none"
-          stroke="var(--text-muted)"
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-          opacity="0.65"
-        />
+        {/* The part that has not happened yet, shaded faintly under the
+            run-out — "this is a projection" readable before any figure is. */}
+        {projecting && live && (
+          <path d={projArea} fill={tryRate != null ? 'var(--accent)' : 'var(--brass)'} opacity={tryRate != null ? 0.1 : 0.06} />
+        )}
+
+        {/* Last month, dashed and behind — a reference, not a second subject.
+            Stronger than a gridline, so a quiet month along the axis still reads. */}
+        {hasPrev && (
+          <path
+            d={line('prevMinor')}
+            fill="none"
+            stroke="var(--text-muted)"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            opacity="0.9"
+          />
+        )}
 
         <path d={area} fill={`url(#fill-${gid})`} />
         {/* Drawn twice: a soft wide pass underneath for the bloom, then the
@@ -233,29 +334,27 @@ export function FlowCurve({
           vectorEffect="non-scaling-stroke"
         />
 
+        {/* The scrub's guide, following the cursor or finger. */}
         {active && (
-          <>
-            <line
-              x1={x(active.day)}
-              x2={x(active.day)}
-              y1={PAD.top}
-              y2={H - PAD.bottom}
-              stroke="var(--border-strong)"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-            <circle cx={x(active.day)} cy={y(active.thisMinor)} r="4" fill="var(--brass)" />
-          </>
+          <line
+            x1={x(active.day)}
+            x2={x(active.day)}
+            y1={PAD.top}
+            y2={H - PAD.bottom}
+            stroke="var(--border-strong)"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+          />
         )}
 
         {/* TODAY. A dashed rule down the live end of the line, and a dotted
             run-out to the end of the month — the part that has not happened
             yet, drawn as clearly unwritten rather than left blank. */}
-        {points.at(-1)!.day < monthDays && (
+        {projecting && (
           <>
             <line
-              x1={x(points.at(-1)!.day)}
-              x2={x(points.at(-1)!.day)}
+              x1={x(today.day)}
+              x2={x(today.day)}
               y1={PAD.top}
               y2={H - PAD.bottom}
               stroke="var(--brass)"
@@ -265,10 +364,10 @@ export function FlowCurve({
               opacity="0.7"
             />
             <line
-              x1={x(points.at(-1)!.day)}
-              y1={y(points.at(-1)!.thisMinor)}
+              x1={x(today.day)}
+              y1={y(today.thisMinor)}
               x2={x(monthDays)}
-              y2={y(Math.min(max, planning ? planEnd : (points.at(-1)!.thisMinor / points.at(-1)!.day) * monthDays))}
+              y2={y(projEnd)}
               stroke={tryRate != null ? 'var(--accent)' : 'var(--brass)'}
               strokeWidth="1.5"
               strokeDasharray="2 5"
@@ -278,34 +377,53 @@ export function FlowCurve({
             />
           </>
         )}
-
-        {/* End cap on the live line, so the eye lands on where you are now. */}
-        <circle cx={x(points.at(-1)!.day)} cy={y(points.at(-1)!.thisMinor)} r="3" fill="var(--brass)" />
       </svg>
 
-      {/* The figure, pinned to the point it describes. Follows the hover and
-          rests on today otherwise. */}
-      {(() => {
-        const at = active ?? points.at(-1)!;
-        const left = (x(at.day) / W) * 100;
-        return (
-          <span
-            className="absolute -translate-x-1/2 -translate-y-full pointer-events-none whitespace-nowrap rounded-md px-2 py-1"
-            style={{
-              left: `${Math.min(92, Math.max(8, left))}%`,
-              top: `${(y(at.thisMinor) / H) * 100}%`,
-              marginTop: '-10px',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <span className="micro block leading-none">
-              {active ? dayLabel(at.date) : `Day ${at.day} · today`}
-            </span>
-            <span className="num text-[12px] font-semibold">{formatINR(at.thisMinor)}</span>
+      {/*
+        Points are HTML, not SVG circles: the plot stretches to its box, which
+        would squash a circle into an ellipse. Today's point breathes, in the
+        same slow pulse as the header's live dot — the one point on the line
+        that is still true only for now. Everything behind it is settled, and
+        still. A month that is over has no live point.
+      */}
+      <span
+        aria-hidden
+        className={`absolute w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none ${live ? 'pulse-dot' : ''}`}
+        style={{ left: `${pctX(today.day)}%`, top: `${pctY(today.thisMinor)}%`, background: 'var(--brass)' }}
+      />
+      {active && active !== today && (
+        <span
+          aria-hidden
+          className="absolute w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none"
+          style={{
+            left: `${pctX(active.day)}%`,
+            top: `${pctY(active.thisMinor)}%`,
+            background: 'var(--brass)',
+            border: '2px solid var(--surface)',
+          }}
+        />
+      )}
+
+      {/* The figure, pinned to the point it describes — on a wide screen.
+          Follows the hover and rests on today otherwise. */}
+      <span
+        className={`${names ? 'hidden sm:block' : ''} absolute -translate-x-1/2 -translate-y-full pointer-events-none whitespace-nowrap rounded-md px-2 py-1`}
+        style={{
+          left: `${Math.min(92, Math.max(8, pctX(at.day)))}%`,
+          top: `${pctY(at.thisMinor)}%`,
+          marginTop: '-12px',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <span className="micro block leading-none">{dayName(at)}</span>
+        <span className="num text-[12px] font-semibold">{formatINR(at.thisMinor)}</span>
+        {names && hasPrev && (
+          <span className="num text-[11px] muted block leading-tight">
+            {names.previous.slice(0, 3)} {formatINR(at.prevMinor)}
           </span>
-        );
-      })()}
+        )}
+      </span>
 
       {/* The handle on the month's end. A generous target of its own, so a
           finger on it drags and a finger anywhere else still scrolls. */}
@@ -319,12 +437,13 @@ export function FlowCurve({
           aria-valuetext={`${formatINR(tryRate ?? paceRate)} a day`}
           className="absolute w-9 h-9 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ns-resize rounded-full focus-visible:outline-2"
           style={{
-            left: `${(x(monthDays) / W) * 100}%`,
-            top: `${(y(Math.min(max, planEnd)) / H) * 100}%`,
+            left: `${pctX(monthDays)}%`,
+            top: `${pctY(Math.min(max, planEnd))}%`,
             touchAction: 'none',
           }}
           onPointerDown={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             e.currentTarget.setPointerCapture(e.pointerId);
             dragging.current = true;
             drag(e.clientY);
@@ -356,7 +475,7 @@ export function FlowCurve({
       {/* Five stops rather than two ends — "Day 14" is a place, "1 … 30" is a
           range you have to measure against. */}
       <div className="flex justify-between mt-2">
-        {axisDays(monthDays, points.at(-1)!.day, dated ? points[0].date : undefined).map((d) => (
+        {axisDays(monthDays, today.day, dated ? points[0].date : undefined).map((d) => (
           <span
             key={d.day}
             className="micro"

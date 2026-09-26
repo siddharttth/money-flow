@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { currentMonth, monthLabel, monthRange, shiftMonth, todayISO } from '@/lib/dates';
@@ -30,7 +30,7 @@ import { CategoryBubbles, FlowCurve } from '@/components/graph';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { NavIcon } from '@/components/icons';
-import { CountMoney, useFreshKeys, useGrowClass, usePulseOnChange } from '@/components/motion';
+import { CountMoney, useFreshKeys, useFreshMonth, useGrowClass, usePulseOnChange } from '@/components/motion';
 import {
   ActiveGoalCard,
   AllocationBar,
@@ -86,6 +86,21 @@ export default function DashboardPage() {
   const net = peers.data?.netMinor ?? 0;
   const monthName = monthLabel(month).split(' ')[0];
 
+  /*
+   * The first look at a new month: the hero counts up once, a touch more
+   * deliberately than a change does, and a "New month" label shows beside
+   * the title for a moment. A real transition — a new tracking period — that
+   * used to pass without a word.
+   */
+  const freshMonth = useFreshMonth(month);
+  const [freshLabel, setFreshLabel] = useState(false);
+  useEffect(() => {
+    if (!freshMonth) return;
+    setFreshLabel(true);
+    const timer = setTimeout(() => setFreshLabel(false), 3300);
+    return () => clearTimeout(timer);
+  }, [freshMonth]);
+
   /* How far through the month's total budget the spending is — the one
      number the header pill needs, and already on screen in Budgets. */
   const budgetPace = useMemo(() => {
@@ -126,7 +141,14 @@ export default function DashboardPage() {
             />
             <span className="micro">Active ledger pulse</span>
           </div>
-          <h1 className="text-[28px] font-bold tracking-tight leading-tight">{monthLabel(month)}</h1>
+          <h1 className="text-[28px] font-bold tracking-tight leading-tight flex items-center gap-3 flex-wrap">
+            {monthLabel(month)}
+            {freshLabel && (
+              <span role="status" className="fresh-month badge badge-good text-[11px]">
+                New month
+              </span>
+            )}
+          </h1>
           <p className="muted text-[13px] mt-0.5">
             Day {f?.pace.elapsedDays ?? '—'} of {f?.pace.monthDays ?? '—'} · pace and liquid overview
           </p>
@@ -200,7 +222,7 @@ export default function DashboardPage() {
                       style={{ color: t.inHandMinor < 0 ? 'var(--rule-red)' : 'var(--hi)' }}
                     >
                       {t.inHandMinor < 0 && '−'}
-                      <CountMoney minor={Math.abs(t.inHandMinor)} />
+                      <CountMoney minor={Math.abs(t.inHandMinor)} intro={freshMonth} />
                     </span>
                     <span className="muted text-[12px]">liquid</span>
                   </div>
@@ -277,7 +299,12 @@ export default function DashboardPage() {
             <CardSection className="flex-1 flex flex-col">
               <div className="mb-4">
                 <h2 className="text-[15px] font-semibold tracking-tight">Cumulative spend trajectory</h2>
-                <p className="muted text-[12px] mt-0.5">This month against the same days of last month</p>
+                {/* Promises a comparison only when last month has something in it. */}
+                <p className="muted text-[12px] mt-0.5">
+                  {f?.cumulative.some((p) => p.prevMinor > 0)
+                    ? 'This month against the same days of last month'
+                    : 'Spending added up, day by day'}
+                </p>
               </div>
               {f && f.cumulative.length >= 2 ? (
                 <FlowCurve
@@ -285,6 +312,11 @@ export default function DashboardPage() {
                   points={f.cumulative}
                   monthDays={f.pace.monthDays}
                   height={230}
+                  live={f.isCurrentMonth}
+                  names={{
+                    current: monthLabel(f.month).split(' ')[0],
+                    previous: monthLabel(shiftMonth(f.month, -1)).split(' ')[0],
+                  }}
                   whatIf={
                     f.isCurrentMonth
                       ? {
