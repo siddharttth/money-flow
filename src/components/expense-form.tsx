@@ -6,6 +6,7 @@ import { api, RequestError } from '@/lib/client';
 import { todayISO } from '@/lib/dates';
 import type { Category, Expense, Person } from '@/lib/types';
 import { ChipRow } from './ui';
+import { PersonPicker } from './person-picker';
 import { formatINR } from '@/lib/money';
 import { Icon, resolveIcon } from '@/components/icons';
 import Link from 'next/link';
@@ -273,33 +274,28 @@ export function ExpenseForm({
       {!isIncome && (
         <div>
           <span className="label">Person</span>
-          <ChipRow>
-            {people.map((p) => (
+          <PersonPicker
+            people={people}
+            selectedIds={personIds}
+            onSelect={selectPerson}
+            onCreated={(p) => {
+              setPersonTouched(true);
+              setPersonIds((prev) => (multi ? [...prev, p.id] : [p.id]));
+            }}
+            extra={
+              /* Splitting across people is rare, so it is opt-in rather than the
+                 default behaviour every single-person entry has to work around. */
               <button
-                key={p.id}
                 type="button"
                 className="chip"
-                data-selected={personIds.includes(p.id)}
-                onClick={() => selectPerson(p.id)}
-                style={personIds.includes(p.id) ? { background: p.color, borderColor: p.color } : undefined}
+                data-selected={multi}
+                onClick={() => setMulti((m) => !m)}
+                title="Tag several people on this one expense"
               >
-                {multi && personIds.includes(p.id) && <span aria-hidden>✓</span>}
-                {p.name}
+                {multi ? '✓ Multiple' : '＋ Multiple'}
               </button>
-            ))}
-
-            {/* Splitting across people is rare, so it is opt-in rather than the
-                default behaviour every single-person entry has to work around. */}
-            <button
-              type="button"
-              className="chip"
-              data-selected={multi}
-              onClick={() => setMulti((m) => !m)}
-              title="Tag several people on this one expense"
-            >
-              {multi ? '✓ Multiple' : '＋ Multiple'}
-            </button>
-          </ChipRow>
+            }
+          />
 
           {personIds.length > 1 && (
             <div className="mt-3">

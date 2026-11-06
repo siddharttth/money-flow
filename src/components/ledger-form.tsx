@@ -6,7 +6,7 @@ import { api, RequestError } from '@/lib/client';
 import { todayISO } from '@/lib/dates';
 import { formatINR } from '@/lib/money';
 import type { Person } from '@/lib/types';
-import { ChipRow } from './ui';
+import { PersonPicker } from './person-picker';
 
 export type LedgerEntry = {
   id: string;
@@ -187,26 +187,12 @@ export function LedgerForm({
       {!lockedPersonId && (
         <div>
           <span className="label">{direction === 'out' ? 'Who you lent it to' : 'Who you borrowed from'}</span>
-          {peers.length === 0 ? (
-            <p className="muted text-sm">Add someone on the People page first.</p>
-          ) : (
-            <ChipRow>
-              {peers.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="chip"
-                  data-selected={personId === p.id}
-                  onClick={() => setPersonId(p.id)}
-                  style={personId === p.id ? { background: p.color, borderColor: p.color, color: '#fff' } : undefined}
-                >
-                  {/* Name only. An initials disc tinted from the person's own
-                      colour disappears once the chip fills with that colour. */}
-                  {p.name}
-                </button>
-              ))}
-            </ChipRow>
-          )}
+          <PersonPicker
+            people={peers}
+            selectedIds={personId ? [personId] : []}
+            onSelect={setPersonId}
+            onCreated={(p) => setPersonId(p.id)}
+          />
         </div>
       )}
 
