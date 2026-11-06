@@ -236,6 +236,31 @@ export default function DashboardPage() {
                     )}
                   </p>
                 </div>
+              ) : t ? (
+                /* Loaded, but nothing to reconcile against: no income has been
+                   logged this month. This used to fall through to the skeleton,
+                   which read as "still loading" forever. */
+                <div className="min-w-0">
+                  <span className="icon-tile icon-tile-accent mb-4">
+                    <NavIcon name="dashboard" size={20} />
+                  </span>
+                  <p className="label mb-1.5">Left in hand · {monthName}</p>
+                  <p className="text-[1.05rem] font-semibold leading-snug">No income logged for {monthName} yet</p>
+                  <p className="muted text-[12.5px] mt-1.5 leading-relaxed">
+                    Record this month&rsquo;s pay and what&rsquo;s left after spending and investing shows up here.
+                  </p>
+                  <Link href="/income" className="btn btn-primary mt-3 inline-flex">
+                    Add income
+                  </Link>
+                </div>
+              ) : plan.error ? (
+                <div className="min-w-0">
+                  <p className="label mb-1.5">Left in hand · {monthName}</p>
+                  <p className="muted text-[12.5px] leading-relaxed">Couldn&rsquo;t load this month&rsquo;s plan.</p>
+                  <button className="btn mt-3" onClick={() => plan.mutate()}>
+                    Retry
+                  </button>
+                </div>
               ) : (
                 <div>
                   <Skeleton className="h-10 w-10 rounded-xl" />
