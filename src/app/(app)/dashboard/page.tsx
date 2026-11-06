@@ -27,6 +27,7 @@ import {
   StatStrip,
 } from '@/components/ui';
 import { CategoryBubbles, FlowCurve } from '@/components/graph';
+import { MonthPicker } from '@/components/month-picker';
 import { TransactionRow } from '@/components/tx-row';
 import { useShell } from '@/components/app-shell';
 import { NavIcon } from '@/components/icons';
@@ -66,7 +67,8 @@ type PeerSummary = {
  * print, since they can no longer appear under a heading from August.
  */
 export default function DashboardPage() {
-  const month = currentMonth();
+  const nowMonth = currentMonth();
+  const [month, setMonth] = useState(nowMonth);
   const { openAdd } = useShell();
   const { start, end } = monthRange(month);
 
@@ -92,7 +94,7 @@ export default function DashboardPage() {
    * the title for a moment. A real transition — a new tracking period — that
    * used to pass without a word.
    */
-  const freshMonth = useFreshMonth(month);
+  const freshMonth = useFreshMonth(nowMonth);
   const [freshLabel, setFreshLabel] = useState(false);
   useEffect(() => {
     if (!freshMonth) return;
@@ -143,17 +145,19 @@ export default function DashboardPage() {
           </div>
           <h1 className="text-[28px] font-bold tracking-tight leading-tight flex items-center gap-3 flex-wrap">
             {monthLabel(month)}
-            {freshLabel && (
+            {freshLabel && month === nowMonth && (
               <span role="status" className="fresh-month badge badge-good text-[11px]">
                 New month
               </span>
             )}
           </h1>
           <p className="muted text-[13px] mt-0.5">
-            Day {f?.pace.elapsedDays ?? '—'} of {f?.pace.monthDays ?? '—'} · pace and liquid overview
+            {f && !f.isCurrentMonth ? 'Full month' : `Day ${f?.pace.elapsedDays ?? '—'} of ${f?.pace.monthDays ?? '—'}`} · pace and liquid overview
           </p>
         </div>
 
+        <div className="flex items-center gap-3 self-start md:self-auto">
+        <MonthPicker month={month} onChange={setMonth} />
         {budgetPace != null && (
           <Link
             href="/analytics/month#budgets"
@@ -179,10 +183,11 @@ export default function DashboardPage() {
             </span>
           </Link>
         )}
+        </div>
       </div>
 
       {/* 0 — last month's underspend, before it evaporates. */}
-      {plan.data && <SweepCard sweep={plan.data.sweep} funds={plan.data.funds} />}
+      {plan.data && month === nowMonth && <SweepCard sweep={plan.data.sweep} funds={plan.data.funds} />}
 
       {/*
         TWO COLUMNS, FROM xl UP.
