@@ -78,6 +78,7 @@ function PeopleHub() {
     name?: string;
   }>(params.get('settle') ? { direction: 'in', personId: params.get('settle')!, settleMinor: 0 } : null);
   const [addingPerson, setAddingPerson] = useState(false);
+  const [removing, setRemoving] = useState<null | { id: string; name: string; busy: boolean }>(null);
 
   const people = useSWR<{ items: Person[] }>('/api/people');
   const stats = useSWR<{ people: PersonStat[]; grandTotalMinor: number }>(`/api/analytics/people?month=${month}`);
@@ -104,6 +105,20 @@ function PeopleHub() {
   }, [people.data, stats.data, peers.data, filter]);
 
   const maxSpend = Math.max(1, ...rows.map((r) => r.spendMinor));
+
+  async function removePerson() {
+    if (!removing) return;
+    setRemoving({ ...removing, busy: true });
+    try {
+      const res = await api.del<{ message?: string }>(`/api/people/${removing.id}`);
+      await refresh();
+      toast(res.message ?? 'Removed');
+    } catch (e) {
+      toast(e instanceof RequestError ? e.message : 'Could not remove that person');
+    } finally {
+      setRemoving(null);
+    }
+  }
 
   async function refresh() {
     await mutate((k) => typeof k === 'string' && k.startsWith('/api/'), undefined, { revalidate: true });
@@ -398,7 +413,7 @@ function PeopleHub() {
           <>
             {/* Column headings earn their place only once there is a table. */}
             <div
-              className="hidden sm:grid grid-cols-[minmax(0,1fr)_11rem_8rem_6rem] gap-4 px-4 py-2.5 border-b"
+              className="hidden sm:grid grid-cols-[minmax(0,1fr)_11rem_8rem_8rem] gap-4 px-4 py-2.5 border-b"
               style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}
             >
               <span className="micro">Contact</span>
@@ -435,7 +450,7 @@ function PeopleHub() {
                         : undefined
                     }
                   >
-                    <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_8rem_6rem] sm:gap-4 sm:items-center">
+                    <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_8rem_8rem] sm:gap-4 sm:items-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <PersonMark name={person.name} color={person.color} size={38} state={state} />
                         <div className="min-w-0 flex-1">
@@ -451,6 +466,19 @@ function PeopleHub() {
                           </p>
                         </div>
 
+                        {!person.isSelf && (
+                          <button
+                            type="button"
+                            className="sm:hidden w-8 h-8 shrink-0 flex items-center justify-center rounded-full text-[15px] leading-none muted"
+                            aria-label={`Remove ${person.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRemoving({ id: person.id, name: person.name, busy: false });
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
                         {/* On a phone the balance rides up next to the name. */}
                         <span className="sm:hidden shrink-0 text-right">
                           <Money minor={spendMinor} className="text-[13.5px] font-semibold block" />
@@ -507,7 +535,7 @@ function PeopleHub() {
                         )}
                       </div>
 
-                      <div className="hidden sm:flex justify-end">
+                      <div className="hidden sm:flex justify-end items-center gap-2">
                         {balanceMinor !== 0 && !person.isSelf ? (
                           <button
                             className="btn-pill"
@@ -536,6 +564,20 @@ function PeopleHub() {
                           <span aria-hidden className="micro">
                             —
                           </span>
+                        )}
+                        {!person.isSelf && (
+                          <button
+                            type="button"
+                            className="w-7 h-7 flex items-center justify-center rounded-full text-[15px] leading-none muted hover:!text-[var(--rule-red)]"
+                            aria-label={`Remove ${person.name}`}
+                            title={`Remove ${person.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRemoving({ id: person.id, name: person.name, busy: false });
+                            }}
+                          >
+                            ✕
+                          </button>
                         )}
                       </div>
                     </div>
@@ -606,6 +648,33 @@ function PeopleHub() {
               toast(ledgerFor.settleMinor !== undefined ? 'Settled up' : 'Ledger updated');
             }}
           />
+        )}
+      </Modal>
+
+      <Modal open={!!removing} onClose={() => setRemoving(null)} title="Remove person">
+        {removing && (
+          <div className="space-y-4">
+            <p className="text-[14px] leading-relaxed">
+              Remove <strong>{removing.name}</strong> from your people?
+            </p>
+            <p className="muted text-[12.5px] leading-relaxed">
+              If they appear on past entries they are hidden, not erased, so your totals stay the same. If
+              they have nothing attached they are deleted. Anyone with an open balance has to be settled first.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button className="btn" onClick={() => setRemoving(null)} disabled={removing.busy}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ background: 'var(--rule-red)', borderColor: 'var(--rule-red)' }}
+                onClick={removePerson}
+                disabled={removing.busy}
+              >
+                {removing.busy ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
 
